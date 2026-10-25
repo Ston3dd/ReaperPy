@@ -1,0 +1,71 @@
+ReaperPy
+========
+
+ReaperPy itself is released under the MIT License (see LICENSE).
+
+It builds on ideas, file-format knowledge and protocol details from the projects below.  ReaperPy's code is its own
+implementation; no source files were copied unchanged.  Where a part follows the original in content, the file header
+says so.
+
+ps5debug-NG payload
+-------------------
+  Author:   OSR (OpenSourcereR); maintained and extended by Pharaoh2k (with EchoStretch and Sonic-Iso)
+  Source:   https://github.com/Pharaoh2k/ps5debug-NG
+  License:  GNU General Public License v3.0
+
+  ReaperPy is a client for this payload and cannot do anything on the console without it.  It talks to the payload over
+  TCP (command port 744, debugger back channel 755, kernel log 3232) according to PROTOCOL.md (v1.3.2) and uses its
+  commands for process memory, scans, the debugger, disassembly, function calls and on-screen notifications.
+  No source code, binaries or other files of ps5debug-NG are part of ReaperPy; the payload is a separate program that you
+  load onto your console yourself and that stays under its own license (GPL-3.0).  ReaperPy only implements the client
+  side of the published wire protocol.
+
+  ps5debug-NG itself is inspired by "ps5debug" by Ctn and SiSTRo and builds on "ps4debug" by jogolden, and it uses the
+  ps5-payload-sdk by John Toernblom (https://github.com/ps5-payload-dev/sdk).  Thanks to all of them: without their
+  work there would be no protocol to write a client for.
+
+PS5Debug-studio
+---------------
+  Author:   alfizari
+  Source:   https://github.com/alfizari/PS5Debug-studio
+  License:  Apache License 2.0  (text: licenses/Apache-2.0.txt)
+
+  ReaperPy has its own architecture and its own code.  From PS5Debug-studio only a few tweaks (small ideas and
+  format/protocol details, no code) were taken over:
+    cheatfmt.py         SHN XML layout (Trainer/Cheat/Cheatline); .mc4 = SHN + AES-256-CBC + base64 with the publicly
+                        known mc4 key/IV; file names TITLEID_VERSION.ext
+    ps5_more.py         call trampoline (stack offset for PROC_CALL), layout of the FOREGROUND (0xBDDD0006),
+                        WRITE_MULTI (0xBDAACC04) and PTRSCAN (0xBDAACC30) commands
+    ptrscan_server.py   "the console scans level by level" method (backwards breadth-first search)
+    logger.py           idea: log function calls through a code cave
+    tools_extra_gui.py  idea: function caller / function logger as separate tabs
+
+  Changes against the original (Apache-2.0 section 4b): everything was rewritten in Python and built into ReaperPy's
+  own architecture (tabs, backend, patch engine).
+
+ps4-unreal-dumper
+-----------------
+  Author:   TetzkatLipHoka  (uediff/peek: Stoned)
+  Source:   https://github.com/TetzkatLipHoka/ps4-unreal-dumper
+  License:  MIT
+
+  The UE features of ReaperPy read the output of this dumper (dump.bin, dump.json, dump.bin.engine.json,
+  SDK/offsets.json, SDK/GObjects.txt, SDK/SDK_HEADERS/*).  Calling a UFunction through ProcessEvent (ue_call.py)
+  follows the method of `uecall`.  No code was copied - only formats and approach.  Dumper-7 (Encryqed) is the basis of
+  the object model there.
+
+Debugger behaviour
+------------------
+  debugger.py re-implements the stop / continue / step flow (server-managed breakpoint step, live-register check after
+  a hit, deferred breakpoint removal while stopped) in ReaperPy's own code.  It was modelled on the observable
+  behaviour of the closed-source "PS5 Debug Toolkit"; no code, assets or binaries of that program are included.
+
+Third-party packages (installed with pip, not part of this repository)
+----------------------------------------------------------------------
+  capstone         BSD-3-Clause   disassembler
+  keystone-engine  GPL-2.0        assembler
+  Pillow           HPND           images (icon, splash screen)
+
+  IMPORTANT for binary builds: build_exe.bat / ReaperPy.spec (PyInstaller) bundle these packages into the EXE.  The
+  source repository does not contain them, but a distributed EXE does.  keystone-engine is GPL-2.0: before you
+  distribute a build, check what that means for the whole bundle (this is not legal advice).

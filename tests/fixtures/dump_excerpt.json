@@ -1,0 +1,53 @@
+{
+ "host": "192.168.137.2",
+ "pid": 89,
+ "name": "eboot.bin",
+ "path": "/app0/eboot.bin",
+ "title_id": "PPSA23126",
+ "time": "2026-10-13 17:31:33",
+ "regions": [
+  {
+   "name": "executable",
+   "start": 4194304,
+   "end": 106397696,
+   "prot": 5,
+   "offset": 0
+  },
+  {
+   "name": "executable",
+   "start": 106397696,
+   "end": 137166848,
+   "prot": 1,
+   "offset": 102203392
+  },
+  {
+   "name": "executable",
+   "start": 137166848,
+   "end": 138330112,
+   "prot": 3,
+   "offset": 132972544
+  },
+  {
+   "name": "executable",
+   "start": 139378688,
+   "end": 142622720,
+   "prot": 3,
+   "offset": 134135808
+  },
+  {
+   "name": "libc.prx",
+   "start": 2147483648,
+   "end": 2148630528,
+   "prot": 5,
+   "offset": 137379840
+  },
+  {
+   "name": "libc.prx",
+   "start": 2148630528,
+   "end": 2149138432,
+   "prot": 1,
+   "offset": 138526720
+  }
+ ],
+ "holes": []
+}

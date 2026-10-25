@@ -1,0 +1,12 @@
+Fix-Paket ReaperPy (Stand 19.10.)
+
+Dateien in den ReaperPy-Ordner kopieren (alte ersetzen), tests\* nach tests\.
+LOESCHEN: tools_ueeasy_gui.py sowie test_ue_autofind.py / test_ue_gas.py / test_ue_promising.py im Hauptordner.
+
+tools_common.py : tree(..., actions=, details=) (Rechtsklick-Menue), row_properties()
+tools_gui.py    : UE-EINFACH entfernt (ersetzt durch UE-LIVE), jeder Zusatz-Tab wird einzeln geladen
+ps5_client.py   : call_function(rip, args, stub)  (CMD_PROC_CALL 0xBDAA0006)
+ps5_ext.py      : InterruptListener: Windows-Fallback bei TIME_WAIT, Port wird beim Schliessen sofort frei
+debugger.py     : DebugSession(listener_port=, client=): Rueckkanal zuerst binden, "bereits debuggt" wird
+                  automatisch geloest, Timeout-Hinweis auf Firewall, Hauptverbindung ausleihbar
+tests/          : test_ue_quick.py an v5.8 angepasst, drei neue UE-Tests

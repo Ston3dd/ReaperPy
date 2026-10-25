@@ -1,0 +1,103 @@
+ReaperPy 5.7.0 - Sammel-Update (alle Aenderungen seit UPGRADE_NOTES_v4_6)
+===================================================================
+Entpacken in den ReaperPy-Ordner (Dateien ueberschreiben, tests\ nach tests\, assets\ nach assets\).
+
+NEU / GEAENDERT IN DIESER RUNDE
+ 1. Stellar-Blade-Tab entfernt (tools_gui.py).  Die Dateien tools_sb_gui.py, sb_hook.py, sb_live.py, sb_profile.py bleiben
+    liegen: sb_live wird vom Entdecker zum Tabellen-Lesen gebraucht.  tools_sb_gui.py und sb_hook.py kannst du loeschen,
+    wenn du die alten SB-Tests (tests\test_gui_sb.py, test_sb*.py) ebenfalls loeschst.
+ 2. DEBUGGER (Verbindungsabbruch nach dem Attach)
+    Ursache NICHT sicher bekannt (kein Zugriff auf deine PS5).  Wahrscheinlichster Kandidat: Die Debug-Verbindung ist nach dem
+    Attach still - nur die Haupt-Verbindung wurde regelmaessig angepingt.  Jetzt:
+      * Keep-Alive-Ping auf der Debug-Verbindung (alle 2 s).
+      * Faellt sie aus: eigene Verbindung neu aufbauen, neu attachen, Breakpoints/Watchpoints wiederherstellen
+        (Label zeigt "Verbindung wird neu aufgebaut ..."; schlaegt das fehl: "Verbindung verloren - DETACH, dann neu attachen").
+      * Der Waechter des Hauptfensters pausiert, solange der Debugger attacht/attached ist, und verlangt 3 verpasste Pings
+        statt 1, bevor er "Verbindung verloren" meldet.
+      * Selbsttest nach dem Attach (nach 0,5 s und 3 s) im Log: "Debug-Verbindung OK/ANTWORTET NICHT, Haupt-Verbindung ...,
+        Rueckkanal steht/fehlt".  FALLS ES WEITER ABBRICHT: bitte diese Selbsttest-Zeilen und das Log schicken - sie zeigen,
+        welche Verbindung faellt.
+ 3. AUTOMATISCHE CODE-ERKENNUNG (autocodes.py + gui.py)
+    Beim Verbinden (und wenn das Spiel neu gestartet wurde) wird die Titel-ID des Vordergrund-Spiels gelesen und in deiner
+    Bibliothek/deinem Projekte-Ordner nach Codes (Patch-Dateien) dazu gesucht.  Gefunden: Codes werden geladen.  Keine Codes:
+    Liste bleibt leer (ein Projekt eines ANDEREN Spiels wird geschlossen; ein Projekt ohne erkennbare Titel-ID bleibt).
+    Abschaltbar: "auto_codes": false in der Konfiguration.
+ 4. ICON + STARTBILDSCHIRM (branding.py, icon_art.py, icon_data.py, assets\)
+    Neues Icon (Ring mit "R" und Sichel), als Fenster-Icon und im Startbildschirm; assets\reaperpy.ico fuer Windows/Exe.
+    Abschaltbar: "splash": false in der Konfiguration oder Umgebungsvariable REAPERPY_NO_SPLASH=1.
+ 5. BEDIENUNG FUER EINSTEIGER (tools_start_gui.py, tools_ctx.py, tools_gui.py)
+    * Neuer Tab START: Klartext-Status (verbunden? Codes?) und drei Schritte mit grossen Knoepfen.
+    * Einfache Tabs vorn: WERT SUCHEN, CHEATS BEARBEITEN, ★ UE-LIVE, ★ UE-ENTDECKER.
+    * Alles Spezielle im Tab FORTGESCHRITTEN (eigene Reiter): SPEICHER, DISASSEMBLER, POINTER, KONVERTER, AOB / UPDATE,
+      DEBUGGER, KERNEL-LOG, PYTHON-SKRIPT, FUNKTION AUFRUFEN, FUNKTIONS-LOGGER, JOURNAL / UNDO, UE-AUTO.
+    * Rechtsklick-Menues ueberall: Listen (Zeile/Zelle/alles als CSV kopieren, Adresse im Speicher/Disassembler oeffnen),
+      Eingabefelder (Ausschneiden/Kopieren/Einfuegen/...), Logs (Kopieren, Leeren, Speichern), Cheat-Karten im Hauptfenster
+      (Aktivieren/Deaktivieren, Info, Namen kopieren, Patch-Datei im Ordner zeigen).  Listen mit eigenem Menue behalten es.
+ 6. ENGLISCH FUER DIE WERKZEUGE (tools_i18n.py, tools_i18n_en.py)
+    Schaltest du im Hauptfenster auf EN, werden alle Werkzeug-Tabs mitgeschaltet (Beschriftungen, Reiter, Tabellenkoepfe,
+    Statuszeilen, Log, Dialoge), auch bei bereits offenem Fenster; zurueck auf DE stellt alles wieder her.  Etwa 900 Texte
+    uebersetzt.  tests\test_tools_i18n.py scheitert, wenn ein neuer deutscher Text im Tab keine Uebersetzung hat.
+    Grenzen: Auswahllisten (Combobox-Eintraege) und Texte in grossen Hilfe-Textfeldern bleiben in der Originalsprache.
+
+NEU (letzte Runde): ACCESS GRANTED / ACCESS DENIED beim Verbinden (hackfx.py)
+    Klick auf VERBINDEN: Gelingt es, poppt ~3 Sekunden ein gruenes "ACCESS GRANTED" im Hacker-Stil auf (Matrix-Regen,
+    Schreibmaschine, kurzes Glitch-Flackern, Ausblenden) mit Ziel und Prozess-ID.  Gelingt es nicht, kommt ein rotes
+    "ACCESS DENIED" (zitternder Rahmen) mit dem wahrscheinlichen Grund: Payload laeuft nicht / falsche IP bzw. Host nicht
+    erreichbar / keine Antwort / kein Spiel gestartet.  Klick schliesst es sofort.
+    Abschaltbar: "hack_fx": false in der Konfiguration oder Umgebungsvariable REAPERPY_NO_FX=1.
+
+FIX (Exporter, Cave-Adresse "liegt unter der Basis")
+    Ursache: Der GoldHEN-Exporter hat Padding aus ALLEN ausfuehrbaren Regionen der Konsole genommen - auch aus Regionen unter
+    der Image-Basis (Fehler "Cave-Adresse 0xffd0 liegt unter der Basis 0x400000") und aus fremden Modulen.  Im Tool selbst
+    klappt es, weil der Live-Patcher seine Cave in beschreibbarem Speicher anlegt; fuer eine feste GoldHEN-Datei muss sie
+    aber im Spiel-Image liegen.  Jetzt: Cave-Suche nur im zusammenhaengenden Spiel-Image (ab Basis, Luecken bis 1 MiB
+    erlaubt).  Findet sich dort nichts, kommt ein Fallback oberhalb der Basis mit deutlicher WARNUNG im Log/Report; sonst
+    die Meldung "Kein freier Platz fuer die Cave im Spiel-Image (ab Basis 0x400000) gefunden".
+    Ausserdem: Titel-ID, Version und Spielname werden beim Oeffnen des Export-Dialogs und beim Exportieren automatisch vom
+    laufenden Spiel geholt, wenn das Feld leer ist (vorher: Datei "CUSAxxxxx_01.00.json").
+    Hinweis: Dein Export hat nur "Inf Shield" gebaut, weil das ein reiner Byte-Patch ist; "Inf Hp" und "Inf Special" sind
+    Caves und bekommen jetzt Platz im Image - ob dort genug Padding frei ist, zeigt das Log ("... Padding-Luecke(n) im
+    Spiel-Image gefunden").  Bitte neu exportieren und das Log schicken, falls es weiter Fehler gibt.
+
+SCANNER-ANZEIGE: Adressen in der Ergebnisliste und der Cheat-Liste stehen jetzt als 0x7F12A4 statt 00000000007F12A4.
+
+CHEAT-LISTE (Hauptfenster)
+    * Suchfeld, Gruppen-Filter und "nur Favoriten" ueber der Liste.
+    * Rechtsklick auf eine Karte: Favorit (★, steht dann oben), Gruppe setzen, Hotkey setzen/entfernen (zusaetzlich zu
+      Aktivieren, Info, Namen kopieren, Datei zeigen).
+    * Hotkeys: F-Taste oder Strg/Alt + Taste; doppelt belegte, Windows-Standard-Kombinationen (Strg+C ...) und blanke
+      Buchstaben sind gesperrt; beim Tippen in Textfeldern loesen sie nicht aus; Tastenwiederholung wird ignoriert.
+      Sie gelten NUR, solange das ReaperPy-Fenster im Vordergrund ist (keine systemweiten Hotkeys).
+
+SPIEL-PROFILE (profiles\<TITEL-ID>.json)
+    Je Spiel gemerkt: Favoriten, Gruppen, Hotkeys, Filter, Notizen (Tab START) und die letzte Entdecker-Analyse (ANALYSIEREN
+    nutzt sie, solange das SDK gleich ist; NEU ANALYSIEREN erzwingt eine neue).  Cheats werden ueber den DATEINAMEN
+    zugeordnet.  Eine kaputte Profildatei wird als .bad aufgehoben und durch ein leeres Profil ersetzt.
+
+LOGS
+    logs\reaperpy.log mit Rotation (1 MB, 5 Sicherungen), inkl. Tracebacks unbehandelter Fehler und Tk-Callback-Fehler.
+    Tab START: LOG-ORDNER OEFFNEN.
+
+AUFGERAEUMT
+    Entfernt: tools_sb_gui.py, sb_hook.py, sb_live.py, sb_profile.py, LIESMICH_SB.txt und die zugehoerigen SB-Tests.
+    Umbenannt: sb_trainer.py -> cave_trainer.py (tests\test_cave_trainer.py).  Neu: ue_tables.py (DataTables lesen),
+    ue_hook.py (ProcessEvent-Slots).  ALTE DATEIEN IM ORDNER LOESCHEN, sonst bleiben sie liegen (das Update loescht nichts):
+      tools_sb_gui.py  sb_hook.py  sb_live.py  sb_profile.py  sb_trainer.py  LIESMICH_SB.txt
+      tests\test_gui_sb.py  tests\test_sb.py  tests\test_sb_hook.py  tests\test_sb_trainer.py
+
+WINDOWS-PROGRAMM + UPDATES
+    * build_exe.bat baut aus ReaperPy.spec: alle Module automatisch (auch die per __import__ geladenen Tabs), Icon, assets,
+      Versionsinfo (aus version.py) und packt dist\ReaperPy_v5.7.0_win64.zip.  Ordner-Version, Konfiguration/Profile/Logs
+      liegen neben der EXE (ist der Ordner nicht beschreibbar: %APPDATA%\ReaperPy).
+    * Update-Pruefung: nur wenn du "update_url" in reaperpy_config.json auf eine JSON-Datei
+      {"version": "5.8.0", "url": "https://...", "notes": "..."} setzt.  Nur https, laedt nichts herunter, sendet nichts.
+      Hauptfenster meldet eine neue Version im Log (aus mit "auto_update_check": false); Tab START: AUF UPDATES PRUEFEN.
+    * Der EXE-Bau lief bei mir NICHT (kein Windows/PyInstaller): getestet ist nur, dass Spec/Bat/Versionsinfo
+      stimmig sind (Module, Icon, Assets, Zeilenenden).  Bitte build_exe.bat einmal ausfuehren und Fehler schicken.
+
+GETESTET / NICHT GETESTET
+ * Alle Logik per Tests (alle gruen).
+ * Die Oberflaeche (verschachtelte Reiter, Startbildschirm, Rechtsklick-Menues, Umschalten der Sprache im offenen Fenster)
+   lief in meiner Umgebung NUR gegen Fake-Widgets - nie mit echtem Tk und nie an der PS5.  Wenn etwas hakt: Startbild-
+   schirm abschalten (siehe oben) und mir die Fehlermeldung schicken.
+ * Debugger-Fix: siehe oben - Ursache vermutet, nicht bewiesen.

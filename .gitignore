@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Runtime data written next to the sources (see paths.py) - contains your console IP and local paths
+reaperpy_config.json
+library/
+logs/
+*.log
+
+# Build output
+build/
+dist/
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Game dumps and exports you made while testing
+dumps/
+*.reapproj.bak

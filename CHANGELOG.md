@@ -1,0 +1,57 @@
+# Changelog
+
+Older release notes (German) are in [`docs/history/`](docs/history/).
+
+## Unreleased
+
+### Added
+- **Console notifications** (`ps5_notify.py`): messages on the PS5 screen when ReaperPy connects, when a cheat is switched
+  on/off (with a "debugger attached" note while a debug session exists), and when the debugger attaches / detaches / loses the
+  connection; optional message per breakpoint hit. Bulk actions send one summary. Configurable with `ps5_notifications` and
+  `ps5_notify_hits`. The notification texts that already existed in `i18n.py` were never sent before.
+- Credits for the **ps5debug-NG** payload (OSR / Pharaoh2k, GPL-3.0) in `README.md`, `NOTICE` and the German README.
+- **CHEAT MENU tab** (`cheatmenu.py`, `tools_cheatmenu_gui.py`): switches and values for the player character, built from the
+  SDK. Works without a CheatManager (shipping builds): engine values (`bCanBeDamaged`, `MovementMode` fly, walk/fly speed,
+  jump, gravity, time dilation) and game values found by the candidate heuristic (health, stamina, ammo, money ...). Only
+  objects owned by the character are written; everything is released when the character changes.
+- **Debugger:** STEP OVER, STEP OUT and run-to (temporary breakpoints in reserved slots), detection of "console already
+  executed the instruction", step waits for the step event with a clear error if it never arrives.
+- **UE Discoverer:** every give-function is checked up front (✔ / ✗ with the reason), item name search in the table list,
+  the ID number is taken from the selected row, and a "next step" hint is shown after the analysis.
+- **Tools i18n:** drop-down lists are translated too; the code keeps receiving the original (German) values from
+  `get()`. About 450 previously untranslated texts added.
+- `LICENSE` (MIT), `NOTICE`, English `README.md`, `CHANGELOG.md`, `.gitignore`, `.gitattributes`, `reaperpy_config.example.json`.
+
+### Changed
+- **Snapshot RAM** is limited to **2048 MB** (the PS5 reports "not enough memory" from 3072 MB). The FIND VALUE drop-down
+  offers 512 / 1024 / 2048 MB, 2048 MB is the default (it was 4608 MB), and the scan log never recommends more than 2048 MB.
+- Credits: PS5Debug-studio is described as what it is (a few tweaks, no code).
+- **Debugger flow** now follows the server-managed breakpoint step: CONTINUE is a plain continue (no RIP rewind, no
+  remove/re-arm), breakpoints removed while stopped are applied on the next continue, and the keep-alive never rebuilds
+  the connection while a thread is stopped.
+- **FIND VALUE layout:** results on the left, scan controls and options on the right, address list at the bottom
+  (resizable). Same widgets and behaviour as before.
+- Build: `ReaperPy.spec` bundles `LICENSE`, `NOTICE`, `README.md` and `licenses/`.
+
+### Fixed
+- Cave allocator logs a warning when the image base lies in no memory region and falls back to regions above it; the
+  matching tests use the current API (`image_base=`, `cave_trainer.image_span`).
+- Keep-alive reconnect counted a reconnect before the state was reported (flaky test).
+
+### Removed
+- Silent Hill specific module `silent_hill_ai_profile.py`, its test, its button in the (unused) `universal_gui.py` and the
+  matching translations. `cheat_testbench.py` now names the game after the folder / ZIP instead of guessing "Palworld" or
+  "Silent Hill"; the category "Stealth / AI detection" is now the generic "AI / perception".
+- Stellar Blade specific modules and tests (`sb_*.py`, `tools_sb_gui.py`, `combine_add_items.py`); the generic replacements
+  `cave_trainer.py`, `ue_tables.py` and `ue_hook.py` were already in place.
+- Unused tabs `tools_ueeasy_gui.py` (replaced by UE-LIVE), `tools_hex_gui.py`, `tools_watch_gui.py`, `tools_rpc_gui.py`.
+- Duplicate test files in the project root, `__pycache__`, a stray empty text file, and your personal
+  `reaperpy_config.json` (console IP and local paths; the app creates a new one).
+- 285 unused entries in the English dictionary.
+
+## 5.7.0
+
+See [`docs/history/CHANGES_5.7_de.txt`](docs/history/CHANGES_5.7_de.txt) (German): keep-alive and reconnect for the debug
+connection, automatic code detection by title ID, new icon and splash screen, START tab and simple/advanced tab split,
+right-click menus everywhere, English for all tool tabs, game profiles (notes, favourites, groups, hotkeys), update check,
+PyInstaller build.

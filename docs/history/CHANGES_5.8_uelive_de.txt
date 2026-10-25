@@ -1,0 +1,26 @@
+ReaperPy 5.8 - UE-LIVE: alles live, "BESTE WERTE", GAS-Attribute (Avowed & Co.)
+
+Alle Dateien in den ReaperPy-Ordner kopieren (alte ersetzen), die drei test_*.py nach tests/.
+
+NEU: uestruct.py - automatische Erkennung von Struct-Wrappern in JEDEM UE4/UE5-SDK (PS4/PS5):
+  Ein Struct, dessen Felder alle einfache Zahlen sind (max. 4 Felder, max. 0x20 Byte, ein Feld wie Value/Current/
+  Amount), wird in Einzelfelder aufgeloest (Health.Current, Health.Max).  Engine-Mathe (FVector ...), Animation,
+  Rendering, Audio, Handles/IDs werden ausgeschlossen.  FGameplayAttributeData (GAS) ist der bekannteste Fall.
+  FFixedPoint64 (Palworld) bleibt wie bisher ein eigener Typ.  Nichts muss von Hand eingetragen werden.
+
+NEU (Avowed / jedes Spiel mit Gameplay Ability System):
+  ue_quick.py     FGameplayAttributeData (Leben, Ausdauer, Essenz, Ruestung ...) wird als zwei Werte angeboten:
+                  Health.CurrentValue (+0xC) und Health.BaseValue (+0x8).  Vorher fehlten ALLE solchen Werte,
+                  weil nur einfache Zahlentypen anklickbar waren.
+  uecheat.py      Cheat-Heuristik (nutzt uestruct) bewertet GAS-Attribute wie Zahlen ("GAS-Attribut" im Grund), kennt "immotal"/"immune".
+  ue_live.py      Instanzen: Blueprint-Vorlagen (CDO, Archetyp und deren Unterobjekte wie Default__X_C.AttributeSetCore)
+                  zaehlen nicht mehr als Objekte.  Zeilen zeigen den Besitzer ("CHA_Xaurip_C_123 > AttributeSetCore"),
+                  Zeilen mit "Player" im Namen stehen oben.  Item-Groesse von GObjects wird gegen 24/16/32/20/40 geprueft
+                  (offsets.json nennt bei Avowed 20, echt sind 24) und der beste Kandidat genommen.
+  ue_promising.py Filter fuer BESTE WERTE versteht GAS-Attribute.
+
+Frueher (bleibt drin): Live-Suche von GObjects/GNames, Member-Offsets live aus der Property-Kette, Neustart-Erkennung,
+  Knoepfe "BESTE WERTE" / "ALLE WERTE" im UE-LIVE-Tab.
+uesdk.py, dumpmem.py  optional: "#define"-Offsets aus GameDefines.hpp, nur wenn keine offsets.json da ist.
+
+Geprueft: 156 Tests (synthetische UE-Welt) und offline an der GObjects.txt + SDK_HEADERS von PPSA26136; nicht an der Konsole.

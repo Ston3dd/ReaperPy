@@ -1,0 +1,16 @@
+{
+ "projects_root": "",
+ "last_project": "",
+ "ps5_ip": "192.168.1.100",
+ "language": "en",
+ "ps5_port": 744,
+ "cave_size": 16384,
+ "image_base": "0x400000",
+ "projects": {},
+ "library_dir": "",
+ "auto_reconnect": false,
+ "tools_expert": false,
+ "update_url": "",
+ "ps5_notifications": true,
+ "ps5_notify_hits": false
+}

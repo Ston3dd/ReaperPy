@@ -1,0 +1,75 @@
+ReaperPy - UE-ENTDECKER (universell fuer jedes Unreal-Spiel)
+============================================================
+Neue Dateien: ue_profile.py, ue_cavegen.py, tools_discover_gui.py, tests\test_ue_profile.py, tests\test_ue_cavegen.py,
+              tests\test_gui_discover.py
+Geaendert:    tools_gui.py (ein Eintrag: neuer Tab "★ UE-ENTDECKER" vor "★ STELLAR BLADE"),
+              cave_trainer.py (Zeilen sind jetzt austauschbar; das Stellar-Blade-Verhalten ist unveraendert)
+
+BENUTZUNG
+  1. Tab ★ UE-LIVE: SPIEL-ORDNER waehlen (SDK laden).  Fuer die Live-Funktionen zusaetzlich mit dem Spiel verbinden.
+  2. Tab ★ UE-ENTDECKER: ANALYSIEREN.  Die Liste zeigt Vorschlaege mit Wert 0-10; Art-Filter und Suchfeld darueber.
+     Anklicken zeigt unten die Begruendung (Belege mit Offsets) und "So benutzt du es".
+  3. TABELLE DOPPELKLICKEN: Der Tabellen-Name wird automatisch ins Feld eingetragen und die Tabelle sofort live gelesen:
+     Zeilen mit Name (= Item-ID), 8-Byte-FName (hex) und den Spalten (Preis, Stack, ID ...).  Findet das Tool keine
+     eindeutig passende Tabelle, zeigt die untere Liste alle Tabellen des Spiels - dort die richtige doppelklicken.
+     (TABELLEN IM SPIEL LISTEN zeigt diese Liste jederzeit.)  TABELLE EXPORTIEREN schreibt CSV/JSON inkl. FName-Bytes.
+     Doppelklick auf Waehrung / Stat-Array / GAS-Attribute oeffnet den Member in UE-LIVE.
+  4. Item-Struct anklicken, in der Tabelle Items waehlen -> INVENTAR-EINTRAEGE SUCHEN: sucht im Speicher nach
+     (ID-Bytes + Menge).  "Menge im Spiel" eintragen macht die Suche exakt.  Bei Zahlen-IDs die ID-Zahl eintippen.
+     Treffer anklicken -> MENGE SETZEN (schreibt im Typ des Mengenfelds); Doppelklick springt in den Speicher.
+  5. BERICHT SPEICHERN (.md/.json); IN UE-LIVE OEFFNEN setzt dort die Suche auf Klasse.Member.
+
+CAVE-TRAINER FUER JEDES SPIEL  (CAVE-TRAINER EXPORTIEREN…)
+  Dieselbe statische Cave wie im Stellar-Blade-Tab (ProcessEvent-Haken im vtable, Schalter-Byte je Eintrag, ein Aufruf
+  je Klick, Ausgabe = ReaperPy-Projekt), aber der Aufruf wird aus den Parametern der gewaehlten Funktion gebaut.
+  1. Eine Zeile der Art "Geben-Funktion" anklicken (AddItem, GiveItem, AddMoney, AddXP ...).
+  2. FName-ID: TABELLE LIVE LESEN und die Items in der Tabelle anklicken.  Zahlen-ID: ID-Zahl eintippen.  Keine ID
+     (AddGold(Menge)): nur Menge.  Feld "Menge" = Wert fuer den Mengen-Parameter, "Weitere Parameter" = Name=Wert, ...
+  3. Mehrere Zeilen: JA = Paket-Eintraege (je 14 Items, "<Name> 1", "<Name> 2" ...), NEIN = je Zeile ein Eintrag.
+  4. Ordner waehlen -> Projekt (BASIS einmal aktivieren, dann Eintraege anklicken; Details in LIESMICH_TRAINER.txt).
+  Wie die Cave aufruft (System-V-ABI, wie der Exec-Thunk des Spiels):
+    rdi = this        auto: Elternklasse des PlayerControllers -> das gehookte Objekt ("hooked"); Zeiger-Member des
+                      PlayerControllers auf die Klasse (z. B. CheatManager) -> dieser Zeiger ("member", bei 0 wird der
+                      Aufruf uebersprungen); sonst 0 ("zero", Warnung).  Per Auswahl "this" ueberschreibbar.
+    rsi,rdx,rcx,r8,r9 Zahlen/Bool/Enum/Zeiger/FName in Reihenfolge;  xmm0-7 float/double
+    FName per Zeiger  Haken "FName per Zeiger (const FName&)": die Cave legt den Wert hinter ihren Code und uebergibt
+                      die Adresse (noetig, wenn die Funktion in C++ const FName& nimmt; bei Stellar Blade: per Wert)
+  Die native Implementierung wird wie im SB-Tab aus dem Exec-Thunk erkannt (Disassembler noetig).  Nicht unterstuetzt
+  (klare Meldung): Out-Parameter, Structs/Strings/Arrays als Parameter, mehr als 5 Ganzzahl- / 8 Gleitkomma-Parameter,
+  Rueckgabe-Structs, Blueprint-Funktionen ohne native Implementierung.
+  Getestet: Die Cave wird in tests\test_ue_cavegen.py auf einem echten x86-64-Prozessor ausgefuehrt (alle Register,
+  Floats in xmm, 64-Bit-Werte, Zeiger-Parameter, this hooked/member/null, mehrere Zeilen, Mischung mit der SB-Form).
+  AM ECHTEN SPIEL/PS5 NICHT GETESTET.  Die Risiken, die kein Test pruefen kann:
+   * Ob die Funktion `this` benutzt und woher die Instanz kommt (this-Hinweis im Log lesen!).  this=0 bei einer Funktion,
+     die this benutzt, stuerzt ab.
+   * Ob ein FName in C++ per Wert oder per Referenz uebergeben wird (Haken oben).  Falsch geraten -> Absturz beim Klick.
+   * Alle Annahmen des Stellar-Blade-Exports (Schalter-Bereich, absolute Adressen, FName-Stabilitaet) gelten ebenso.
+   * Vorher speichern; beim ersten Versuch einen harmlosen Eintrag (kleine Menge) nehmen.
+
+WAS ERKANNT WIRD (alles aus dem SDK, ohne Spiel-spezifische Namen)
+  Stat-Enum / Stat-Array   Enum mit Leben/Ausdauer/Mana/... (Wert = Index) und TArray<float|int> dazu
+  GAS-Attribute            FGameplayAttributeData je AttributeSet (Base +0x8, Current +0xC)
+  Item-Struct              ID-Feld (FName, Zahl, GameplayTag, RowHandle, String, Referenz) + Mengenfeld, dazu Slot-
+                           Felder (SlotIndex ...), Zusatzfelder (Haltbarkeit, Level ...) und die Klassen, die ein TArray
+                           davon halten (= das Inventar).  Widgets/UI werden ausgeschlossen.
+  Tabellen                 Zeilenstructs (FTableRowBase) mit Rolle (Items, Shop/Preise, Loot, Rezepte, Skills, Quests,
+                           Gegner, Waehrung, Dialog), ID-Spalten, Halter (UDataTable*/RowHandle) und - mit GObjects-Dump -
+                           die Tabellen-Objekte (Plural-Abgleich Item/Items)
+  ID-/Slot-Enums           Slot, Kategorie, Seltenheit, Waehrung (mit allen Werten)
+  Slot-Felder              SlotIndex/EquipSlot/PocketId ... mit Besitzer-Klassen
+  Geben-Funktionen         AddItem/GiveItem/AddMoney ... mit Parameter-Form (name+menge, id+menge, klasse+menge ...)
+  Cheat-Manager            UCheatManager-Unterklassen, Funktionen nach Kategorie (Unverwundbar, Teleport, XP, Items ...)
+  Waehrung                 Zahlen-Member wie Gold/Money/Coins
+
+GRENZEN / NICHT GETESTET
+  * Alles sind Vorschlaege aus Namen und Typen.  Ein Spiel mit ganz eigenen Namen kann leer ausgehen; dann steht ein
+    Hinweis in der Liste, und UE-LIVE (Wert anklicken) bleibt der Weg.
+  * Getestet nur mit synthetischen SDKs (ARPG mit FName-IDs, Spiel mit Zahlen-IDs, GAS, leeres Spiel) und einem
+    Fake-Speicher.  AM ECHTEN SPIEL/PS5 NICHT GETESTET.  Prueft bitte an einem zweiten echten Spiel und schickt Beispiele,
+    wo etwas fehlt oder falsch einsortiert ist.
+  * TABELLE LIVE LESEN nutzt dieselbe RowMap-Erkennung wie der Stellar-Blade-Tab (Stride 24: FName + Zeiger + Hash).
+    Aeltere Engines (vor UE 4.23, TNameEntryArray) werden von UE-LIVE nicht unterstuetzt.
+  * Die Menge zu setzen aendert nur den Zahlenwert im Speicher.  Hat das Spiel eine zweite Kopie (Speicherstand/UI),
+    Inventar neu oeffnen.  Vorher speichern.
+  * Items live GEBEN (Funktionsaufruf auf dem Spiel-Thread) gibt es weiter nur im Stellar-Blade-Tab; fuer andere Spiele
+    baut der Entdecker den Cave-Trainer (siehe oben).
