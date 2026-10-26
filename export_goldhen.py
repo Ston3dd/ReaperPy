@@ -540,6 +540,11 @@ def _gui_dialog():
                       "werden live aus dem Spiel gelesen.")
             if not gid and getattr(app.backend, "client", None) is not None:
                 self.after(300, self.detect_game)           # Titel-ID/Version/Name automatisch eintragen
+            try:
+                import tools_i18n
+                tools_i18n.apply_to(self)                   # EN-Modus: Beschriftungen, Knoepfe, Titel
+            except Exception:
+                pass
 
         def do_import(self):
             import gh_import
@@ -594,6 +599,11 @@ def _gui_dialog():
 
         # -- Hilfen ------------------------------------------------------
         def _say(self, msg, tag=None):
+            try:
+                import tools_i18n
+                msg = tools_i18n.translate(msg)
+            except Exception:
+                pass
             self.out.insert("end", msg + "\n", tag or ())
             self.out.see("end")
 

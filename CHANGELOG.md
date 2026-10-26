@@ -5,6 +5,17 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 ## Unreleased
 
 ### Added
+- **Cheat menu: right-click -> build matching code cave** (`cheatmenu_cave.py`, `tools_cheatmenu_gui.py`). Finds the instructions
+  that write the selected value (from the game folder's `dump.bin`, otherwise read live from the console), picks the best hit
+  and saves a `.reapproj` in the project's patch folder. Cave types: *Value cannot decrease*, *Fix value* (new,
+  `ue_instr.force_cave_patch`) and *NOP*. "Choose hit" lists all hits with the reasons why a cave is or is not possible.
+  Offsets below 0x80 are refused (search would be unreliable). Applies to ALL objects using that code (enemies too).
+
+### Fixed
+- English mode: the GoldHEN/etaHEN export dialog, the status line ("connected"), the main log and about 250 error messages
+  from the modules were still German. New windows are now translated automatically (`tools_i18n.install_toplevel_hook`).
+- The English dictionary failing to load is no longer silent: a warning appears in the log.
+
 - **Console notifications** (`ps5_notify.py`): messages on the PS5 screen when ReaperPy connects, when a cheat is switched
   on/off (with a "debugger attached" note while a debug session exists), and when the debugger attaches / detaches / loses the
   connection; optional message per breakpoint hit. Bulk actions send one summary. Configurable with `ps5_notifications` and

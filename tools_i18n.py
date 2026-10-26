@@ -18,15 +18,24 @@ _EN = None
 MIN_FRAGMENT = 4
 
 
+LOAD_ERROR = ""          # Text des Fehlers, falls tools_i18n_en nicht geladen werden konnte
+
+
 def _dict():
-    global _EN
+    global _EN, LOAD_ERROR
     if _EN is None:
         try:
             from tools_i18n_en import EN
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             EN = {}
+            LOAD_ERROR = f"{e.__class__.__name__}: {e}"      # sichtbar machen statt still alles deutsch zu lassen
         _EN = EN
     return _EN
+
+
+def status():
+    """-> (Anzahl Woerterbuch-Eintraege, Fehlertext) - leer/0 heisst: Englisch faellt still auf Deutsch zurueck."""
+    return len(_dict()), LOAD_ERROR
 
 
 def set_lang(lang):
@@ -229,6 +238,25 @@ def install_var_hook(var_cls):
     if orig_get is not None:
         var_cls.get = get_
     var_cls._i18n_hooked = True
+
+
+def install_toplevel_hook(tk_mod):
+    """Jedes neue Fenster (Export-Dialog, Auswahl-Dialoge ...) wird im EN-Modus nach dem Aufbau uebersetzt.  Idempotent."""
+    top = tk_mod.Toplevel
+    if getattr(top, "_i18n_hooked", False):
+        return
+    orig = top.__init__
+
+    def init(self, *a, **kw):
+        orig(self, *a, **kw)
+        if LANG == "en":
+            for ms in (60, 400, 1500):                    # die Widgets entstehen erst nach __init__
+                try:
+                    self.after(ms, lambda: apply_to(self) if self.winfo_exists() and LANG == "en" else None)
+                except Exception:  # noqa: BLE001
+                    break
+    top.__init__ = init
+    top._i18n_hooked = True
 
 
 def install_combobox_hook(ttk_mod):

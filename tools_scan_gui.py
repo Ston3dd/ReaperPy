@@ -72,6 +72,7 @@ class ScanTab(BaseTab):
         button(r1b, "ABBRECHEN", self.cancel).pack(side="left", padx=2)
         button(r1b, "NEUER SCAN", self.new_scan).pack(side="left", padx=2)
         button(r1b, "SELBSTTEST", self.selftest).pack(side="left", padx=2)
+        button(r1b, "REGIONEN-BERICHT", self.region_report).pack(side="left", padx=2)
 
         r3 = tk.Frame(right, bg=BG); r3.pack(fill="x", pady=(8, 0))
         self.pb = ttk.Progressbar(r3, orient="horizontal", mode="determinate", length=300, maximum=100)
@@ -531,6 +532,30 @@ class ScanTab(BaseTab):
     # ------------------------------------------------------------------
     # Selbsttest
     # ------------------------------------------------------------------
+    def region_report(self):
+        """Alle Speicherregionen des Spiels (Name, Groesse, Rechte) in die Datei regionen_<PID>.txt schreiben."""
+        def job():
+            import os
+            import paths
+            import ps5_ext
+            import regionreport
+            cl = self.win.app.backend.client
+            if cl is None or cl.pid is None:
+                raise RuntimeError("nicht verbunden - im Hauptfenster VERBINDEN")
+            text = regionreport.report(ps5_ext.maps_named(cl))
+            path = os.path.join(paths.data_dir(), f"regionen_{cl.pid}.txt")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+            return path, text
+
+        def ok(res):
+            path, text = res
+            for line in text.splitlines()[:12]:
+                self.log(line)
+            self.log(f"Regionen-Bericht gespeichert: {path}", "ok")
+
+        self.win.bg(job, ok, lambda e: self.log(f"Regionen-Bericht: {e}", "err"))
+
     def selftest(self):
         """Kleiner Scan über 1 MB: prüft Verbindung, Auth, Turbo, Ergebnis-Abruf."""
         if self.running:

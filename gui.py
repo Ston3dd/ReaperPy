@@ -401,9 +401,11 @@ class App:
             tools_i18n.set_lang(self.tr.lang)       # Werkzeug-Tabs folgen der Sprache des Hauptfensters
             tools_i18n.install_var_hook(tk.StringVar)
             tools_i18n.install_combobox_hook(ttk)
+            tools_i18n.install_toplevel_hook(tk)
             tools_i18n.install_dialog_hooks(messagebox, _sd, filedialog)
+            self._i18n_note = tools_i18n.status()
         except Exception:
-            pass
+            self._i18n_note = (0, "tools_i18n konnte nicht geladen werden")
 
         self.q = queue.Queue()
         self._connected = False
@@ -512,6 +514,9 @@ class App:
         self.lang_btn_de.pack(side="right", padx=(2, 14))
         self.lang_btn_en.pack(side="right", padx=2)
         self._refresh_lang_buttons()
+        n_i18n, err_i18n = getattr(self, "_i18n_note", (0, ""))
+        if self.tr.lang == "en" and (err_i18n or n_i18n < 100):
+            self.root.after(800, lambda: self.log_msg(f"[i18n] English dictionary not loaded ({n_i18n} entries) {err_i18n} - texts stay German", "warn"))
 
         self.btn_connect = tk.Button(top, text="VERBINDEN", bg=BG_CARD, fg=ACCENT,
                                      font=FONT_LABEL, relief="flat", bd=0,
@@ -862,6 +867,11 @@ class App:
                 tag = "head"
             else:
                 tag = "info"
+        try:
+            import tools_i18n
+            msg = tools_i18n.translate(str(msg))        # freie Meldungen aus den Modulen (EN-Modus)
+        except Exception:
+            pass
         try:
             import logsetup
             logsetup.log(msg, tag)

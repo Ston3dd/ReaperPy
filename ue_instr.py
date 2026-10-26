@@ -521,6 +521,82 @@ def keep_cave_patch(dump, h, aob_text=None, name=None, author=""):
         {"label": "OriginTarget", "offset": "0x0", "defaultValue": "\n".join(lines), "newValue": ""}]}
 
 
+_SIZE_WORDS = {"byte": 1, "word": 2, "dword": 4, "qword": 8}
+_PTR_PREFIX = re.compile(r"^\s*(byte|word|dword|qword)\s+ptr\s+", re.I)
+_FORCE_MNEM = ("mov", "add", "sub", "adc", "sbb", "and", "or", "xor", "inc", "dec", "neg", "not", "movss", "movsd")
+
+
+def store_operand(h):
+    """Speicher-Ziel der schreibenden Instruktion als (Text ohne Groessen-Praefix, Groesse in Byte) oder (None, 0)."""
+    i = h.ins
+    ops = split_ops(i.ops)
+    if not ops or "[" not in ops[0] or ":" in ops[0].split("[")[0]:      # kein Segment-/String-Ziel
+        return None, 0
+    m = _PTR_PREFIX.match(ops[0])
+    if not m:
+        return None, 0
+    return ops[0][m.end():].strip(), _SIZE_WORDS[m.group(1).lower()]
+
+
+def can_force(h):
+    """Kann hinter dem Schreibzugriff ein fester Wert in dasselbe Ziel geschrieben werden? -> (ok, grund, groesse)"""
+    i = h.ins
+    if not i.writes:
+        return False, "die Instruktion schreibt nicht", 0
+    if i.mnem not in _FORCE_MNEM:
+        return False, f"'{i.mnem}' wird nicht unterstützt", 0
+    if i.size < 5:
+        return False, "Instruktion kürzer als 5 Byte", 0
+    if i.mem is None or i.mem.base in (None, "rip"):
+        return False, "RIP-relativ oder ohne Basisregister", 0
+    dest, size = store_operand(h)
+    if dest is None:
+        return False, "Ziel ist kein einfacher Speicher-Operand mit Größenangabe", 0
+    if i.mnem.startswith("mov") and i.mnem in ("movss", "movsd") and size not in (4, 8):
+        return False, "Ziel hat keine 4/8 Byte", 0
+    total = i.size + sum(j.size for j in h.stolen)
+    if total < 8:
+        return False, "Folge-Instruktionen fehlen für den 8-Byte-Hook", 0
+    for j in h.stolen:
+        if j.branch or (j.mem and j.mem.base == "rip"):
+            return False, f"Folge-Instruktion '{j.text}' ist nicht verschiebbar", 0
+    return True, "", size
+
+
+def force_cave_patch(dump, h, bits, aob_text=None, name=None, author=""):
+    """'Wert festschreiben': die Original-Instruktion laeuft, danach wird `bits` (Rohbits, Groesse = Store-Groesse) in
+    dasselbe Ziel geschrieben.  Fuer Zahlen und Schalter; fuer 8-Byte-Ziele muss der Wert als vorzeichenerweiterter
+    32-Bit-Wert passen."""
+    ok, why, size = can_force(h)
+    if not ok:
+        raise ValueError(why)
+    if not 0 <= bits < (1 << (8 * size)):
+        raise ValueError(f"Wert passt nicht in {size} Byte")
+    imm = bits
+    if size == 8:
+        if bits >= 1 << 63:
+            bits -= 1 << 64
+        if not -(1 << 31) <= bits < (1 << 31):
+            raise ValueError("Wert passt nicht in einen 32-Bit-Direktwert (8-Byte-Ziel)")
+        imm = bits
+    i = h.ins
+    dest, _ = store_operand(h)
+    word = {1: "byte", 2: "word", 4: "dword", 8: "qword"}[size]
+    lines = [i.text, f"mov {word} ptr {dest}, {imm:#x}" if imm >= 0 else f"mov {word} ptr {dest}, -{-imm:#x}"]
+    lines += [j.text for j in h.stolen]
+    lines.append("jmp OriginReturn")
+    total = i.size + sum(j.size for j in h.stolen)
+    name = name or f"{'+'.join(h.tags) or hex(h.offset)} - Wert festgeschrieben ({i.text})"
+    src_v = {"label": "OriginSource", "offset": hex(h.rva), "defaultValue": _spaced(dump[h.pos:h.pos + 8]),
+             "newValue": "jmp OriginTarget"}
+    if aob_text:
+        src_v["aob"], src_v["aobOffset"] = aob_text, 0
+    return {"name": name, "author": author, "Variables": [
+        src_v,
+        {"label": "OriginReturn", "offset": hex(total), "defaultValue": "", "newValue": ""},
+        {"label": "OriginTarget", "offset": "0x0", "defaultValue": "\n".join(lines), "newValue": ""}]}
+
+
 # ==================================================================
 # Funktionen: sofort zurueckkehren / Implementierung hinter dem Exec-Thunk finden
 # ==================================================================
