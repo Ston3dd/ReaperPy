@@ -136,21 +136,38 @@ the registers when it stops, **STEP** / **STEP OVER** / **STEP OUT**, **CONTINUE
 
 ### FIND VALUE (the cheat searcher)
 
-- **Value / To** - the number to look for (and the upper bound for "between").
-- **Compare** - *Exact*, *Approx. (float)*, *Greater than*, *Less than*, *Between*, *Increased / Decreased*, *Increased by /
-  Decreased by*, *Changed / Unchanged*, *Unknown initial value*.
-- **Value type** - signed and unsigned 8 / 16 / 32 / 64-bit integers, float and double.
+Layout: **hits** (left) | **scan** (middle) | **memory sections** (right), the **address list** below. Everything is also
+available through right-click menus; rarely used settings are in the **OPTIONS** dialog.
+
+- **Value / Value type / Compare / To** - the number to look for (*To* = upper bound for "between"). Compare: *Exact*,
+  *Approx. (float)*, *Greater than*, *Less than*, *Between*, *Increased / Decreased*, *Increased by / Decreased by*,
+  *Changed / Unchanged*, *Unknown initial value*. Types: signed/unsigned 8 / 16 / 32 / 64-bit integers, float, double.
 - **Range** - *Data (rw, no code)*, everything writable, everything readable.
-- **Scan options** - speed filter (skip slow regions), simplify float, parallel, aliasing (experimental), skip small
+- **MEMORY SECTIONS** (new) - shows what is in the game's memory and what gets scanned:
+  - **eboot.bin is split up** into its code, read-only and data sections (one row each, with address, size and rights);
+    game modules (`.prx`, not system), **system libraries** (one row per library), heap / anonymous memory, shared
+    memory and stacks follow. Heap regions of 1 MB or more get their own row, smaller ones are summarised in one row.
+  - Every row has a **checkbox** (click the box, double-click the row, or press Space). Category rows switch a whole group.
+  - **HIDE** - presets (*all system libraries*, *libSce\**, *libc / libkernel / libm*, *shared memory*, *stacks*) plus
+    **own patterns** (`libSce*, SDL, Shm` - with `*` a wildcard, without it a part of the name). Default: system libraries
+    hidden. Right-click a module -> *Hide module* adds it to the patterns.
+  - **ALL / NONE / EBOOT ONLY / GAME ONLY** buttons; right-click: switch selection on/off, scan only this selection, copy
+    start address, show in memory.
+  - The summary shows *selected / total* regions and size (and the saved percentage). After one scan it also estimates the
+    read time from the speed of that scan. Fewer MB to read = faster scan, especially for **Unknown initial value**.
+  - The filter is applied on a **fresh memory map at scan start** (the heap grows), and it is remembered between sessions
+    (`scan_filter.json` in the data folder). Hiding libraries is normally safe for game values; if a value is not found,
+    switch the filter to *ALL* and scan again.
+- **OPTIONS ...** - speed filter (skip slow regions), simplify float, parallel, aliasing (experimental), skip small
   segments, **snapshot RAM** (how much of the unknown-value snapshot stays in console RAM; more = much faster but uses
-  console memory) and where the rest is spilled (internal `/data`, M.2 expansion, USB).
+  console memory) and where the rest is spilled (internal `/data`, M.2 expansion, USB), plus SELF-TEST and REGION REPORT.
 - **Snapshot RAM limit:** the PS5 supports **up to 2048 MB**. From **3072 MB** upwards the payload reports that the PS5
   does not have enough memory. The drop-down therefore offers 512 / 1024 / 2048 MB (default 2048 MB); the rest of the snapshot is spilled to the chosen storage.
-- **FIRST SCAN / NEXT SCAN / CANCEL / NEW SCAN / SELF-TEST** - self-test checks protocol and payload capabilities.
-- **Results** (left) - paged list with address, current, previous and first value. Double-click or **ADD SELECTED / ADD ALL
-  (PAGE)** moves them to the address list.
-- **Address list** (bottom) - **SET VALUE**, **FREEZE**, description, remove, **WHO WRITES?** (hardware watchpoint through
-  the debugger), **-> HEX**, **-> POINTER SCAN**. Freezing uses one bulk write per tick.
+- **FIRST SCAN / NEXT SCAN / CANCEL / NEW SCAN** - self-test (in OPTIONS) checks protocol and payload capabilities.
+- **Hits** - paged list with address, current, previous and first value. Double-click or **ADD SELECTED / ADD ALL
+  (PAGE)** moves them to the address list; right-click also offers *show in memory* and *copy address*.
+- **Address list** - **SET VALUE**, **FREEZE**, description, remove, **WHO WRITES?** (hardware watchpoint through
+  the debugger), **-> HEX**, **-> POINTER SCAN**, copy address. Freezing uses one bulk write per tick.
 
 ### Advanced tabs
 
@@ -227,8 +244,10 @@ archives, are fine - the files are searched for.
    base from the process map (`Il2CppUserAssemblies.prx`, like `il2mem.py` does) and checks it against class names read from
    memory - nothing is guessed. On failure the log shows what was found. If it fails you can type the
    base address in by hand.
-3. Use the three pages:
-   - **VALUES** - press **(2b) SCAN GAME** once: ReaperPy counts the real objects per class and the list shows only fields of
+3. The info box under the buttons explains the numbers (classes = blueprints from the dump, objects = what really exists in
+   the game); the log at the bottom can be resized by dragging its handle, and every divider (list / values) can be dragged.
+4. Use the three pages:
+   - **VALUES** - press **(3) SCAN GAME** once: ReaperPy counts the real objects per class and the list shows only fields of
      classes that exist in memory (with the object count). Then search `Class.field` (gold, hp, money ...), click it, ReaperPy finds all live objects of that class
      and shows the value. After the scan, clicking a field shows its objects instantly; INSTANCES REFRESH rescans (use it for objects created after the scan). Double-click changes it (`+100` and `*2` work), **FREEZE** holds it. Static fields (singletons,
      save data) have exactly one row. Classes without a pointer in `script.json` are found by their name in memory.

@@ -199,6 +199,7 @@ class Scanner:
         self.snap_ram_mb = 512
         self.spill_dir = ""
         self.last_plan = None
+        self.last_mbps = 0.0
         self.keep_first = False
         self.keep_prev = False
         self.cands = []
@@ -336,8 +337,16 @@ class Scanner:
     def has(self, bit):
         return bool(self.caps and self.caps["engines"] & bit)
 
-    def regions(self, scope="data", min_mbps=0, min_size=0x1000, report=False):
-        maps = self.client.get_maps()
+    def regions(self, scope="data", min_mbps=0, min_size=0x1000, report=False, pick=None):
+        """Scanbare Regionen [(start, end)].  pick(maps_named) -> Startadressen: Bereichsfilter des Searchers
+        (eboot.bin / Libs ausblenden, siehe regionfilter.py); ohne pick wird nichts zusaetzlich gefiltert."""
+        allowed = None
+        if pick is not None:
+            named = self.client.get_maps_named()
+            allowed = set(pick(named))
+            maps = [(s, e, p) for s, e, p, _n in named]
+        else:
+            maps = self.client.get_maps()
         info = None
         if min_mbps or report:
             try:
@@ -355,8 +364,12 @@ class Scanner:
                 continue
             if any(cs <= s < ce for cs, ce in slow):
                 continue
+            if allowed is not None and s not in allowed:
+                continue
             out.append((s, e))
         out.sort()
+        if allowed is not None:
+            self.log(f"[scan] Bereichsfilter: {len(out)} Regionen, {sum(e - s for s, e in out) / 1048576:.0f} MB")
         if report and info:
             self.speed_report(out, info)
         return out
@@ -488,6 +501,7 @@ class Scanner:
             self.first_scan_done = True
             dt = max(time.time() - t0, 1e-6)
             mb = sum(e - s for s, e in self._normalise_regions(regions)) / 1048576
+            self.last_mbps = mb / dt
             self.log(f"[scan] erster Scan: {n} Treffer in {dt:.1f}s ({self.session}) - {mb:.0f} MB = "
                      f"{mb / dt:.0f} MB/s; {self.speed_mode()}")
             if unknown and self.last_plan:

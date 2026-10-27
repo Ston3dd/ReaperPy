@@ -1,12 +1,19 @@
-"""tools_scan_gui.py – Cheat-Searcher-Tab (schnelle Memory-Scans + Cheat-Liste)."""
+"""tools_scan_gui.py – Cheat-Searcher-Tab (schnelle Memory-Scans + Cheat-Liste).
+
+Aufbau (drei Spalten oben, Adressliste unten):
+  TREFFER (links)  |  SCAN (Mitte: Wert, Typ, Vergleich, Buttons)  |  BEREICHE (rechts: eboot.bin aufgesplittet,
+                                                                       Libs & Co. ausblenden -> tools_sections_gui.py)
+  ADRESSLISTE (unten): Werte setzen, einfrieren, Beschreibung, Pointer-Scan ...
+Alle Funktionen sind ueber Rechtsklick-Menues erreichbar; die selteneren Scan-Optionen liegen im Dialog OPTIONEN.
+"""
 import struct
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
 import scanner as SC
 import pointerscan as PS
-from tools_common import (BG, BG_CARD, ACCENT, TEXT, TEXT_DIM, WARN, ERROR, FONT_LABEL,
-                          BaseTab, button, label, entry, tree, with_scroll, hexs)
+from tools_common import (BG, BG_BAR, BG_CARD, BG_CARD_HVR, BORDER, ACCENT, ACCENT_DIM, TEXT, TEXT_DIM, WARN, ERROR,
+                          FONT_LABEL, BaseTab, entry, tree, with_scroll)
 
 SCOPES = {"Daten (rw, ohne Code)": "data", "Alles Schreibbare": "rw", "Alles Lesbare": "all"}
 PAGE = 500
@@ -28,6 +35,41 @@ def fmt_addr(addr):
     return f"0x{int(addr):X}"
 
 
+# ----------------------------------------------------------------------------------------------------------------
+# Kleine Bausteine fuer das einheitliche Aussehen (Karten, Knoepfe)
+# ----------------------------------------------------------------------------------------------------------------
+def card(parent, title, bg=BG_CARD):
+    """Karte mit Titelleiste -> (aussen, innen, titelleiste).  Weitere Knoepfe/Zaehler kommen rechts in die Titelleiste."""
+    outer = tk.Frame(parent, bg=bg, highlightthickness=1, highlightbackground=BORDER)
+    head = tk.Frame(outer, bg=BG_BAR)
+    head.pack(fill="x")
+    tk.Label(head, text=title, bg=BG_BAR, fg=ACCENT_DIM, font=FONT_LABEL).pack(side="left", padx=8, pady=3)
+    body = tk.Frame(outer, bg=bg)
+    body.pack(fill="both", expand=True, padx=8, pady=6)
+    return outer, body, head
+
+
+def clabel(parent, text, dim=True, bg=BG_CARD, **kw):
+    return tk.Label(parent, text=text, bg=bg, fg=TEXT_DIM if dim else TEXT, font=FONT_LABEL, anchor="w", **kw)
+
+
+def pbtn(parent, text, cmd, primary=False, **kw):
+    """Knopf im Karten-Stil: primaer = gefuellt in der Akzentfarbe, sonst dezent mit Hover."""
+    bg, fg = (ACCENT, "#04110d") if primary else (BG_CARD_HVR, TEXT)
+    hov = "#5dffe0" if primary else "#1f2b40"
+    b = tk.Button(parent, text=text, command=cmd, bg=bg, fg=fg, font=FONT_LABEL, relief="flat", bd=0, padx=10,
+                  pady=5, cursor="hand2", highlightthickness=0, activebackground=hov,
+                  activeforeground="#04110d" if primary else ACCENT, **kw)
+    b.bind("<Enter>", lambda _e: b.configure(bg=hov))
+    b.bind("<Leave>", lambda _e: b.configure(bg=bg))
+    return b
+
+
+def _check(parent, text, var, bg=BG_CARD):
+    return tk.Checkbutton(parent, text=text, variable=var, bg=bg, fg=TEXT_DIM, selectcolor=BG_CARD,
+                          activebackground=bg, activeforeground=ACCENT, font=FONT_LABEL, anchor="w")
+
+
 class ScanTab(BaseTab):
     def __init__(self, parent, win):
         super().__init__(parent, win)
@@ -38,133 +80,203 @@ class ScanTab(BaseTab):
         self._tick_n = 0
         self._busy_tick = False
 
-        # Layout wie im PS5 Debug Toolkit: oben Treffer (links) + Scan-Steuerung (rechts), unten die Adressliste.
+        # Scan-Optionen (Werte leben hier; der Dialog OPTIONEN zeigt sie nur an)
+        self.slow_sel = tk.StringVar(value=list(SLOW_CHOICES)[1])
+        self.o_float = tk.BooleanVar(value=True)
+        self.o_par = tk.BooleanVar(value=True)
+        self.o_alias = tk.BooleanVar(value=False)
+        self.o_debug = tk.BooleanVar(value=False)
+        self.o_small = tk.BooleanVar(value=False)
+        self.ram_sel = tk.StringVar(value=list(RAM_CHOICES)[2])
+        self.spill_sel = tk.StringVar(value=list(SPILL_CHOICES)[0])
+
         pw = tk.PanedWindow(self, orient="vertical", bg=BG, sashwidth=5, sashrelief="flat", bd=0)
         pw.pack(fill="both", expand=True, padx=8, pady=8)
         top = tk.Frame(pw, bg=BG)
         bottom = tk.Frame(pw, bg=BG)
-        pw.add(top, minsize=220, stretch="always")
-        pw.add(bottom, minsize=170, stretch="always")
-        left = tk.Frame(top, bg=BG); left.pack(side="left", fill="both", expand=True)
-        right = tk.Frame(top, bg=BG); right.pack(side="left", fill="y", padx=(10, 0))
+        pw.add(top, minsize=260, stretch="always")
+        pw.add(bottom, minsize=150, stretch="always")
 
-        # --- links: Treffer ---
-        hd = tk.Frame(left, bg=BG); hd.pack(fill="x")
-        self.lbl_res = label(hd, "GEFUNDEN: 0"); self.lbl_res.pack(side="left")
-        button(hd, "▶", lambda: self._page(1)).pack(side="right", padx=2)
-        button(hd, "◀", lambda: self._page(-1)).pack(side="right", padx=2)
-        fr = tk.Frame(left, bg=BG); fr.pack(fill="both", expand=True, pady=(2, 0))
-        self.rt = tree(fr, [("a", "ADRESSE"), ("c", "AKTUELL"), ("p", "VORHER"), ("f", "ERSTER")],
-                       [150, 100, 100, 100], height=12, anchors={})
-        with_scroll(fr, self.rt)
-        self.rt.bind("<Double-1>", lambda _e: self.add_selected())
-        lb = tk.Frame(left, bg=BG); lb.pack(fill="x", pady=4)
-        button(lb, "→ AUSGEWÄHLTE HINZUFÜGEN", self.add_selected, accent=True).pack(side="left", padx=2)
-        button(lb, "→ ALLE (SEITE)", self.add_all).pack(side="left", padx=2)
+        # Spalten oben: Bereiche (rechts) und Scan (Mitte) zuerst packen, Treffer nimmt den Rest
+        col_c = tk.Frame(top, bg=BG, width=410)
+        col_c.pack(side="right", fill="y", padx=(8, 0))
+        col_c.pack_propagate(False)
+        col_b = tk.Frame(top, bg=BG, width=300)
+        col_b.pack(side="right", fill="y", padx=(8, 0))
+        col_b.pack_propagate(False)
+        col_a = tk.Frame(top, bg=BG)
+        col_a.pack(side="left", fill="both", expand=True)
 
-        # --- rechts: Scan-Steuerung ---
-        r1 = tk.Frame(right, bg=BG); r1.pack(fill="x")
-        self.b_first = button(r1, "ERSTER SCAN", self.scan_first, accent=True)
-        self.b_first.pack(side="left", padx=2)
-        self.b_next = button(r1, "NÄCHSTER SCAN", self.scan_next, accent=True)
-        self.b_next.pack(side="left", padx=2)
-        r1b = tk.Frame(right, bg=BG); r1b.pack(fill="x", pady=(4, 0))
-        button(r1b, "ABBRECHEN", self.cancel).pack(side="left", padx=2)
-        button(r1b, "NEUER SCAN", self.new_scan).pack(side="left", padx=2)
-        button(r1b, "SELBSTTEST", self.selftest).pack(side="left", padx=2)
-        button(r1b, "REGIONEN-BERICHT", self.region_report).pack(side="left", padx=2)
-
-        r3 = tk.Frame(right, bg=BG); r3.pack(fill="x", pady=(8, 0))
-        self.pb = ttk.Progressbar(r3, orient="horizontal", mode="determinate", length=300, maximum=100)
-        self.pb.pack(fill="x")
-        self.lbl = label(right, "bereit", dim=False); self.lbl.pack(anchor="w", pady=(2, 0))
-        self.lbl_mode = label(right, ""); self.lbl_mode.pack(anchor="w")
-
-        rv = tk.Frame(right, bg=BG); rv.pack(fill="x", pady=(8, 2))
-        label(rv, "WERT").pack(side="left")
-        self.v1 = tk.StringVar()
-        self.e1 = entry(rv, self.v1, 14); self.e1.pack(side="left", padx=(6, 8))
-        self.e1.bind("<Return>", lambda _e: self.scan_first() if not self.sc or not self.sc.first_scan_done
-                     else self.scan_next())
-        label(rv, "BIS").pack(side="left")
-        self.v2 = tk.StringVar()
-        self.e2 = entry(rv, self.v2, 10); self.e2.pack(side="left", padx=(6, 0))
-
-        rt_ = tk.Frame(right, bg=BG); rt_.pack(fill="x", pady=2)
-        label(rt_, "VERGLEICH").pack(side="left")
-        self.ct = tk.StringVar(value="Genau")
-        self.cb_ct = ttk.Combobox(rt_, textvariable=self.ct, width=24, state="readonly")
-        self.cb_ct.pack(side="left", padx=6)
-        self.cb_ct.bind("<<ComboboxSelected>>", lambda _e: self._ct_changed())
-        rv2 = tk.Frame(right, bg=BG); rv2.pack(fill="x", pady=2)
-        label(rv2, "WERTTYP").pack(side="left")
-        self.vt = tk.StringVar(value="Int32")
-        ttk.Combobox(rv2, textvariable=self.vt, values=list(SC.VTYPES), width=10,
-                     state="readonly").pack(side="left", padx=(14, 6))
-        rs = tk.Frame(right, bg=BG); rs.pack(fill="x", pady=2)
-        label(rs, "BEREICH").pack(side="left")
-        self.scope = tk.StringVar(value="Daten (rw, ohne Code)")
-        ttk.Combobox(rs, textvariable=self.scope, values=list(SCOPES), width=24,
-                     state="readonly").pack(side="left", padx=(14, 6))
-
-        # --- Optionen (Rahmen wie "Memory scan options" im Toolkit) ---
-        opt = tk.LabelFrame(right, text=" SCAN-OPTIONEN ", bg=BG, fg=TEXT_DIM, font=FONT_LABEL,
-                            bd=1, relief="groove", labelanchor="nw")
-        opt.pack(fill="x", pady=(8, 0))
-        o1 = tk.Frame(opt, bg=BG); o1.pack(fill="x", padx=4, pady=2)
-        self.slow_sel = tk.StringVar(value=list(SLOW_CHOICES)[1])
-        ttk.Combobox(o1, textvariable=self.slow_sel, values=list(SLOW_CHOICES), width=24,
-                     state="readonly").pack(side="left", padx=2)
-        o2 = tk.Frame(opt, bg=BG); o2.pack(fill="x", padx=4)
-        self.o_float = self._chk(o2, "Float vereinfachen", True)
-        self.o_par = self._chk(o2, "Parallel (schneller)", True)
-        o3 = tk.Frame(opt, bg=BG); o3.pack(fill="x", padx=4)
-        self.o_alias = self._chk(o3, "Aliasing (experimentell)", False)
-        self.o_debug = self._chk(o3, "Debug-Log", False)
-        o4 = tk.Frame(opt, bg=BG); o4.pack(fill="x", padx=4)
-        self.o_small = self._chk(o4, "kleine Segmente (<256 KB) auslassen", False)
-        o5 = tk.Frame(opt, bg=BG); o5.pack(fill="x", padx=4, pady=(4, 0))
-        label(o5, "SNAPSHOT-RAM").pack(side="left")
-        self.ram_sel = tk.StringVar(value=list(RAM_CHOICES)[2])
-        ttk.Combobox(o5, textvariable=self.ram_sel, values=list(RAM_CHOICES), width=26,
-                     state="readonly").pack(side="left", padx=4)
-        o6 = tk.Frame(opt, bg=BG); o6.pack(fill="x", padx=4, pady=(2, 0))
-        label(o6, "AUSLAGERN NACH").pack(side="left")
-        self.spill_sel = tk.StringVar(value=list(SPILL_CHOICES)[0])
-        ttk.Combobox(o6, textvariable=self.spill_sel, values=list(SPILL_CHOICES), width=26,
-                     state="readonly").pack(side="left", padx=4)
-        label(opt, "(nur 'Unbekannter Startwert': mehr RAM = viel schneller, belegt aber PS5-Speicher)",
-              dim=True).pack(anchor="w", padx=4, pady=(2, 4))
-
-        # --- unten: Adressliste (Cheat-Liste) ---
-        hd = tk.Frame(bottom, bg=BG); hd.pack(fill="x")
-        label(hd, "ADRESSLISTE").pack(side="left")
-        self.v_live = tk.BooleanVar(value=True)
-        tk.Checkbutton(hd, text="live", variable=self.v_live, bg=BG, fg=TEXT_DIM, selectcolor=BG_CARD,
-                       activebackground=BG, activeforeground=ACCENT, font=FONT_LABEL).pack(side="right")
-        fr2 = tk.Frame(bottom, bg=BG); fr2.pack(fill="both", expand=True, pady=(2, 0))
-        self.lt = tree(fr2, [("z", "❄"), ("d", "BESCHREIBUNG"), ("a", "ADRESSE"), ("t", "TYP"), ("v", "WERT")],
-                       [30, 220, 160, 80, 140], height=7, anchors={"z": "center"})
-        with_scroll(fr2, self.lt)
-        self.lt.bind("<Double-1>", lambda _e: self.set_value())
-        ac = tk.Frame(bottom, bg=BG); ac.pack(fill="x", pady=(4, 0))
-        button(ac, "WERT SETZEN", self.set_value, accent=True).pack(side="left", padx=2)
-        button(ac, "FREEZE", self.toggle_freeze).pack(side="left", padx=2)
-        button(ac, "BESCHREIBUNG", self.rename).pack(side="left", padx=2)
-        button(ac, "ENTFERNEN", self.remove).pack(side="left", padx=2)
-        button(ac, "WER SCHREIBT?", self.who_writes).pack(side="left", padx=(14, 2))
-        button(ac, "→ HEX", self.to_hex).pack(side="left", padx=2)
-        button(ac, "→ POINTER-SCAN", self.to_pointer).pack(side="left", padx=2)
+        self._build_results(col_a)
+        self._build_scan(col_b)
+        self._build_sections(col_c)
+        self._build_list(bottom)
 
         self._ct_values(first=True)
         self._ct_changed()
         self.after(150, self._tick)
+        self.after(900, self.panel.auto)
+        self.bind("<Map>", lambda _e: self.panel.auto())
 
-    def _chk(self, parent, text, default):
-        v = tk.BooleanVar(value=default)
-        tk.Checkbutton(parent, text=text, variable=v, bg=BG, fg=TEXT_DIM, selectcolor=BG_CARD,
-                       activebackground=BG, activeforeground=ACCENT, font=FONT_LABEL).pack(side="left", padx=4)
-        return v
+    # ------------------------------------------------------------------
+    # Aufbau der drei Spalten + Adressliste
+    # ------------------------------------------------------------------
+    def _build_results(self, parent):
+        outer, body, head = card(parent, "TREFFER")
+        outer.pack(fill="both", expand=True)
+        self.lbl_res = tk.Label(head, text="GEFUNDEN: 0", bg=BG_BAR, fg=TEXT, font=FONT_LABEL)
+        self.lbl_res.pack(side="left", padx=(10, 0))
+        pbtn(head, "▶", lambda: self._page(1)).pack(side="right", padx=(2, 4), pady=2)
+        pbtn(head, "◀", lambda: self._page(-1)).pack(side="right", padx=2, pady=2)
+        fr = tk.Frame(body, bg=BG_CARD)
+        fr.pack(fill="both", expand=True)
+        self.rt = tree(fr, [("a", "ADRESSE"), ("c", "AKTUELL"), ("p", "VORHER"), ("f", "ERSTER")],
+                       [140, 100, 100, 100], height=12, anchors={},
+                       actions=[("→ Zur Adressliste hinzufügen", self.add_selected),
+                                ("→ Alle (Seite) hinzufügen", self.add_all),
+                                (None, None),
+                                ("Im Speicher anzeigen", self._res_to_hex),
+                                ("Adresse kopieren", self._res_copy)])
+        with_scroll(fr, self.rt)
+        self.rt.bind("<Double-1>", lambda _e: self.add_selected())
+        lb = tk.Frame(body, bg=BG_CARD)
+        lb.pack(fill="x", pady=(6, 0))
+        pbtn(lb, "→ AUSGEWÄHLTE HINZUFÜGEN", self.add_selected, primary=True).pack(side="left")
+        pbtn(lb, "→ ALLE (SEITE)", self.add_all).pack(side="left", padx=6)
+        clabel(lb, "Doppelklick oder Rechtsklick", dim=True).pack(side="right")
+
+    def _build_scan(self, parent):
+        outer, g, _head = card(parent, "SCAN")
+        outer.pack(fill="both", expand=True)
+        g.grid_columnconfigure(0, weight=3)
+        g.grid_columnconfigure(1, weight=2)
+
+        clabel(g, "WERT").grid(row=0, column=0, sticky="w")
+        clabel(g, "WERTTYP").grid(row=0, column=1, sticky="w", padx=(8, 0))
+        self.v1 = tk.StringVar()
+        self.e1 = entry(g, self.v1, 10)
+        self.e1.grid(row=1, column=0, sticky="ew", ipady=3)
+        self.e1.bind("<Return>", lambda _e: self.scan_first() if not self.sc or not self.sc.first_scan_done
+                     else self.scan_next())
+        self.vt = tk.StringVar(value="Int32")
+        ttk.Combobox(g, textvariable=self.vt, values=list(SC.VTYPES), width=8, state="readonly").grid(
+            row=1, column=1, sticky="ew", padx=(8, 0))
+
+        clabel(g, "VERGLEICH").grid(row=2, column=0, sticky="w", pady=(8, 0))
+        clabel(g, "BIS").grid(row=2, column=1, sticky="w", padx=(8, 0), pady=(8, 0))
+        self.ct = tk.StringVar(value="Genau")
+        self.cb_ct = ttk.Combobox(g, textvariable=self.ct, width=20, state="readonly")
+        self.cb_ct.grid(row=3, column=0, sticky="ew")
+        self.cb_ct.bind("<<ComboboxSelected>>", lambda _e: self._ct_changed())
+        self.v2 = tk.StringVar()
+        self.e2 = entry(g, self.v2, 8)
+        self.e2.grid(row=3, column=1, sticky="ew", padx=(8, 0), ipady=3)
+
+        clabel(g, "BEREICH").grid(row=4, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        self.scope = tk.StringVar(value="Daten (rw, ohne Code)")
+        cb_scope = ttk.Combobox(g, textvariable=self.scope, values=list(SCOPES), width=24, state="readonly")
+        cb_scope.grid(row=5, column=0, columnspan=2, sticky="ew")
+        cb_scope.bind("<<ComboboxSelected>>", lambda _e: self.panel.on_scope_changed())
+
+        self.b_first = pbtn(g, "ERSTER SCAN", self.scan_first, primary=True)
+        self.b_first.grid(row=6, column=0, sticky="ew", pady=(12, 0))
+        self.b_next = pbtn(g, "NÄCHSTER SCAN", self.scan_next, primary=True)
+        self.b_next.grid(row=6, column=1, sticky="ew", padx=(8, 0), pady=(12, 0))
+        pbtn(g, "NEUER SCAN", self.new_scan).grid(row=7, column=0, sticky="ew", pady=(6, 0))
+        pbtn(g, "ABBRECHEN", self.cancel).grid(row=7, column=1, sticky="ew", padx=(8, 0), pady=(6, 0))
+
+        self.pb = ttk.Progressbar(g, orient="horizontal", mode="determinate", length=200, maximum=100)
+        self.pb.grid(row=8, column=0, columnspan=2, sticky="ew", pady=(12, 0))
+        self.lbl = tk.Label(g, text="bereit", bg=BG_CARD, fg=TEXT, font=FONT_LABEL, anchor="w", justify="left",
+                            wraplength=270)
+        self.lbl.grid(row=9, column=0, columnspan=2, sticky="w", pady=(4, 0))
+        self.lbl_mode = clabel(g, "")
+        self.lbl_mode.grid(row=10, column=0, columnspan=2, sticky="w")
+        pbtn(g, "⚙ OPTIONEN …", self.open_options).grid(row=11, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+
+    def _build_sections(self, parent):
+        from tools_sections_gui import SectionPanel
+        outer, body, _head = card(parent, "SPEICHERBEREICHE  -  was gescannt wird")
+        outer.pack(fill="both", expand=True)
+        self.panel = SectionPanel(body, self)
+        self.panel.pack(fill="both", expand=True)
+
+    def _build_list(self, parent):
+        outer, body, head = card(parent, "ADRESSLISTE")
+        outer.pack(fill="both", expand=True)
+        self.v_live = tk.BooleanVar(value=True)
+        tk.Checkbutton(head, text="live", variable=self.v_live, bg=BG_BAR, fg=TEXT_DIM, selectcolor=BG_CARD,
+                       activebackground=BG_BAR, activeforeground=ACCENT, font=FONT_LABEL).pack(side="right", padx=8)
+        fr2 = tk.Frame(body, bg=BG_CARD)
+        fr2.pack(fill="both", expand=True)
+        self.lt = tree(fr2, [("z", "❄"), ("d", "BESCHREIBUNG"), ("a", "ADRESSE"), ("t", "TYP"), ("v", "WERT")],
+                       [30, 220, 160, 80, 140], height=6, anchors={"z": "center"},
+                       actions=[("Wert setzen ...", self.set_value),
+                                ("Einfrieren / Freigeben", self.toggle_freeze),
+                                ("Beschreibung ...", self.rename),
+                                (None, None),
+                                ("Wer schreibt hierher?", self.who_writes),
+                                ("Im Speicher anzeigen", self.to_hex),
+                                ("→ Pointer-Scan", self.to_pointer),
+                                ("Adresse kopieren", self._list_copy),
+                                (None, None),
+                                ("Entfernen", self.remove)])
+        with_scroll(fr2, self.lt)
+        self.lt.bind("<Double-1>", lambda _e: self.set_value())
+        self.lt.bind("<Delete>", lambda _e: self.remove())
+        ac = tk.Frame(body, bg=BG_CARD)
+        ac.pack(fill="x", pady=(6, 0))
+        pbtn(ac, "WERT SETZEN", self.set_value, primary=True).pack(side="left")
+        pbtn(ac, "❄ FREEZE", self.toggle_freeze).pack(side="left", padx=4)
+        pbtn(ac, "BESCHREIBUNG", self.rename).pack(side="left")
+        pbtn(ac, "ENTFERNEN", self.remove).pack(side="left", padx=4)
+        pbtn(ac, "WER SCHREIBT?", self.who_writes).pack(side="left", padx=(14, 4))
+        pbtn(ac, "→ HEX", self.to_hex).pack(side="left")
+        pbtn(ac, "→ POINTER-SCAN", self.to_pointer).pack(side="left", padx=4)
+
+    # ------------------------------------------------------------------
+    # Dialog OPTIONEN (seltene Einstellungen) + Werkzeuge
+    # ------------------------------------------------------------------
+    def open_options(self):
+        if getattr(self, "_dlg", None) is not None:
+            try:
+                if self._dlg.winfo_exists():
+                    return self._dlg.lift()
+            except Exception:
+                pass
+        dlg = tk.Toplevel(self)
+        self._dlg = dlg
+        dlg.title("Scan-Optionen")
+        dlg.configure(bg=BG)
+        try:
+            dlg.transient(self.winfo_toplevel())
+        except Exception:
+            pass
+        outer, body, _h = card(dlg, "SCAN-OPTIONEN")
+        outer.pack(fill="both", expand=True, padx=10, pady=10)
+        clabel(body, "Tempo").pack(anchor="w")
+        ttk.Combobox(body, textvariable=self.slow_sel, values=list(SLOW_CHOICES), width=30,
+                     state="readonly").pack(anchor="w", pady=(0, 6))
+        for text, var in (("Float vereinfachen", self.o_float), ("Parallel (schneller)", self.o_par),
+                          ("Aliasing (experimentell)", self.o_alias),
+                          ("kleine Segmente (<256 KB) auslassen", self.o_small), ("Debug-Log", self.o_debug)):
+            _check(body, text, var).pack(anchor="w")
+        clabel(body, "SNAPSHOT-RAM").pack(anchor="w", pady=(10, 0))
+        ttk.Combobox(body, textvariable=self.ram_sel, values=list(RAM_CHOICES), width=30,
+                     state="readonly").pack(anchor="w")
+        clabel(body, "AUSLAGERN NACH").pack(anchor="w", pady=(6, 0))
+        ttk.Combobox(body, textvariable=self.spill_sel, values=list(SPILL_CHOICES), width=40,
+                     state="readonly").pack(anchor="w")
+        clabel(body, "(nur 'Unbekannter Startwert': mehr RAM = viel schneller, belegt aber PS5-Speicher)",
+               dim=True).pack(anchor="w", pady=(4, 8))
+        row = tk.Frame(body, bg=BG_CARD)
+        row.pack(fill="x")
+        pbtn(row, "SELBSTTEST", self.selftest).pack(side="left")
+        pbtn(row, "REGIONEN-BERICHT", self.region_report).pack(side="left", padx=6)
+        pbtn(row, "SCHLIESSEN", dlg.destroy, primary=True).pack(side="right")
+
+    def scope_key(self):
+        return SCOPES.get(self.scope.get(), "data")
 
     # ------------------------------------------------------------------
     # Vergleichs-Auswahl
@@ -240,6 +352,7 @@ class ScanTab(BaseTab):
         scope = SCOPES[self.scope.get()]
         min_mbps = SLOW_CHOICES[self.slow_sel.get()]
         opts = self._opts()
+        pick = self.panel.make_pick(scope)       # Bereichsfilter: nur angehakte, nicht ausgeblendete Regionen
         try:        # früh validieren (Meldung im UI-Thread)
             if ctype not in SC.FIRST_ONLY:
                 if SC.CTYPES[ctype][1] >= 1:
@@ -252,7 +365,7 @@ class ScanTab(BaseTab):
         def job():
             sc = self._ensure()
             sc.reset()
-            regs = sc.regions(scope, min_mbps=min_mbps, report=True)
+            regs = sc.regions(scope, min_mbps=min_mbps, report=True, pick=pick)
             total = sum(e - s for s, e in regs)
             self.win.ui(lambda: self.log(f"Scanne {len(regs)} Region(en), {total / 1048576:.0f} MB", "info"))
             return sc.first_scan(vname, ctype, t1, t2, regs, opts, self._progress)
@@ -262,6 +375,7 @@ class ScanTab(BaseTab):
             self._ct_changed()
             self._status(f"{n} Treffer", ACCENT if n else WARN)
             self._show_results(0)
+            self.panel.update_summary()
         self._run(job, done)
 
     def scan_next(self):
@@ -457,6 +571,28 @@ class ScanTab(BaseTab):
         for e in self._sel_entries():
             self.entries.remove(e)
         self._refresh_list()
+
+    def _res_to_hex(self):
+        sel = self.rt.selection()
+        if sel:
+            self.win.goto_memory(int(sel[0]))
+
+    def _res_copy(self):
+        sel = self.rt.selection()
+        if sel:
+            self._clip(" ".join(fmt_addr(int(i)) for i in sel))
+
+    def _list_copy(self):
+        sel = [e for e in self._sel_entries() if e["addr"]]
+        if sel:
+            self._clip(" ".join(fmt_addr(e["addr"]) for e in sel))
+
+    def _clip(self, text):
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(text)
+        except Exception:
+            pass
 
     def who_writes(self):
         sel = self._sel_entries()

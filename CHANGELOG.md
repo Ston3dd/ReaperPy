@@ -5,13 +5,23 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 ## Unreleased
 
 ### Added
+- **Cheat searcher: MEMORY SECTIONS panel** (`regionfilter.py`, `tools_sections_gui.py`, `scanner.py`). The tab now lists what is
+  in the game's memory - **eboot.bin split into its code / read-only / data sections**, game modules, one row per system
+  library, heap, shared memory, stacks - with a checkbox per row and a **HIDE filter** (presets such as *all system
+  libraries*, *libSce\**, *libc / libkernel / libm* plus own wildcard patterns, right-click *Hide module*). Only the
+  selected regions are scanned (`Scanner.regions(pick=...)`), so **Unknown initial value** has less to read. The summary shows
+  regions / MB / saved percentage and, after a scan, an estimated read time. The filter uses a fresh memory map at scan start
+  and is saved in `scan_filter.json`. Tests: `tests/test_regionfilter.py`, `tests/test_scan_sections_gui.py`.
+
 - **UNITY tab for Unity (IL2CPP) games** (`il2cpp_dump.py`, `tools_unity_gui.py`): loads the Il2CppDumper output (`dump.cs`,
   `script.json`; nested folders are found), detects the IL2CPP module base by checking class names in memory, lists live
   instances by their class pointer (name-scan fallback when `script.json` has none), edits/freezes values, patches methods
   (return TRUE/FALSE/value, make void empty - refused when the return type does not fit) with restore and `.reapproj` export,
   and searches enum names (item IDs). Module detection uses the module names of the process map (like `il2mem.py`) and
   treats execute-only code regions as valid module starts (PS5); on failure the log shows what is in memory.
-  **SCAN GAME** counts the real objects per class in one heap pass (subclass objects count for their base class) and the field
+  UNITY tab layout: the three steps are large buttons, an info box explains the numbers, the status line wraps, the log
+  is part of the tab and resizable, and the list/values divider moves freely. All Unity messages are translated (also those with
+  inserted numbers); `tests/test_unity_i18n.py` guards this. **SCAN GAME** counts the real objects per class in one heap pass (subclass objects count for their base class) and the field
   list then shows only classes that exist in memory; compiler-generated closure/iterator fields are hidden and
   `<X>k__BackingField` is shown as `X`. The scan also remembers the object addresses, so clicking a field afterwards finds its
   instances instantly (each address is re-checked); INSTANCES REFRESH rescans the heap, skipping module regions (.prx/eboot). Tests: `tests/test_il2cpp.py`, `tests/test_unity_tab.py`.
@@ -20,6 +30,11 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
   and saves a `.reapproj` in the project's patch folder. Cave types: *Value cannot decrease*, *Fix value* (new,
   `ue_instr.force_cave_patch`) and *NOP*. "Choose hit" lists all hits with the reasons why a cave is or is not possible.
   Offsets below 0x80 are refused (search would be unreliable). Applies to ALL objects using that code (enemies too).
+
+### Changed
+- **Cheat searcher layout** redesigned: three columns (hits | scan | sections) with card headers, filled primary buttons,
+  right-click menus for hits and address list, rarely used settings moved to an **OPTIONS** dialog (self-test and region
+  report are there too). No functions removed.
 
 ### Fixed
 - English mode: the GoldHEN/etaHEN export dialog, the status line ("connected"), the main log and about 250 error messages
