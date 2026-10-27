@@ -959,7 +959,8 @@ class AobTab(BaseTab):
 # ==================================================================
 class ToolsWindow(tk.Toplevel):
     # Reihenfolge der Anfaenger-Tabs (START kommt zuerst, FORTGESCHRITTEN zuletzt)
-    SIMPLE = ("WERT SUCHEN", "CHEATS BEARBEITEN", "★ UE-LIVE", "★ UE-ENTDECKER", "★ CHEAT-MENÜ")
+    SIMPLE = ("WERT SUCHEN", "CHEATS BEARBEITEN", "★ UE-LIVE", "★ UE-ENTDECKER", "★ CHEAT-MENÜ",
+              "★ UNITY")
     ADVANCED = ("SPEICHER", "DISASSEMBLER", "POINTER", "KONVERTER", "AOB / UPDATE", "DEBUGGER", "KERNEL-LOG",
                 "PYTHON-SKRIPT", "FUNKTION AUFRUFEN", "FUNKTIONS-LOGGER", "JOURNAL / UNDO", "UE-AUTO")
 
@@ -1047,6 +1048,7 @@ class ToolsWindow(tk.Toplevel):
                  ("tools_uelive_gui", "UeLiveTab", "★ UE-LIVE"),
                  ("tools_discover_gui", "DiscoverTab", "★ UE-ENTDECKER"),
                  ("tools_cheatmenu_gui", "CheatMenuTab", "★ CHEAT-MENÜ"),
+                 ("tools_unity_gui", "UnityTab", "★ UNITY"),
                  ("tools_ue_gui", "UeTab", "UE-AUTO"))
         for modname, clsname, name in extra:
             try:

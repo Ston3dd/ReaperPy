@@ -54,6 +54,15 @@ ps4-unreal-dumper
   follows the method of `uecall`.  No code was copied - only formats and approach.  Dumper-7 (Encryqed) is the basis of
   the object model there.
 
+Il2CppDumper
+------------
+  Author:   Perfare (original), TetzkatLipHoka (console fork)
+  Source:   https://github.com/TetzkatLipHoka/Il2CppDumper
+  License:  MIT
+
+  The UNITY tab (il2cpp_dump.py, tools_unity_gui.py) reads the output of this dumper (dump.cs, script.json).  The files
+  are parsed by ReaperPy's own code; no code, binaries or assets of Il2CppDumper are included.
+
 Debugger behaviour
 ------------------
   debugger.py re-implements the stop / continue / step flow (server-managed breakpoint step, live-register check after

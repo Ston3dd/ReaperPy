@@ -131,6 +131,7 @@ the registers when it stops, **STEP** / **STEP OVER** / **STEP OUT**, **CONTINUE
 | **EDIT CHEATS** | Write a patch: name, author, offset from the image base. *Simple patch / NOP* (original bytes -> new bytes) or *Code cave* (assembly in a separate box, `jmp OriginReturn` goes back). Assembler or hex bytes are accepted; saved as `.reapproj`. |
 | **UE-LIVE** | Live values of an Unreal Engine game: pick a member, see all live instances, change / freeze them. |
 | **UE DISCOVERER** | Analyses the SDK and tells you what is there to find: item structs, item tables, give-functions, stat enums, cheat managers - with a check whether a cave trainer can be built for each ("✔" / "✗ not possible: reason"). |
+| **UNITY** | The same idea for Unity (IL2CPP) games: load the Il2CppDumper folder, then change / freeze live values, patch methods (always true, fixed return value, skip) and look up enum names (item IDs). See [below](#unity-il2cpp-games). |
 | **CHEAT MENU** | Switches and values for the player character, generated from the SDK. Works in shipping builds without a CheatManager. |
 
 ### FIND VALUE (the cheat searcher)
@@ -212,6 +213,36 @@ ReaperPy reads the output of [ps4-unreal-dumper](https://github.com/TetzkatLipHo
 Instance addresses change with every game start; classes, offsets and the SDK stay valid. Functions that create objects
 (spawning actors, widgets) can crash the game when called from a helper thread - prefer functions that read and write values.
 
+## Unity (IL2CPP) games
+
+ReaperPy reads the output of [Il2CppDumper](https://github.com/TetzkatLipHoka/Il2CppDumper) (the TetzkatLipHoka fork, which also
+works on console memory dumps). The tab is called **UNITY**.
+
+Your folder should contain `dump.cs` and `script.json` (the `DummyDll` folder is optional - it holds the same information as
+.NET stubs for dnSpy/ILSpy; the offsets and addresses ReaperPy needs are in `dump.cs`). Nested folders, e.g. unzipped
+archives, are fine - the files are searched for.
+
+1. **UNITY -> GAME FOLDER...** choose the folder, loading takes about 10 s for a large game.
+2. Start the game on the console and load a save, connect ReaperPy, press **(2) DETECT MODULE**. ReaperPy takes the module
+   base from the process map (`Il2CppUserAssemblies.prx`, like `il2mem.py` does) and checks it against class names read from
+   memory - nothing is guessed. On failure the log shows what was found. If it fails you can type the
+   base address in by hand.
+3. Use the three pages:
+   - **VALUES** - press **(2b) SCAN GAME** once: ReaperPy counts the real objects per class and the list shows only fields of
+     classes that exist in memory (with the object count). Then search `Class.field` (gold, hp, money ...), click it, ReaperPy finds all live objects of that class
+     and shows the value. After the scan, clicking a field shows its objects instantly; INSTANCES REFRESH rescans (use it for objects created after the scan). Double-click changes it (`+100` and `*2` work), **FREEZE** holds it. Static fields (singletons,
+     save data) have exactly one row. Classes without a pointer in `script.json` are found by their name in memory.
+   - **METHODS (cheats)** - search a method (`AddMoney`, `IsDead`, `Damage`), then *always returns TRUE / FALSE*,
+     *returns value...* (int, float, bool ...) or *make method empty* (void methods). Takes effect immediately; **REMOVE**
+     restores the original bytes, **ON / OFF** toggles. The tool refuses patches that would crash (e.g. emptying a method
+     that returns a value). **EXPORT .reapproj** saves the patches (offset = RVA in the IL2CPP module); set ReaperPy's image base
+     to the module base shown in the tab when you load them in EDIT CHEATS.
+   - **NAMES (items, IDs)** - search all enums (`Item Apple`); double-click copies the numeric value for give/set functions.
+
+Notes: object addresses change on every game start, classes/offsets/RVAs stay valid for the same game version. Use a dump of
+the exact version you play. Static fields assume `Il2CppClass.static_fields` at `0xB8` (Unity 2018.3 - 6); the STATIC OFFSET
+box changes that. As with UE: use this for single-player/offline games on your own console.
+
 ## Export formats
 
 | Format | Notes |
@@ -289,6 +320,7 @@ Code style: `ruff` (configured in `pyproject.toml`, line length 120).
 | `debugger.py`, `unwind.py` | Debug session, stack unwinder |
 | `patch_engine.py`, `reapatch.py`, `cave_trainer.py`, `export_goldhen.py`, `cheatfmt.py` | Patches, caves, trainers and export |
 | `ue_*.py`, `uesdk.py`, `uecheat.py`, `cheatmenu.py` | Unreal Engine support and the cheat menu logic |
+| `il2cpp_dump.py`, `tools_unity_gui.py` | Unity (IL2CPP) support: Il2CppDumper output, live instances, method patches |
 | `docs/` | `de/` German notes, `history/` old release notes, `screenshots/` |
 | `tests/` | Unit tests |
 
@@ -305,6 +337,8 @@ ReaperPy is released under the **[MIT License](LICENSE)**.
   the [ps5-payload-sdk](https://github.com/ps5-payload-dev/sdk) by John Törnblom.
 - **[ps4-unreal-dumper](https://github.com/TetzkatLipHoka/ps4-unreal-dumper)** by TetzkatLipHoka (MIT) - ReaperPy's Unreal
   Engine tools read the output of this dumper; calling a UFunction follows the method of its `uecall`. No code was copied.
+- **[Il2CppDumper](https://github.com/TetzkatLipHoka/Il2CppDumper)** by TetzkatLipHoka (MIT, fork of Perfare's Il2CppDumper) - the
+  UNITY tab reads its `dump.cs` and `script.json`. No code was copied.
 - **[PS5Debug-studio](https://github.com/alfizari/PS5Debug-studio)** by alfizari (Apache-2.0) - ReaperPy has its own
   architecture and code; only a few tweaks (small ideas and format details such as the `.shn` / `.mc4` layout) were taken over.
 

@@ -360,7 +360,7 @@ class PS5DebugClient:
         return True
 
     @_locked
-    def get_maps(self):
+    def get_maps(self, names=False):
         if self.pid is None:
             raise RuntimeError("Kein PID gesetzt")
         self._send_packet(CMD_PROC_MAPS, struct.pack("<I", self.pid))
@@ -381,8 +381,16 @@ class PS5DebugClient:
             off = i * 58
             start, end, _offset = struct.unpack_from("<QQQ", data, off + 32)
             prot = struct.unpack_from("<H", data, off + 56)[0]
-            out.append((start, end, prot))
+            if names:
+                nm = data[off:off + 32].split(b"\0", 1)[0].decode("utf-8", "replace")
+                out.append((start, end, prot, nm))
+            else:
+                out.append((start, end, prot))
         return out
+
+    def get_maps_named(self):
+        """Wie get_maps(), aber (start, end, prot, modulname) - Name z. B. 'Il2CppUserAssemblies.prx'."""
+        return self.get_maps(names=True)
 
     # ------------------------------------------------------------------
     # PID-Abfrage ohne Seiteneffekt (fuer den Watchdog)

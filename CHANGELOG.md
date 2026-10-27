@@ -5,6 +5,16 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 ## Unreleased
 
 ### Added
+- **UNITY tab for Unity (IL2CPP) games** (`il2cpp_dump.py`, `tools_unity_gui.py`): loads the Il2CppDumper output (`dump.cs`,
+  `script.json`; nested folders are found), detects the IL2CPP module base by checking class names in memory, lists live
+  instances by their class pointer (name-scan fallback when `script.json` has none), edits/freezes values, patches methods
+  (return TRUE/FALSE/value, make void empty - refused when the return type does not fit) with restore and `.reapproj` export,
+  and searches enum names (item IDs). Module detection uses the module names of the process map (like `il2mem.py`) and
+  treats execute-only code regions as valid module starts (PS5); on failure the log shows what is in memory.
+  **SCAN GAME** counts the real objects per class in one heap pass (subclass objects count for their base class) and the field
+  list then shows only classes that exist in memory; compiler-generated closure/iterator fields are hidden and
+  `<X>k__BackingField` is shown as `X`. The scan also remembers the object addresses, so clicking a field afterwards finds its
+  instances instantly (each address is re-checked); INSTANCES REFRESH rescans the heap, skipping module regions (.prx/eboot). Tests: `tests/test_il2cpp.py`, `tests/test_unity_tab.py`.
 - **Cheat menu: right-click -> build matching code cave** (`cheatmenu_cave.py`, `tools_cheatmenu_gui.py`). Finds the instructions
   that write the selected value (from the game folder's `dump.bin`, otherwise read live from the console), picks the best hit
   and saves a `.reapproj` in the project's patch folder. Cave types: *Value cannot decrease*, *Fix value* (new,

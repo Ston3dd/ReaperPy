@@ -1495,3 +1495,7 @@ EN.update({
     "Regionen-Bericht: ": "Region report: ",
     "nicht verbunden - im Hauptfenster VERBINDEN": "not connected - click CONNECT in the main window",
 })
+
+
+from tools_i18n_unity import EN_UNITY  # noqa: E402
+EN.update(EN_UNITY)
