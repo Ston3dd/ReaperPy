@@ -39,3 +39,42 @@ git add regionfilter.py tools_sections_gui.py tools_scan_gui.py scanner.py tools
 git commit -m "Cheat searcher: memory sections panel (eboot.bin split, hide system libs), new layout"
 git push
 ```
+
+---
+
+# Update 2: Tab "★ ITEMS" - alle Items als Trainer in drei Schritten
+
+Vorher: UE-LIVE laden -> UE-ENTDECKER -> ANALYSIEREN -> Geben-Funktion anklicken -> Tabelle lesen -> Zeilen wählen -> CAVE-TRAINER
+EXPORTIEREN (Menge, this, FName per Zeiger, Ordner ...). Jetzt ein Tab, drei Schritte:
+
+1. **SPIEL**: Spiel-Ordner wählen (wird gemerkt), im Hauptfenster verbinden, Spielstand laden. Der Tab zeigt ✔/✗ in Klartext.
+2. **ITEMS FINDEN**: sucht selbst die Item-Tabelle (Namen mit Item/Inventory/Loot/Weapon zuerst) und die Geben-Funktion, die der
+   Trainer bauen kann, liest alle Items live und teilt sie in Kategorien ein (Kategorie-Spalte, sonst Namens-Vorsilbe:
+   `Item_Fish_Trout` -> *Fish*). Haken setzen (Kästchen, Doppelklick, Leertaste, Rechtsklick), Suche, Kategorie-Filter,
+   ALLE AN / ALLE AUS.
+3. **TRAINER SPEICHERN**: Menge je Item, ein Klick. Einträge à 14 Items je Kategorie (*Fish 1*, *Fish 2* ..., ohne das Wort
+   "Item"). Mehr als 400 Items oder 64 Einträge -> mehrere Projekte (`Items 1`, `Items 2` ...), davon nur EINS gleichzeitig
+   aktivieren. Speicherort: Datenordner/trainer/<Spiel>/ (Button ORDNER ÖFFNEN). Beim Speichern wird im Spiel nur gelesen.
+
+Falls die Automatik falsch liegt: über der Liste *Item-Tabelle* / *Geben-Funktion* ändern. Gibt es keine baubare Funktion, sagt der
+Tab warum und verweist auf UE-ENTDECKER -> INVENTAR-EINTRÄGE SUCHEN.
+
+## Dateien (Update 2)
+neu: `ue_items.py`, `tools_items_gui.py`, `tests/test_ue_items.py`, `tests/test_gui_items.py`
+geändert: `tools_gui.py` (Tab registriert), `tools_start_gui.py` (Karte), `tools_discover_gui.py` (nutzt `ue_items.hook_targets`),
+`tools_i18n_en.py`, `tests/i18n_harvest.py`, `tests/test_tools_i18n.py`, `README.md`, `CHANGELOG.md`
+
+## Hinweise
+- Die Trainer-Erzeugung selbst ist der bisherige, getestete Code (cave_trainer / ue_cavegen); neu ist die Automatik davor.
+  Mit einer Fake-Konsole habe ich den ganzen Weg durchgespielt (Items lesen -> Pakete -> Cave-Plan -> Projektdateien), an einem
+  echten Spiel NICHT. Bitte zuerst mit einem Spielstand testen, den du nicht brauchst.
+- Die Kategorie-Einteilung ist eine Heuristik. Stimmt sie bei deinem Spiel nicht, sag mir die Tabellen-/Spaltennamen, dann passe ich sie an.
+
+## Git (Update 2)
+```
+git add ue_items.py tools_items_gui.py tools_gui.py tools_start_gui.py tools_discover_gui.py tools_i18n_en.py \
+        tests/test_ue_items.py tests/test_gui_items.py tests/i18n_harvest.py tests/test_tools_i18n.py \
+        README.md CHANGELOG.md UPDATE_NOTES_scan_sections.md
+git commit -m "New ITEMS tab: find all items and save them as a trainer in three steps"
+git push
+```

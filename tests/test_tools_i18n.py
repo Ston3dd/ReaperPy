@@ -362,7 +362,10 @@ class StartTabAndNavigation(unittest.TestCase):
         with Lang("en"):
             self.assertEqual(T.translate(S.STEPS[1][1][:30]), T.translate(S.STEPS[1][1][:30]))
             self.assertEqual(T.translate(S.STEPS[0][3]), "SHOW MAIN WINDOW")
-            self.assertEqual(T.translate(S.EXTRAS[1][2]), "OPEN ADVANCED")
+            adv = next(e for e in S.EXTRAS if e[3] == "adv_frame")               # nicht vom Listen-Index abhaengig
+            self.assertEqual(T.translate(adv[2]), "OPEN ADVANCED")
+            items = next(e for e in S.EXTRAS if e[3] == "items_tab")
+            self.assertEqual(T.translate(items[2]), "GO TO ITEMS")
 
     def test_show_tab_reaches_tabs_inside_advanced_notebook(self):
         from tools_gui import ToolsWindow

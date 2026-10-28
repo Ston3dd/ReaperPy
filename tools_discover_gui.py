@@ -16,6 +16,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import cave_trainer as TR
 import ue_cavegen as CG
+import ue_items as IT
 import ue_profile as P
 from tools_common import BG, TEXT_DIM, BaseTab, button, entry, label, tree, with_scroll
 
@@ -520,22 +521,7 @@ class DiscoverTab(BaseTab):
     # -- Cave-Trainer fuer beliebige Funktionen ----------------------------------------------------
     def _hook_targets(self, live):
         """Nur LESEN: ProcessEvent-Adresse + vtable-Slots der PlayerController -> (pe, slots, notizen)."""
-        import ue_hook as HK
-        import ue_call
-        sdk = self._sdk()
-        pidx = sdk.offset("process_event_index", "processeventindex", default=77)
-        prva = sdk.offset("process_event")
-        objs = []
-        try:
-            objs = [i["addr"] for i in live.instances("APlayerController") if "Default__" not in i["name"]]
-        except Exception:  # noqa: BLE001
-            pass
-        if not objs:
-            raise ValueError("Kein PlayerController gefunden - Spielstand laden (nicht im Hauptmenue)")
-        read = self.win.client.read_memory
-        pe = ue_call.process_event_addr(read, objs[0], pidx, fallback=(self.base + prva) if prva else None)
-        slots, notes = HK.find_slots(read, objs, pidx, pe)
-        return pe, slots, notes
+        return IT.hook_targets(self._sdk(), live, self.win.client.read_memory, self.base)
 
     def _parse_extra(self, text):
         out = {}

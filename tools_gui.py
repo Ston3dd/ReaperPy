@@ -959,7 +959,7 @@ class AobTab(BaseTab):
 # ==================================================================
 class ToolsWindow(tk.Toplevel):
     # Reihenfolge der Anfaenger-Tabs (START kommt zuerst, FORTGESCHRITTEN zuletzt)
-    SIMPLE = ("WERT SUCHEN", "CHEATS BEARBEITEN", "★ UE-LIVE", "★ UE-ENTDECKER", "★ CHEAT-MENÜ",
+    SIMPLE = ("WERT SUCHEN", "CHEATS BEARBEITEN", "★ ITEMS", "★ UE-LIVE", "★ UE-ENTDECKER", "★ CHEAT-MENÜ",
               "★ UNITY")
     ADVANCED = ("SPEICHER", "DISASSEMBLER", "POINTER", "KONVERTER", "AOB / UPDATE", "DEBUGGER", "KERNEL-LOG",
                 "PYTHON-SKRIPT", "FUNKTION AUFRUFEN", "FUNKTIONS-LOGGER", "JOURNAL / UNDO", "UE-AUTO")
@@ -1041,11 +1041,13 @@ class ToolsWindow(tk.Toplevel):
             self.after(200, lambda msg=msg: self.log(msg, "err"))
         self.extra_tabs = []
         self.discover_tab = None
+        self.items_tab = None
         # jeder Zusatz-Tab einzeln: ein defekter Tab darf die anderen nicht mitreissen
         extra = (("tools_extra_gui", "CallerTab", "FUNKTION AUFRUFEN"),
                  ("tools_extra_gui", "LoggerTab", "FUNKTIONS-LOGGER"),
                  ("tools_extra_gui", "JournalTab", "JOURNAL / UNDO"),
                  ("tools_uelive_gui", "UeLiveTab", "★ UE-LIVE"),
+                 ("tools_items_gui", "ItemsTab", "★ ITEMS"),
                  ("tools_discover_gui", "DiscoverTab", "★ UE-ENTDECKER"),
                  ("tools_cheatmenu_gui", "CheatMenuTab", "★ CHEAT-MENÜ"),
                  ("tools_unity_gui", "UnityTab", "★ UNITY"),
@@ -1058,6 +1060,8 @@ class ToolsWindow(tk.Toplevel):
                 tabs.append((t, name))
                 if clsname == "DiscoverTab":
                     self.discover_tab = t
+                if clsname == "ItemsTab":
+                    self.items_tab = t
             except Exception as e:
                 msg = f"Tab {name} nicht geladen: {e}"
                 self.after(200, lambda msg=msg: self.log(msg, "err"))

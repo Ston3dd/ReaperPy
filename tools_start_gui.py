@@ -26,7 +26,9 @@ STEPS = [
      "ZU CHEATS BEARBEITEN", "t_cheat"),
 ]
 EXTRAS = [
-    ("Unreal-Engine-Spiel?", "Items, Tabellen und Funktionen werden automatisch gefunden - ohne Suchen.",
+    ("Unreal-Engine-Spiel: Items als Trainer", "Alle Items eines Unreal-Spiels automatisch finden und als fertigen "
+     "Trainer speichern - in drei Klicks.", "ZU ITEMS", "items_tab"),
+    ("Unreal-Engine-Spiel: Spezialfälle", "Tabellen, Funktionen und Werte von Hand ansehen.",
      "UE-ENTDECKER ÖFFNEN", "discover_tab"),
     ("Mehr Werkzeuge", "Speicher, Disassembler, Debugger, Pointer, Skripte und Co. für Fortgeschrittene.",
      "FORTGESCHRITTEN ÖFFNEN", "adv_frame"),

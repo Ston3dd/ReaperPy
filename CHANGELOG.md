@@ -5,6 +5,12 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 ## Unreleased
 
 ### Added
+- **New tab ITEMS - all items as a trainer in three steps** (`ue_items.py`, `tools_items_gui.py`). Choose the game folder -> **FIND
+  ITEMS** (automatically picks the item table and a buildable give-function, reads all items live, sorts them into
+  categories) -> **SAVE TRAINER** (amount per item; entries of 14 per category such as *Fish 1*, *Fish 2*; more than 400 items
+  are spread over several projects). Checkbox list with search, category filter, right-click menu. Replaces the former
+  five manual steps across UE-LIVE / UE DISCOVERER. START tab gets a card for it. Tests: `tests/test_ue_items.py`,
+  `tests/test_gui_items.py`.
 - **Cheat searcher: MEMORY SECTIONS panel** (`regionfilter.py`, `tools_sections_gui.py`, `scanner.py`). The tab now lists what is
   in the game's memory - **eboot.bin split into its code / read-only / data sections**, game modules, one row per system
   library, heap, shared memory, stacks - with a checkbox per row and a **HIDE filter** (presets such as *all system

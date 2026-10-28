@@ -98,7 +98,10 @@ money), press **FIRST SCAN**, change the number in the game, type the new one, p
 addresses are left. Add them to the address list, set or freeze the value. *Who writes this?* shows the instruction
 that changes it - **EDIT CHEATS** turns it into a NOP patch or a code cave.
 
-**3. Unreal Engine game.** Open **UE-LIVE**, choose the game's SDK folder (output of
+**3. Unreal Engine game - all items as a trainer.** Open **ITEMS**, choose the game folder (step 1), click **FIND ITEMS**
+(step 2), then **SAVE TRAINER** (step 3). No tables, FNames or IDs to know - see [below](#unreal-engine-games).
+
+**3b. Unreal Engine game - single values.** Open **UE-LIVE**, choose the game's SDK folder (output of
 [ps4-unreal-dumper](https://github.com/TetzkatLipHoka/ps4-unreal-dumper)), click a value such as
 `UHealthComponent.Health`, see the live value on the right and change or freeze it. Or let **UE DISCOVERER** analyse the
 game and **CHEAT MENU** build switches for health, stamina, fly, speed ...
@@ -129,6 +132,7 @@ the registers when it stops, **STEP** / **STEP OVER** / **STEP OUT**, **CONTINUE
 | **START** | Three big steps for beginners with plain-language status: connected? codes found? Leads to the simple tools. |
 | **FIND VALUE** | The cheat searcher. Layout: found addresses on the left, scan controls on the right, your **address list** at the bottom. See [below](#find-value-the-cheat-searcher). |
 | **EDIT CHEATS** | Write a patch: name, author, offset from the image base. *Simple patch / NOP* (original bytes -> new bytes) or *Code cave* (assembly in a separate box, `jmp OriginReturn` goes back). Assembler or hex bytes are accepted; saved as `.reapproj`. |
+| **ITEMS** | The easy way for Unreal Engine games: **all items as a ready-made trainer in three steps** (game folder -> FIND ITEMS -> SAVE TRAINER). See [below](#unreal-engine-games). |
 | **UE-LIVE** | Live values of an Unreal Engine game: pick a member, see all live instances, change / freeze them. |
 | **UE DISCOVERER** | Analyses the SDK and tells you what is there to find: item structs, item tables, give-functions, stat enums, cheat managers - with a check whether a cave trainer can be built for each ("✔" / "✗ not possible: reason"). |
 | **UNITY** | The same idea for Unity (IL2CPP) games: load the Il2CppDumper folder, then change / freeze live values, patch methods (always true, fixed return value, skip) and look up enum names (item IDs). See [below](#unity-il2cpp-games). |
@@ -221,6 +225,23 @@ depend on how the game implements movement and damage - if a game ignores them, 
 
 ReaperPy reads the output of [ps4-unreal-dumper](https://github.com/TetzkatLipHoka/ps4-unreal-dumper): `offsets.json`,
 `SDK/SDK_HEADERS`, optionally `dump.bin`, `dump.json`, `GObjects.txt`. UE 4.23+ and UE 5 (FNamePool) are supported.
+
+**Items as a trainer (the easy way) - tab ITEMS**
+
+1. **Game** - choose the game folder (remembered) and connect in the main window; start the game and load a save.
+2. **FIND ITEMS** - ReaperPy picks the item table and a give-function it can build a trainer for, reads all items live and
+   sorts them into categories (from a category/type column or the item names, e.g. `Item_Fish_Trout` -> *Fish*). Tick or
+   untick items (click the box, double-click, Space, right-click menu), search by name, filter by category, **ALL ON / ALL
+   OFF** act on the visible rows. If the automatic choice looks wrong, change *Item table* / *Give function* above the list.
+3. **SAVE TRAINER** - enter the amount per item and save. Items become entries of 14 per category (*Fish 1*, *Fish 2* ...,
+   no "Item" in the names). Very large lists are spread over several projects (`Items 1`, `Items 2` ...; at most 400 items
+   and 64 entries per project) - activate only **one** at a time. The folder is a normal ReaperPy project: choose it,
+   activate `00 BASIS` once, then click entries. Saving only reads the game; nothing is changed until you activate BASIS.
+
+Not every game works: if the SDK has no give-function the trainer can build (the tab tells you why), use **UE DISCOVERER ->
+SEARCH INVENTORY ENTRIES** to set quantities directly in memory.
+
+**Manual way (special cases)**
 
 1. In **UE-LIVE** choose the game folder and connect. The object index is built once per game start.
 2. **UE DISCOVERER** -> **ANALYZE** for a plain-language summary and next step; **READ TABLE LIVE** lists item rows by name
