@@ -576,6 +576,7 @@ class UeTab(BaseTab):
 
     def _ensure_live(self, offline=False):
         import ue_live
+        import ue_quick as Q
 
         proj = self.proj
         if proj is None:
@@ -615,6 +616,7 @@ class UeTab(BaseTab):
                 if len(bases) > 1
                 else str(error)
             )
+        Q.attach_fast(live, client, lambda m: self.log(m, "info"))  # parallele Lese-Verbindungen fuer den Objekt-Index
         self.live = live
         self.log(
             f"GObjects {live.num_elements} Objekte, Item {live.item_size:#x}, Name-Pool ok, Basis {live.base:#x}", "ok"

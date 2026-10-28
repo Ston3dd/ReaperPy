@@ -109,6 +109,18 @@ class UeLiveTab(BaseTab):
             font=FONT_LABEL,
         ).pack(side="left", padx=4)
         button(fr2, "↻ INSTANZEN NEU", lambda: self.refind(force=True)).pack(side="right", padx=2)
+        self.v_fast = tk.BooleanVar(value=Q.FAST_READ)
+        tk.Checkbutton(
+            fr2,
+            text="schnell lesen (mehrere Verbindungen)",
+            variable=self.v_fast,
+            command=lambda: setattr(Q, "FAST_READ", bool(self.v_fast.get())),  # im UI-Thread; die Jobs lesen nur Q.FAST_READ
+            bg=BG,
+            fg=TEXT_DIM,
+            selectcolor=BG,
+            activebackground=BG,
+            font=FONT_LABEL,
+        ).pack(side="left", padx=4)
 
         row_actions = [
             ("Wert ändern…", self.edit_dialog),

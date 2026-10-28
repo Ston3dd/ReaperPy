@@ -48,6 +48,15 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
   found, the log lists the modules. Tests: `tests/test_imagebase.py`.
 
 ### Changed
+- **UNREAL: much faster object index / instance scan** (`fastread.py`, `ue_live.py`, `ue_quick.py`). Building the object index (the
+  step behind *UE-LIVE*, *UE DISCOVERER*, *ITEMS* and every "find instances") used to read one 64 KB page after the other over a
+  single connection. Now the object headers are collected into a few large read windows (`fastread.plan_windows`), read in parallel
+  over several extra connections to the payload while the previous window is parsed, and the name pool is fetched block-wise in
+  parallel instead of name by name. Checkbox *read fast (several connections)* in the UE-LIVE tab (on by default; falls back to
+  fewer connections if they cannot be opened, and to the old one-by-one path if anything goes wrong). The log shows objects, time
+  and number of connections. Extra connections of a replaced game session are closed. `UELive.instances()` also checks the class
+  before the template test, so it no longer walks the owner chain for every object in the game. The result is identical to the old
+  path (same entries, same order). Tests: `tests/test_ue_live_fast.py`.
 - **UNITY: much faster instance scan and census** (`il2cpp_dump.py`, `tools_unity_gui.py`). Big memory ranges are now read in parallel over
   several extra connections to the payload (checkbox *read fast (several connections)*, on by default; falls back to one connection if
   they cannot be opened) and the next block is read while the previous one is searched. The census (*SCAN GAME*) no longer tests every

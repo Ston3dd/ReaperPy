@@ -9,9 +9,16 @@ sonst aus typischen Standardwerten; Array-Layout und Name-Pool werden gegen den 
 """
 
 import struct
+import threading
+import time
+
+import fastread
 
 BLOCK = 0x10000  # Objekte je Chunk
 READ_BLOCK = 0x10000  # Cache-Blockgroesse beim Lesen
+NAME_BLOCK = 0x20000  # Byte je Block im FNamePool (65536 Eintraege * Stride 2)
+INDEX_GAP = 0x400  # Objekt-Koepfe, die hoechstens so weit auseinanderliegen, werden in EINEM Read geholt
+INDEX_WINDOW = 0x80000  # groesstes Lesefenster beim Objekt-Index
 
 
 class UELiveError(RuntimeError):
@@ -31,8 +38,16 @@ def _valid_ptr(p):
 
 
 class UELive:
-    def __init__(self, read, module_base, sdk=None, gobjects_rva=None, gnames_rva=None, log=print):
+    fast = True  # build_index: parallel + zusammengelegte Lesefenster (False = alter Einzel-Weg)
+
+    def __init__(self, read, module_base, sdk=None, gobjects_rva=None, gnames_rva=None, log=print,
+                 extra_readers=(), closers=()):
         self._read = read
+        self._rlock = threading.Lock()  # Hauptverbindung: Hintergrund-Lesen und Hauptthread nie gleichzeitig
+        self.extra_readers = list(extra_readers)  # weitere Verbindungen: lesen den Objekt-Index parallel
+        self._closers = list(closers)
+        self.index_stats = None  # nach build_index: {"objects", "seconds", "readers", "mode"}
+        self._base_names = {}  # FName-Index -> Text (aus dem parallel gelesenen Name-Pool)
         self.base = module_base
         self.sdk = sdk
         self.log = log
@@ -88,6 +103,27 @@ class UELive:
             out += page[a - block : a - block + take]
             a += take
         return bytes(out)
+
+    def _lread(self, addr, n):
+        """Hauptverbindung mit Sperre (fuer Lesen im Hintergrund-Thread und Rueckfall im Hauptthread)."""
+        with self._rlock:
+            return self._read(addr, n)
+
+    def readers(self):
+        """Alle Lese-Funktionen: Hauptverbindung (gesperrt) + zusaetzliche Verbindungen."""
+        return [self._lread] + list(self.extra_readers)
+
+    def attach_readers(self, readers, closers=()):
+        self.close_readers()
+        self.extra_readers, self._closers = list(readers), list(closers)
+
+    def close_readers(self):
+        for c in self._closers:
+            try:
+                c()
+            except Exception:
+                pass
+        self._closers, self.extra_readers = [], []
 
     def drop_cache(self):
         self._pages.clear()
@@ -375,6 +411,11 @@ class UELive:
         key = (idx, number)
         if key in self.names_cache:
             return self.names_cache[key]
+        pre = self._base_names.get(idx)
+        if pre is not None:  # schon parallel mit dem ganzen Name-Pool gelesen
+            text = pre + (f"_{number - 1}" if number > 0 else "")
+            self.names_cache[key] = text
+            return text
         blk, off = idx >> 16, (idx & 0xFFFF) * 2
         base = _u64(self.rd(self.pool_blocks + blk * 8, 8))
         if not _valid_ptr(base):
@@ -451,7 +492,129 @@ class UELive:
                 progress(min(n, (c + 1) * BLOCK), n)
 
     def build_index(self, progress=None):
-        """Einmal ueber alle Objekte: {adresse: (index, class_ptr, name)}  (dauert je nach Spiel)."""
+        """Einmal ueber alle Objekte: {adresse: (index, class_ptr, name)}  (dauert je nach Spiel).
+        Schneller Weg (Standard): Objekt-Koepfe werden zu grossen Fenstern zusammengelegt und ueber mehrere
+        Verbindungen gleichzeitig gelesen, der Name-Pool wird blockweise parallel geholt.  Geht dabei etwas schief,
+        laeuft der alte Einzel-Weg."""
+        t0 = time.time()
+        if self.fast:
+            try:
+                idx = self._build_index_fast(progress)
+                self.index_stats = {"objects": len(idx), "seconds": time.time() - t0,
+                                    "readers": 1 + len(self.extra_readers), "mode": "fast"}
+                self.log(f"UE-LIVE: Objekt-Index: {len(idx)} Objekte in {self.index_stats['seconds']:.1f} s "
+                         f"({self.index_stats['readers']} Verbindung(en))")
+                return idx
+            except Exception as error:  # noqa: BLE001
+                self.log(f"UE-LIVE: Schneller Objekt-Index fehlgeschlagen ({error}) - lese einzeln")
+        idx = self._build_index_serial(progress)
+        self.index_stats = {"objects": len(idx), "seconds": time.time() - t0, "readers": 1, "mode": "serial"}
+        return idx
+
+    def _object_pointers(self):
+        """[(index, objekt_zeiger)] in Index-Reihenfolge; die Chunks der Objekt-Tabelle werden parallel gelesen."""
+        n = self.num_elements
+        nchunks = (n + BLOCK - 1) // BLOCK
+        table = self.rd(self._objs, nchunks * 8)
+        isz = self.item_size
+        jobs = []
+        for c in range(nchunks):
+            chunk = _u64(table, c * 8)
+            if _valid_ptr(chunk):
+                cnt = min(BLOCK, n - c * BLOCK)
+                jobs.append((chunk, cnt * isz, (c, cnt, chunk)))
+        out = []
+        for (c, cnt, chunk), raw in fastread.stream(self.readers(), jobs):
+            if raw is None:
+                raw = bytes(self._lread(chunk, cnt * isz))  # wie frueher: scheitert auch das, ist es ein Fehler
+            if isz % 8 == 0:
+                words = memoryview(raw).cast("Q")[:: isz // 8]
+                ptrs = words.tolist()
+            else:
+                ptrs = [_u64(raw, i * isz) for i in range(cnt)]
+            base = c * BLOCK
+            out.extend((base + i, p) for i, p in enumerate(ptrs) if _valid_ptr(p))
+        return out
+
+    def _decode_name(self, buf, off):
+        """Name-Eintrag an Offset off eines Name-Pool-Blocks -> Text | None (Eintrag ragt aus dem Puffer)."""
+        if off + 2 > len(buf):
+            return None
+        hdr = struct.unpack_from("<H", buf, off)[0]
+        length, wide = (hdr >> 1 if self.name_style == "ue4" else hdr >> 6), hdr & 1
+        size = length * (2 if wide else 1)
+        if off + 2 + size > len(buf):
+            return None
+        return bytes(buf[off + 2: off + 2 + size]).decode("utf-16-le" if wide else "latin-1", "replace")
+
+    def _prefetch_names(self, ids):
+        """Alle gebrauchten FName-Indizes auf einmal: jeder betroffene Name-Pool-Block wird komplett (parallel)
+        gelesen.  Was so nicht klappt, holt fname_str spaeter einzeln."""
+        by_blk = {}
+        for i in ids:
+            by_blk.setdefault(i >> 16, []).append(i)
+        jobs = []
+        for blk in sorted(by_blk):
+            try:
+                base = _u64(self.rd(self.pool_blocks + blk * 8, 8))
+            except Exception:
+                continue
+            if _valid_ptr(base):
+                jobs.append((base, NAME_BLOCK, blk))
+        for blk, buf in fastread.stream(self.readers(), jobs):
+            if buf is None:
+                continue
+            for i in by_blk[blk]:
+                text = self._decode_name(buf, (i & 0xFFFF) * 2)
+                if text is not None:
+                    self._base_names[i] = text
+
+    def _build_index_fast(self, progress=None):
+        items = self._object_pointers()
+        total = max(1, len(items))
+        hlen = max(self.o_outer, self.o_name, self.o_class) + 8
+        order = sorted(range(len(items)), key=lambda k: items[k][1])
+        addrs = [items[k][1] for k in order]
+        wins = fastread.plan_windows(addrs, hlen, INDEX_GAP, INDEX_WINDOW)
+        jobs = [(start, length, (start, lo, hi)) for start, length, lo, hi in wins]
+        heads = [None] * len(items)  # Objekt-Kopf je Eintrag, in Index-Reihenfolge
+        done = 0
+        for (start, lo, hi), buf in fastread.stream(self.readers(), jobs):
+            for j in range(lo, hi):
+                a = addrs[j]
+                try:
+                    if buf is not None:
+                        heads[order[j]] = bytes(buf[a - start: a - start + hlen])
+                    else:  # Fenster nicht lesbar -> dieses Objekt einzeln
+                        heads[order[j]] = bytes(self._lread(a, hlen))
+                except Exception:
+                    pass  # wie frueher: Objekt ohne lesbaren Kopf auslassen
+            done += hi - lo
+            if progress:
+                progress(done, total)
+        parsed, names = [], set()
+        for k, hdr in enumerate(heads):
+            if hdr is None or len(hdr) < hlen:
+                continue
+            nidx = _u32(hdr, self.o_name)
+            names.add(nidx)
+            parsed.append((items[k][0], items[k][1], _u64(hdr, self.o_class), nidx, _u32(hdr, self.o_name + 4),
+                           _u64(hdr, self.o_outer), _u32(hdr, 8)))
+        self._prefetch_names(names)
+        idx, outers, rflags = {}, {}, {}
+        for i, ptr, cl, nidx, nnum, outer, flags in parsed:
+            try:
+                nm = self.fname_str(nidx, nnum)
+            except Exception:
+                continue
+            idx[ptr] = (i, cl, nm)
+            outers[ptr] = outer
+            rflags[ptr] = flags  # UObject.ObjectFlags (RF_ClassDefaultObject 0x10, RF_ArchetypeObject 0x20)
+        self.index, self.outers, self.rflags = idx, outers, rflags
+        return idx
+
+    def _build_index_serial(self, progress=None):
+        """Alter Weg: Objekt fuer Objekt ueber den Seiten-Cache (eine Verbindung, nichts parallel).  Rueckfall."""
         idx, outers, rflags = {}, {}, {}
         n_total = max(1, self.num_elements)
         for i, ptr in self.iter_objects():
@@ -556,11 +719,16 @@ class UELive:
         if not cls:
             return []
         out = []
+        match = {}  # Klassenzeiger -> passt? (nur wenige verschiedene Klassen, daher nicht je Objekt neu rechnen)
         for key, (i, cl, nm) in self.index.items():
+            ok = match.get(cl)
+            if ok is None:
+                ok = match[cl] = cl == cls or (subclasses and cls in self.ancestors(cl))
+            if not ok:
+                continue
             if not include_defaults and (nm.startswith("Default__") or self.is_template(key)):
                 continue
-            if cl == cls or (subclasses and cls in self.ancestors(cl)):
-                out.append({"addr": key, "index": i, "name": nm, "class": self.index.get(cl, (0, 0, "?"))[2]})
+            out.append({"addr": key, "index": i, "name": nm, "class": self.index.get(cl, (0, 0, "?"))[2]})
         for item in out[:500]:  # Besitzer (Outer) dazu: "CHA_Xaurip_C_123" statt nur "AttributeSetCore"
             try:
                 outer = self.outer(item["addr"])

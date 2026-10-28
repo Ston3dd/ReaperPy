@@ -9,6 +9,7 @@ deshalb ohne Konsole testbar.
   write_value     schreiben (Bitfelder per Lesen-Aendern-Schreiben)
   Freezer         haelt Werte fest (ein Bulk-Write je Tick)
   connect_live    GObjects/GNames im laufenden Spiel erkennen (mehrere Basisadressen probieren)
+  attach_fast     zusaetzliche Lese-Verbindungen fuer den schnellen Objekt-Index
 """
 
 import struct
@@ -275,15 +276,43 @@ class Freezer:
         return len(writes)
 
 
-def connect_live(client, proj, log=print, cached=None):
+FAST_READ = True  # Standard: mehrere Lese-Verbindungen fuer den Objekt-Index (GUI: Haken "schnell lesen")
+
+
+def attach_fast(live, client, log=print, fast=None):
+    """Zusaetzliche Verbindungen zum Payload oeffnen und am UELive anmelden (paralleles Lesen).  Gelingt das nicht,
+    wird mit der einen Verbindung gelesen - der Index ist dann nur etwas langsamer.  fast=False schliesst sie wieder."""
+    import fastread
+
+    if fast is None:
+        fast = FAST_READ
+    if not fast:
+        live.close_readers()
+        return 0
+    if live.extra_readers:
+        return len(live.extra_readers)
+    readers, closers, error = fastread.open_readers(client)
+    if error:
+        log(f"UE-LIVE: Zusätzliche Verbindungen nicht möglich ({error}) - lese mit weniger Verbindungen")
+    if readers:
+        live.attach_readers(readers, closers)
+        log(f"UE-LIVE: {len(readers)} zusätzliche Lese-Verbindung(en) geöffnet")
+    return len(readers)
+
+
+def connect_live(client, proj, log=print, cached=None, fast=None):
     """UELive fuer das laufende Spiel bereitstellen (gleiche Strategie wie UE-AUTO: mehrere
-    Basisadressen, absolute Adressen und Layout aus dump.bin.engine.json).  cached = vorheriges UELive."""
+    Basisadressen, absolute Adressen und Layout aus dump.bin.engine.json).  cached = vorheriges UELive.
+    fast: zusaetzliche Lese-Verbindungen fuer den Objekt-Index (None = FAST_READ)."""
     import ue_live
 
     pid = getattr(client, "pid", None)
     if cached is not None and cached._read == client.read_memory and cached.arr:
         if getattr(cached, "pid", None) == pid:  # Spiel neu gestartet (neue PID) -> alles neu live suchen
+            attach_fast(cached, client, log, fast)
             return cached
+    if cached is not None and hasattr(cached, "close_readers"):
+        cached.close_readers()  # altes UELive wird ersetzt: seine Zusatz-Verbindungen schliessen
     bases = [proj.base]
     try:
         module_base = ue_live.live_module_base(client.get_maps())
@@ -303,6 +332,7 @@ def connect_live(client, proj, log=print, cached=None):
         raise RuntimeError(
             f"{error}\n(Spiel gestartet und Level/Spielstand geladen? Heap-Adressen aendern sich bei jedem Start.)"
         ) from None
+    attach_fast(live, client, log, fast)
     return live
 
 

@@ -1630,3 +1630,5 @@ EN.update({
 
 from tools_i18n_unity import EN_UNITY  # noqa: E402
 EN.update(EN_UNITY)
+from tools_i18n_ue_fast import EN_UE_FAST  # noqa: E402
+EN.update(EN_UE_FAST)
