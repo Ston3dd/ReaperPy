@@ -104,13 +104,17 @@ class PS5DebugClient:
         self.lock = threading.RLock()
 
     def _recv_exact(self, n):
-        buf = b""
-        while len(buf) < n:
-            chunk = self.sock.recv(n - len(buf))
-            if not chunk:
+        """n Byte lesen - direkt in einen vorab angelegten Puffer (kein Aneinanderhaengen: bei vielen kleinen
+        Teilstuecken kopiert `buf += chunk` quadratisch)."""
+        buf = bytearray(n)
+        view = memoryview(buf)
+        got = 0
+        while got < n:
+            k = self.sock.recv_into(view[got:], n - got)
+            if not k:
                 raise ConnectionError("Verbindung geschlossen")
-            buf += chunk
-        return buf
+            got += k
+        return bytes(buf)
 
     def _send_packet(self, cmd, data=b""):
         pkt = struct.pack("<III", PACKET_MAGIC, cmd, len(data)) + data
@@ -160,6 +164,12 @@ class PS5DebugClient:
         self.last_error = None
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.settimeout(self.timeout)
+        for level, opt, val in ((socket.IPPROTO_TCP, socket.TCP_NODELAY, 1),
+                                (socket.SOL_SOCKET, socket.SO_RCVBUF, 4 * 1024 * 1024)):
+            try:                                   # grosser Empfangspuffer: deutlich mehr Durchsatz beim Lesen grosser Bereiche
+                self.sock.setsockopt(level, opt, val)
+            except OSError:
+                pass
         try:
             self.sock.connect((self.host, self.port))
             self._send_packet(CMD_VERSION)

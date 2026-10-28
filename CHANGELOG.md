@@ -48,6 +48,13 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
   found, the log lists the modules. Tests: `tests/test_imagebase.py`.
 
 ### Changed
+- **UNITY: much faster instance scan and census** (`il2cpp_dump.py`, `tools_unity_gui.py`). Big memory ranges are now read in parallel over
+  several extra connections to the payload (checkbox *read fast (several connections)*, on by default; falls back to one connection if
+  they cannot be opened) and the next block is read while the previous one is searched. The census (*SCAN GAME*) no longer tests every
+  8-byte word in a Python loop: with `numpy` installed (optional, `pip install numpy`) it is about 20x faster, without it about 3x.
+  Tests: `tests/test_il2cpp_fast.py`.
+- **Faster reading from the console** (`ps5_client.py`): replies are received straight into a preallocated buffer instead of being
+  concatenated piece by piece, and the socket uses a 4 MB receive buffer and `TCP_NODELAY`.
 - **Cheat searcher layout** redesigned: three columns (hits | scan | sections) with card headers, filled primary buttons,
   right-click menus for hits and address list, rarely used settings moved to an **OPTIONS** dialog (self-test and region
   report are there too). No functions removed.

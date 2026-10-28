@@ -1,4 +1,4 @@
-"""tools_i18n_unity.py - Deutsch -> Englisch fuer den Unity-Tab (wird in tools_i18n_en.EN eingemischt)."""
+"""tools_i18n_unity.py - Deutsch -> Englisch für den Unity-Tab (wird in tools_i18n_en.EN eingemischt)."""
 
 EN_UNITY = {
     '★ UNITY': '★ UNITY',
@@ -71,19 +71,19 @@ EN_UNITY = {
     'UNITY: Patch fehlgeschlagen: ': 'UNITY: patch failed: ',
     'UNITY: suche Klasse/Instanzen im Speicher (beim ersten Mal etwas Geduld) …': 'UNITY: searching class/instances in memory (patience on the first run) …',
     ' Wert(e) eingefroren (aktueller Wert wird gehalten)': ' value(s) frozen (current value is held)',
-    'Kein Modul passt zu den Klassennamen aus dump.cs. Stimmen Spiel-Version und Dump? Ist das Spiel schon im Menue/Spielstand geladen? Notfalls die Basis von Hand eintragen.':
+    'Kein Modul passt zu den Klassennamen aus dump.cs. Stimmen Spiel-Version und Dump? Ist das Spiel schon im Menü/Spielstand geladen? Notfalls die Basis von Hand eintragen.':
         'No module matches the class names from dump.cs. Do game version and dump match? Is the game already in the menu/save loaded? If needed, enter the base by hand.',
-    'script.json fehlt oder enthaelt keine TypeInfo-Zeiger - Modul-Basis nicht pruefbar': 'script.json is missing or has no TypeInfo pointers - module base cannot be verified',
-    "' ist void und hat keinen Rueckgabewert - waehle 'Methode leer machen'.": "' is void and has no return value - choose 'Make method empty'.",
+    'script.json fehlt oder enthält keine TypeInfo-Zeiger - Modul-Basis nicht prüfbar': 'script.json is missing or has no TypeInfo pointers - module base cannot be verified',
+    "' ist void und hat keinen Rückgabewert - wähle 'Methode leer machen'.": "' is void and has no return value - choose 'Make method empty'.",
     'dump.cs nicht gefunden.': 'dump.cs not found.',
     ' davon im Spiel-Code (Assembly-CSharp)': ' of them in game code (Assembly-CSharp)',
-    " zurueck, nicht bool. Nimm 'Wert zurueckgeben'.": " back, not bool. Use 'returns value'.",
+    " zurück, nicht bool. Nimm 'Wert zurückgeben'.": " back, not bool. Use 'returns value'.",
     ' ist kein einfacher Zahlentyp (Objekt/Struct) - nicht patchbar.': ' is not a simple number type (object/struct) - not patchable.',
     'script.json fehlt: Methoden-Patches gehen, aber keine Live-Instanzen (TypeInfo-Zeiger fehlen)': 'script.json missing: method patches work, but no live instances (TypeInfo pointers missing)',
     'script.json nicht lesbar: ': 'script.json not readable: ',
-    'Kein Modul passt zu den Klassennamen aus dump.cs. Stimmen Spiel-Version und Dump (derselbe Build)? Ist das Spiel schon im Menue/Spielstand geladen? Notfalls die Basis von Hand eintragen.':
+    'Kein Modul passt zu den Klassennamen aus dump.cs. Stimmen Spiel-Version und Dump (derselbe Build)? Ist das Spiel schon im Menü/Spielstand geladen? Notfalls die Basis von Hand eintragen.':
         'No module matches the class names from dump.cs. Do game version and dump (same build) match? Is the game already in the menu/save loaded? If needed, enter the base by hand.',
-    'Tabelle nicht direkt gefunden - suche ueber Klassen im Speicher (dauert laenger) ...': 'Table not found directly - searching via classes in memory (takes longer) ...',
+    'Tabelle nicht direkt gefunden - suche über Klassen im Speicher (dauert länger) ...': 'Table not found directly - searching via classes in memory (takes longer) ...',
     ' nicht lesbar (nicht in der Speicherkarte)': ' not readable (not in the memory map)',
     ' gefunden (': ' found (',
     ' (der Rest wird von IL2CPP erst beim ersten Benutzen gesetzt)': ' (IL2CPP only sets the rest on first use)',
@@ -102,4 +102,69 @@ EN_UNITY = {
     '  - ② b. SPIEL SCANNEN zeigt nur Felder von Klassen, die im Spiel wirklich existieren': '  - ② b. SCAN GAME shows only fields of classes that really exist in the game',
     '  - nur Klassen mit Objekten im Speicher (': '  - only classes with objects in memory (',
     ' Klassen)': ' classes)',
+    # --- il2cpp_dump.py: Lade-/Erkennungs-Meldungen -------------------------------------------------------------
+    'Unity-Spiel': 'Unity game',
+    'Diagnose ': 'Diagnosis ',
+    ' Klassen-Slots erwartet ab RVA ': ' class slots expected from RVA ',
+    '  davon befüllt: ': '  of them filled: ',
+    'Prüfe ': 'Checking ',
+    ' Speicherregionen auf das IL2CPP-Modul ...': ' memory regions for the IL2CPP module ...',
+    'dump.cs gelesen: ': 'dump.cs read: ',
+    ' Klassen': ' classes',
+    ' Es gibt zwar einen DummyDll-Ordner, aber die Felder-Offsets und Methoden-Adressen stehen in dump.cs - Il2CppDumper schreibt beide zusammen; bitte dump.cs mit in den Ordner legen.':
+        ' There is a DummyDll folder, but the field offsets and method addresses are in dump.cs - Il2CppDumper writes both together; please put dump.cs into the folder as well.',
+    'Insgesamt ': 'In total ',
+    ' Klassen: ': ' classes: ',
+    ' Spiel-Code (Assembly-CSharp), ': ' game code (Assembly-CSharp), ',
+    ' Unity-/System-Bibliotheken; ': ' Unity/system libraries; ',
+    ' Methoden, ': ' methods, ',
+    ': erwartet ': ': expected ',
+    ', Zeiger ': ', pointer ',
+    ', im Speicher gelesen ': ', read from memory ',
+    ' Klassennamen bestätigt)': ' class names confirmed)',
+    'IL2CPP-Modul ': 'IL2CPP module ',
+    ' Regionen geprüft': ' regions checked',
+    " zurück - leer machen geht nur bei void (sonst Absturz). Nimm 'Wert zurückgeben'.":
+        " back - emptying only works for void methods (otherwise crash). Use 'returns value'.",
+    'Rückgabetyp ': 'Return type ',
+    'script.json gelesen: ': 'script.json read: ',
+    ' Klassen-Zeiger (darüber werden die Klassen im Spiel gefunden)': ' class pointers (used to find the classes in the game)',
+    ' über ': ' via ',
+    # --- tools_unity_gui.py: Oberflaeche, Info-Feld, Meldungen --------------------------------------------------
+    '① Spiel-Ordner wählen und laden (dump.cs + script.json)   ② Spiel starten, Spielstand laden, MODUL ERKENNEN   ③ SPIEL SCANNEN - danach zeigt WERTE nur, was im Spiel wirklich existiert':
+        '① Choose and load the game folder (dump.cs + script.json)   ② Start the game, load a save, DETECT MODULE   ③ SCAN GAME - then VALUES shows only what really exists in the game',
+    '  - ③ SPIEL SCANNEN zeigt nur Felder von Klassen, die im Spiel wirklich existieren':
+        '  - ③ SCAN GAME shows only fields of classes that really exist in the game',
+    ': kein Objekt dieser Klasse im Speicher. Die Klasse wird oft erst im Spiel erzeugt - Spielstand laden / Menü öffnen, dann ↻ INSTANZEN NEU. Alternativ ein anderes Feld derselben Klasse versuchen.':
+        ': no object of this class in memory. The class is often only created in the game - load a save / open the menu, then ↻ INSTANCES REFRESH. Or try another field of the same class.',
+    ': Klasse im Spiel noch nicht initialisiert (oder STATIC-OFFSET passt nicht). Spielstand laden, dann ↻ INSTANZEN NEU.':
+        ': class not yet initialized in the game (or STATIC OFFSET does not fit). Load a save, then ↻ INSTANCES REFRESH.',
+    'Noch nichts geladen. Wähle den Ordner, in dem dump.cs und script.json von Il2CppDumper liegen (verschachtelte Ordner sind egal), und drücke ① LADEN.':
+        'Nothing loaded yet. Choose the folder containing dump.cs and script.json from Il2CppDumper (nested folders are fine) and press ① LOAD.',
+    'nur Spiel-Code': 'only game code',
+    'PROTOKOLL (Griff darüber zieht die Größe)': 'LOG (drag the handle above to resize)',
+    'DUMP: ': 'DUMP: ',
+    ' Klassen insgesamt = ': ' classes in total = ',
+    ' Spiel-Code (Assembly-CSharp) + ': ' game code (Assembly-CSharp) + ',
+    ' Klassen haben einen Zeiger in script.json (damit finden wir sie im Spiel).': ' classes have a pointer in script.json (that is how we find them in the game).',
+    'ANZEIGE: ': 'SHOWN: ',
+    ' Felder (Zahlen, Ja/Nein, Enums), die sich ändern lassen.': ' fields (numbers, yes/no, enums) that can be changed.',
+    'MODUL: noch nicht erkannt - Spiel starten, Spielstand laden, ② MODUL ERKENNEN.': 'MODULE: not detected yet - start the game, load a save, ② DETECT MODULE.',
+    'SCAN: noch nicht gescannt. Klassen sind die Baupläne aus dem Dump; nur Objekte, die gerade im Spiel existieren, haben Werte, die sich ändern lassen. ③ SPIEL SCANNEN findet sie.':
+        'SCAN: not scanned yet. Classes are the blueprints from the dump; only objects that currently exist in the game have values that can be changed. ③ SCAN GAME finds them.',
+    'MODUL: IL2CPP-Code im Spiel bei ': 'MODULE: IL2CPP code in the game at ',
+    ' Klassen haben Objekte im Speicher. Die Liste zeigt nur diese Klassen.': ' classes have objects in memory. The list shows only these classes.',
+    ': geladen - jetzt Spiel starten, Spielstand laden und ② MODUL ERKENNEN': ': loaded - now start the game, load a save and ② DETECT MODULE',
+    ' Klassen) - weiter mit ③ SPIEL SCANNEN': ' classes) - continue with ③ SCAN GAME',
+    ' im IL2CPP-Modul. Image-Basis = IL2CPP-Modul-Basis.': ' in the IL2CPP module. Image base = IL2CPP module base.',
+    'sofort aus dem Scan': 'instantly from the scan',
+    'Speicher durchsucht': 'memory searched',
+    'SCHNELL': 'QUICK',
+    'WIRKT AUF': 'APPLIES TO',
+    '① LADEN': '① LOAD',
+    '③ SPIEL SCANNEN': '③ SCAN GAME',
+    'schnell lesen (mehrere Verbindungen)': 'read fast (several connections)',
+    ' zusätzliche Lese-Verbindung(en) geöffnet': ' extra read connection(s) opened',
+    'UNITY: Zusätzliche Verbindungen nicht möglich (': 'UNITY: Extra connections not possible (',
+    ') - lese mit einer Verbindung': ') - reading with one connection',
 }

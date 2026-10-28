@@ -265,6 +265,22 @@ class T(unittest.TestCase):
         self.assertEqual(live.last_source, "cache")
         self.assertTrue(all(n <= 16 for _a, n in reads), reads)
 
+    def test_parallel_readers_give_same_results(self):
+        """Mehrere Verbindungen (extra_readers) liefern dieselben Instanzen und Zaehler wie eine."""
+        mem, live, _reads = self._census_world()
+        w = self.g.find_class("Wallet")
+        single = live.instances(w, use_cache=False)
+        counts1, _ = live.census()
+        mem2, live2, _r2 = self._census_world()
+        live2.extra_readers = [mem2.read, mem2.read, mem2.read]
+        self.assertEqual(live2.instances(w, use_cache=False), single)
+        self.assertEqual(live2.last_source, "scan")
+        self.assertEqual(live2.census()[0], counts1)
+        closed = []
+        live2._closers = [lambda: closed.append(1)]
+        live2.close_readers()
+        self.assertEqual((closed, live2.extra_readers), ([1], []))
+
     def test_cache_drops_freed_objects(self):
         mem, live, reads = self._census_world()
         live.census()

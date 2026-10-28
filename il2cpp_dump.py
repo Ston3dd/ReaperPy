@@ -1,18 +1,18 @@
 """il2cpp_dump.py - Unity-(IL2CPP)-Spiele: Ausgabe von Il2CppDumper lesen und im laufenden Spiel benutzen.
 
-Das ist das Gegenstueck zu uesdk.py/ue_live.py fuer Unreal.  Keine Oberflaeche, kein Netzwerk-Code: alles
-bekommt read/write-Funktionen uebergeben und ist deshalb ohne Konsole testbar.
+Das ist das Gegenstueck zu uesdk.py/ue_live.py für Unreal.  Keine Oberflaeche, kein Netzwerk-Code: alles
+bekommt read/write-Funktionen übergeben und ist deshalb ohne Konsole testbar.
 
 Eingabe ist ein Spiel-Ordner mit der Ausgabe von Il2CppDumper (Fork TetzkatLipHoka):
     dump.cs          Klassen, Felder (mit Offsets), Methoden (mit RVA), Enums           <- wichtig
-    script.json      Methodennamen mit Adresse + TypeInfo-Zeiger der Klassen             <- fuer Live-Zugriff
-    DummyDll/        (optional) dieselben Daten als .NET-DLLs fuer dnSpy/ILSpy - wird hier nicht gebraucht
+    script.json      Methodennamen mit Adresse + TypeInfo-Zeiger der Klassen             <- für Live-Zugriff
+    DummyDll/        (optional) dieselben Daten als .NET-DLLs für dnSpy/ILSpy - wird hier nicht gebraucht
 Die Ordner duerfen verschachtelt liegen (z. B. entpackte ZIPs): find_game_files() sucht darin.
 
   GameDump         geladen: .classes, .methods, .typeinfo_rva; Suche, Zahlen-Felder, Enum-Namen
   find_module_base Basisadresse des IL2CPP-Moduls im laufenden Spiel (per Klassennamen-Pruefung, nicht raten)
   Il2CppLive       Instanzen einer Klasse im Heap finden, statische Felder lesen
-  patch_*          Bytes fuer einfache Methoden-Patches (Rueckgabewert festlegen / Methode leer machen)
+  patch_*          Bytes für einfache Methoden-Patches (Rückgabewert festlegen / Methode leer machen)
 """
 
 import json
@@ -32,7 +32,7 @@ PRIMS = {
     "int32": "int32", "uint32": "uint32", "int64": "int64", "uint64": "uint64",
     "intptr": "uint64", "uintptr": "uint64",
 }
-# Wert-Groesse in Bytes (fuer Enum-Felder: Standard int32)
+# Wert-Groesse in Bytes (für Enum-Felder: Standard int32)
 SIZES = {"bool": 1, "uint8": 1, "int8": 1, "int16": 2, "uint16": 2, "int32": 4, "uint32": 4,
          "int64": 8, "uint64": 8, "float": 4, "double": 8}
 
@@ -237,7 +237,7 @@ def parse_dump_cs(path, log=None):
         if c.typedef >= 0 and images:
             c.image = images[max(0, bisect.bisect_right(starts, c.typedef) - 1)][1]
     if log:
-        log(f"dump.cs: {len(classes)} Klassen")
+        log(f"dump.cs gelesen: {len(classes)} Klassen")
     return classes
 
 
@@ -254,7 +254,7 @@ def _unescape(s):
 
 
 def parse_typeinfo(script_path):
-    """script.json -> {Klassenname (mit Namespace): RVA des TypeInfo-Zeigers}.  Per Regex ueber den Text:
+    """script.json -> {Klassenname (mit Namespace): RVA des TypeInfo-Zeigers}.  Per Regex über den Text:
     die Datei ist >100 MB, json.load wuerde mehr als 1 GB RAM brauchen."""
     out = {}
     with open(script_path, encoding="utf-8", errors="replace") as fh:
@@ -279,7 +279,7 @@ def clean_field_name(name):
 
 
 def is_generated(cls, fld=None):
-    """Vom Compiler erzeugt (Lambda-/Closure-Klassen, Iterator-Zustandsautomaten, Hilfsfelder) - fuer Cheats uninteressant."""
+    """Vom Compiler erzeugt (Lambda-/Closure-Klassen, Iterator-Zustandsautomaten, Hilfsfelder) - für Cheats uninteressant."""
     last = cls.name.rsplit(".", 1)[-1]
     if last.startswith("<") or "__DisplayClass" in last:
         return True
@@ -297,6 +297,7 @@ class GameDump:
         self.by_full = {}
         self.typeinfo_rva = {}
         self.title = ""
+        self.stats = {}
         self._methods = None
 
     def load(self):
@@ -313,14 +314,21 @@ class GameDump:
         if self.files.get("script"):
             try:
                 self.typeinfo_rva = parse_typeinfo(self.files["script"])
-                self.log(f"script.json: {len(self.typeinfo_rva)} Klassen-Zeiger")
+                self.log(f"script.json gelesen: {len(self.typeinfo_rva)} Klassen-Zeiger (darüber werden die Klassen im Spiel gefunden)")
             except Exception as e:  # noqa: BLE001
                 self.log(f"script.json nicht lesbar: {e}")
         else:
             self.log("script.json fehlt: Methoden-Patches gehen, aber keine Live-Instanzen (TypeInfo-Zeiger fehlen)")
-        asm = [c for c in self.classes if c.image.startswith("Assembly-CSharp.dll")]
+        asm = [c for c in self.classes if c.image.startswith("Assembly-CSharp")]
         self.title = os.path.basename(os.path.dirname(self.files["dump_cs"])) or "Unity-Spiel"
-        self.log(f"{len(self.classes)} Klassen, {len(asm)} davon im Spiel-Code (Assembly-CSharp)")
+        self.stats = {
+            "classes": len(self.classes), "game": len(asm), "lib": len(self.classes) - len(asm),
+            "methods": len(self.all_methods()), "enums": sum(1 for c in self.classes if c.kind == "enum"),
+            "pointers": len(self.typeinfo_rva),
+        }
+        st = self.stats
+        self.log(f"Insgesamt {st['classes']} Klassen: {st['game']} Spiel-Code (Assembly-CSharp), "
+                 f"{st['lib']} Unity-/System-Bibliotheken; {st['methods']} Methoden, {st['enums']} Enums")
         return self
 
     # --- Suche -------------------------------------------------------------
@@ -454,6 +462,112 @@ def _cstr(read, addr, n=96):
     return raw[: z if z >= 0 else n].decode("utf-8", "replace")
 
 
+class ChunkStream:
+    """Liest viele Bloecke nacheinander, mehrere gleichzeitig ueber getrennte Verbindungen (`readers` = Liste von
+    read(addr, n)-Funktionen).  Liefert (pos, n, buf) in der urspruenglichen Reihenfolge; buf ist None, wenn der
+    Read fehlschlug.  Mit nur einem Reader laeuft das Lesen trotzdem in einem Hilfsthread weiter, waehrend der
+    Aufrufer den vorigen Block auswertet (Netz und CPU ueberlappen)."""
+
+    def __init__(self, readers, jobs, cancel=None):
+        self.readers = list(readers)
+        self.jobs = list(jobs)                         # [(pos, n, readlen)]
+        self.cancel = cancel
+
+    def __iter__(self):
+        import queue
+        from concurrent.futures import ThreadPoolExecutor
+        workers = max(1, len(self.readers))
+        free = queue.Queue()
+        for r in self.readers:
+            free.put(r)
+
+        def work(job):
+            pos, _n, rl = job
+            r = free.get()
+            try:
+                return bytes(r(pos, rl))
+            except Exception:  # noqa: BLE001 - wie bisher: Block auslassen
+                return None
+            finally:
+                free.put(r)
+
+        window = workers + 1
+        pending = []
+        it = iter(self.jobs)
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            try:
+                while True:
+                    while len(pending) < window:
+                        job = next(it, None)
+                        if job is None:
+                            break
+                        pending.append((job, ex.submit(work, job)))
+                    if not pending:
+                        return
+                    if self.cancel and self.cancel():
+                        return
+                    job, fut = pending.pop(0)
+                    yield job[0], job[1], fut.result()
+            finally:
+                for _j, f in pending:
+                    f.cancel()
+
+
+def _plan_jobs(regions, chunk, extra=16, align=1):
+    """[(start, end)] -> [(pos, n, readlen)]: Bloecke zu `chunk` Byte, jeweils `extra` Byte ueberlappend lesbar."""
+    out = []
+    for s, e in regions:
+        pos = s
+        while pos < e:
+            n = min(chunk, e - pos)
+            if align > 1:
+                n = n // align * align
+                if n <= 0:
+                    break
+            out.append((pos, n, min(n + extra, e - pos)))
+            pos += n
+    return out
+
+
+def _qword_matcher(kset):
+    """-> f(buf, n) = Indizes (in Qwords) der ersten n//8 Qwords von buf, die in kset liegen.
+    Mit numpy (falls installiert) ~20x schneller als die reine Python-Schleife: erst grober Bereichsfilter, dann genau."""
+    vals = sorted(kset)
+    try:
+        import numpy as np
+    except Exception:  # noqa: BLE001
+        np = None
+    if np is not None and vals:
+        karr = np.array(vals, dtype=np.uint64)
+        lo, hi, top = karr[0], karr[-1], len(karr) - 1
+
+        def fast(buf, n):
+            arr = np.frombuffer(buf, dtype=np.uint64, count=n // 8)
+            cand = np.flatnonzero((arr >= lo) & (arr <= hi))
+            if not len(cand):
+                return []
+            sub = arr[cand]
+            pos = np.minimum(np.searchsorted(karr, sub), top)
+            return cand[karr[pos] == sub].tolist()
+        return fast
+
+    def slow(buf, n):
+        mv = memoryview(buf)[: n // 8 * 8].cast("Q")
+        present = kset.intersection(mv)                     # in C: viel schneller als jedes Qword einzeln in Python
+        if not present:
+            return []
+        out = []
+        for v in present:
+            needle = struct.pack("<Q", v)
+            i = buf.find(needle, 0, n)
+            while i >= 0:
+                if i % 8 == 0:
+                    out.append(i // 8)
+                i = buf.find(needle, i + 1, n)
+        return sorted(out)
+    return slow
+
+
 class SafeReader:
     """read() mit lokaler Pruefung gegen die Speicherkarte (jede gemappte Region zaehlt, auch ohne Lese-Bit): Adressen ausserhalb lesbarer Regionen werden gar nicht erst an
     die Konsole geschickt.  Ein fehlgeschlagener Read kostet dort Sekunden (Wiederholung + Warten) - bei hunderten
@@ -487,7 +601,7 @@ def _safe(read, maps):
 
 
 def _slots(game):
-    """[(rva, Klassenname)] fuer normale Klassen (keine Generics/Verschachtelten), nach RVA sortiert."""
+    """[(rva, Klassenname)] für normale Klassen (keine Generics/Verschachtelten), nach RVA sortiert."""
     out = []
     for c in game.classes:
         rva = game.typeinfo_for(c)
@@ -498,9 +612,9 @@ def _slots(game):
 
 
 def check_base(read, base, game, samples=12, maps=None):
-    """Stimmt base als Modul-Basis?  Die ganze TypeInfo-Tabelle auf einmal lesen, die befuellten Eintraege (IL2CPP
+    """Stimmt base als Modul-Basis?  Die ganze TypeInfo-Tabelle auf einmal lesen, die befüllten Eintraege (IL2CPP
     fuellt sie erst beim ersten Benutzen einer Klasse) gegen Klassennamen im Speicher pruefen.
-    -> (Treffer, geprueft).  Mit maps: Adressen ausserhalb der Speicherkarte kosten nichts."""
+    -> (Treffer, geprüft).  Mit maps: Adressen ausserhalb der Speicherkarte kosten nichts."""
     if maps is not None:
         read = _safe(read, maps)
     slots = getattr(game, "_slot_cache", None)
@@ -542,7 +656,7 @@ def check_base(read, base, game, samples=12, maps=None):
 
 
 def _good(ok, tried):
-    """Genug Namenstreffer?  Mind. 4, oder (kleine Spiele/frueher Start) mindestens einer und die Haelfte der befuellten Slots."""
+    """Genug Namenstreffer?  Mind. 4, oder (kleine Spiele/frueher Start) mindestens einer und die Haelfte der befüllten Slots."""
     return ok >= 4 or (ok >= 1 and ok * 2 >= tried)
 
 
@@ -568,17 +682,17 @@ def named_modules(maps):
 
 
 def diagnose(read, base, game, maps, name=""):
-    """Textbericht fuer die Fehlersuche: Ist die TypeInfo-Tabelle lesbar, wie viele Slots sind befuellt, was steht drin?"""
+    """Textbericht für die Fehlersuche: Ist die TypeInfo-Tabelle lesbar, wie viele Slots sind befüllt, was steht drin?"""
     sread = _safe(read, maps)
     slots = getattr(game, "_slot_cache", None) or _slots(game)
-    out = [f"Diagnose {name or 'Modul'} @ {base:#x}: {len(slots)} Klassen-Slots erwartet ab RVA {slots[0][0]:#x}"]
+    out = [f"Diagnose {name or '?'} @ {base:#x}: {len(slots)} Klassen-Slots erwartet ab RVA {slots[0][0]:#x}"]
     try:
         blob = sread(base + slots[0][0], slots[-1][0] + 8 - slots[0][0])
     except Exception as e:  # noqa: BLE001
         return out + [f"  Tabelle nicht lesbar: {e}"]
     filled = [(r, n, struct.unpack_from("<Q", blob, r - slots[0][0])[0]) for r, n, _ns in slots]
     filled = [x for x in filled if x[2]]
-    out.append(f"  davon befuellt: {len(filled)} (der Rest wird von IL2CPP erst beim ersten Benutzen gesetzt)")
+    out.append(f"  davon befüllt: {len(filled)} (der Rest wird von IL2CPP erst beim ersten Benutzen gesetzt)")
     for r, n, ptr in filled[:3]:
         try:
             got = _cstr(sread, struct.unpack("<Q", sread(ptr + K_NAME, 8))[0])
@@ -592,9 +706,9 @@ def diagnose(read, base, game, maps, name=""):
 
 def find_module_base(read, maps, game, log=print, cancel=None):
     """Basisadresse des IL2CPP-Moduls (PS5: meist Il2CppUserAssemblies.prx, sonst eboot) finden.
-    Stufe 1: jede Region als Modul-Anfang pruefen (Klassennamen). Stufe 2: ueber Klassenzeiger im Speicher rueckwaerts."""
+    Stufe 1: jede Region als Modul-Anfang pruefen (Klassennamen). Stufe 2: über Klassenzeiger im Speicher rueckwaerts."""
     if not game.typeinfo_rva:
-        raise DumpError("script.json fehlt oder enthaelt keine TypeInfo-Zeiger - Modul-Basis nicht pruefbar")
+        raise DumpError("script.json fehlt oder enthält keine TypeInfo-Zeiger - Modul-Basis nicht prüfbar")
     sread = _safe(read, maps)
     cands = candidate_bases(maps)
     slots = getattr(game, "_slot_cache", None) or _slots(game)
@@ -612,11 +726,11 @@ def find_module_base(read, maps, game, log=print, cancel=None):
             continue
         ok, t = check_base(sread, b, game, maps=maps)
         if _good(ok, t):
-            log(f"IL2CPP-Modul {n} bei {b:#x} ({ok} Klassennamen bestaetigt)")
+            log(f"IL2CPP-Modul {n} bei {b:#x} ({ok} Klassennamen bestätigt)")
             return b
         if named_first is None and "il2cpp" in n.lower():
             named_first = (n, b)
-    log(f"Pruefe {len(cands)} Speicherregionen auf das IL2CPP-Modul ...")
+    log(f"Prüfe {len(cands)} Speicherregionen auf das IL2CPP-Modul ...")
     for i, base in enumerate(cands):
         if cancel and cancel():
             break
@@ -626,14 +740,14 @@ def find_module_base(read, maps, game, log=print, cancel=None):
         if ok > best[0] and _good(ok, _t):
             best = (ok, base)
         if ok >= 4:
-            log(f"IL2CPP-Modul bei {base:#x} ({ok} Klassennamen bestaetigt)")
+            log(f"IL2CPP-Modul bei {base:#x} ({ok} Klassennamen bestätigt)")
             return base
         if i and i % 100 == 0:
-            log(f"... {i}/{len(cands)} Regionen geprueft")
+            log(f"... {i}/{len(cands)} Regionen geprüft")
     if best[0] >= 1:
-        log(f"IL2CPP-Modul bei {best[1]:#x} ({best[0]} Klassennamen bestaetigt)")
+        log(f"IL2CPP-Modul bei {best[1]:#x} ({best[0]} Klassennamen bestätigt)")
         return best[1]
-    log("Tabelle nicht direkt gefunden - suche ueber Klassen im Speicher (dauert laenger) ...")
+    log("Tabelle nicht direkt gefunden - suche über Klassen im Speicher (dauert länger) ...")
     base = _find_base_by_pointer(sread, maps, game, slots, log, cancel)
     if base:
         return base
@@ -641,7 +755,7 @@ def find_module_base(read, maps, game, log=print, cancel=None):
         for line in diagnose(read, named_first[1], game, maps, named_first[0]):
             log(line)
     raise DumpError("Kein Modul passt zu den Klassennamen aus dump.cs. Stimmen Spiel-Version und Dump (derselbe Build)? "
-                    "Ist das Spiel schon im Menue/Spielstand geladen? Notfalls die Basis von Hand eintragen.")
+                    "Ist das Spiel schon im Menü/Spielstand geladen? Notfalls die Basis von Hand eintragen.")
 
 
 def _find_base_by_pointer(sread, maps, game, slots, log, cancel):
@@ -663,7 +777,7 @@ def _find_base_by_pointer(sread, maps, game, slots, log, cancel):
             base = h - rva
             ok, _t = check_base(sread, base, game, maps=maps)
             if _good(ok, _t):
-                log(f"IL2CPP-Modul bei {base:#x} ueber {name} gefunden ({ok} Klassennamen bestaetigt)")
+                log(f"IL2CPP-Modul bei {base:#x} über {name} gefunden ({ok} Klassennamen bestätigt)")
                 return base
         if tried >= 6:
             break
@@ -673,8 +787,10 @@ def _find_base_by_pointer(sread, maps, game, slots, log, cancel):
 class Il2CppLive:
     """Zugriff auf das laufende Spiel: Klassenzeiger, Instanzen, statische Felder."""
 
-    def __init__(self, read, game, base, maps, static_off=K_STATIC_FIELDS, log=print):
+    def __init__(self, read, game, base, maps, static_off=K_STATIC_FIELDS, log=print, extra_readers=(), closers=()):
         self.read, self.game, self.base, self.maps = _safe(read, maps), game, base, maps
+        self.extra_readers = list(extra_readers)       # weitere Verbindungen: lesen grosse Bereiche parallel
+        self._closers = list(closers)
         self.static_off = static_off
         self.log = log
         self._klass = {}
@@ -685,14 +801,25 @@ class Il2CppLive:
         self.last_source = ""
         self._raw = read._read if isinstance(read, SafeReader) else read
 
+    def close_readers(self):
+        for c in self._closers:
+            try:
+                c()
+            except Exception:  # noqa: BLE001
+                pass
+        self._closers, self.extra_readers = [], []
+
+    def _readers(self):
+        return [self._raw] + list(self.extra_readers)
+
     def set_maps(self, maps):
         """Neue Speicherkarte (nach Levelwechsel o. ae.) - Klassenzeiger bleiben gueltig, Heap-Regionen aendern sich."""
         self.maps = maps
         self.read = SafeReader(self._raw, maps)
 
     def klass_ptr(self, cls, by_name=True, cancel=None):
-        """Zeiger auf die Il2CppClass im Spiel.  Erst ueber den TypeInfo-Zeiger aus script.json; hat die Klasse keinen
-        (Il2CppDumper listet nur Klassen, auf die der Code direkt zeigt), dann ueber ihren Namen im Speicher.
+        """Zeiger auf die Il2CppClass im Spiel.  Erst über den TypeInfo-Zeiger aus script.json; hat die Klasse keinen
+        (Il2CppDumper listet nur Klassen, auf die der Code direkt zeigt), dann über ihren Namen im Speicher.
         None = nicht gefunden (Klasse im Spiel noch nie benutzt)."""
         if cls.full in self._klass and (self._klass[cls.full] or not by_name):
             return self._klass[cls.full]
@@ -713,28 +840,25 @@ class Il2CppLive:
     def _scan(self, needle, regions, limit=16, align=1, chunk=0x400000, cancel=None, stop_after=None):
         hits = []
         for s, e in regions:
-            pos = s
-            while pos < e and len(hits) < limit:
-                if cancel and cancel():
-                    return hits
-                n = min(chunk + len(needle), e - pos)
-                try:
-                    buf = self.read(pos, n)
-                except Exception:  # noqa: BLE001
-                    pos += chunk
+            jobs = [(p, n, min(n + len(needle), e - p)) for p, n, _rl in _plan_jobs([(s, e)], chunk, 0)]
+            for pos, n, buf in ChunkStream(self._readers(), jobs, cancel):
+                if buf is None:
                     continue
                 i = buf.find(needle)
                 while i >= 0 and len(hits) < limit:
-                    if (pos + i) % align == 0:
+                    if (pos + i) % align == 0 and i < n:       # Treffer im Ueberlapp gehoert zum naechsten Block
                         hits.append(pos + i)
                     i = buf.find(needle, i + 1)
-                pos += chunk
+                if len(hits) >= limit:
+                    break
+            if cancel and cancel():
+                return hits
             if len(hits) >= limit or (stop_after and len(hits) >= stop_after):
                 break
         return hits
 
     def resolve_by_name(self, cls, cancel=None):
-        """Il2CppClass ueber Namen finden: Name-String suchen -> Zeiger darauf bei klass+0x10 suchen -> Namespace und
+        """Il2CppClass über Namen finden: Name-String suchen -> Zeiger darauf bei klass+0x10 suchen -> Namespace und
         element_class (zeigt auf sich selbst) pruefen."""
         name = cls.name.encode()
         readable = [(m[0], m[1]) for m in self.maps if (m[2] & 1) and (m[1] - m[0]) >= 0x1000]
@@ -783,7 +907,7 @@ class Il2CppLive:
         return any(k <= addr < k + 0x400 for k in extra)
 
     def klass_table(self):
-        """{Klassenzeiger: Class} fuer alle Klassen, deren TypeInfo-Slot schon befuellt ist (ein Block-Read)."""
+        """{Klassenzeiger: Class} für alle Klassen, deren TypeInfo-Slot schon befüllt ist (ein Block-Read)."""
         slots = getattr(self.game, "_slot_cache", None) or _slots(self.game)
         self.game._slot_cache = slots
         if not slots:
@@ -805,7 +929,7 @@ class Il2CppLive:
         return out
 
     def census(self, progress=None, cancel=None, chunk=0x400000):
-        """Ein Durchlauf ueber den schreibbaren Speicher: wie viele Objekte gibt es von jeder Klasse?
+        """Ein Durchlauf über den schreibbaren Speicher: wie viele Objekte gibt es von jeder Klasse?
         -> ({Klassenname: Anzahl}, {Klassenname, die schon initialisiert sind}).  Objekt = Klassenzeiger an Offset 0 und
         leeres Monitor-Feld an Offset 8 (schliesst Zeiger in Klassen-Strukturen aus)."""
         from collections import Counter
@@ -817,24 +941,17 @@ class Il2CppLive:
         regs = self.heap_regions()
         total = sum(e - s for s, e in regs) or 1
         done = 0
-        for s, e in regs:
-            pos = s
-            while pos < e:
-                if cancel and cancel():
-                    return dict(counts), {c.full for c in table.values()}     # abgebrochen: kein Cache
-                n = min(chunk, e - pos) // 8 * 8
-                if n <= 0:
-                    break
-                try:
-                    buf = self.read(pos, n + 8 if pos + n + 8 <= e else n)
-                except Exception:  # noqa: BLE001
-                    pos += n
-                    done += n
-                    continue
+        match = _qword_matcher(kset)
+        jobs = _plan_jobs(regs, chunk, 8, align=8)
+        for pos, n, buf in ChunkStream(self._readers(), jobs, cancel):
+            if cancel and cancel():
+                return dict(counts), {c.full for c in table.values()}     # abgebrochen: kein Cache
+            done += n
+            if buf is not None and len(buf) >= n:
+                full_len = len(buf) % 8 == 0
                 mv = memoryview(buf)[: n].cast("Q")
-                nxt = memoryview(buf).cast("Q") if len(buf) % 8 == 0 else mv
-                hits = [i for i, w in enumerate(mv) if w in kset]
-                for i in hits:
+                nxt = memoryview(buf).cast("Q") if full_len else mv
+                for i in match(buf, n):
                     mon = nxt[i + 1] if i + 1 < len(nxt) else 0
                     if mon == 0 and not self._in_class_struct(pos + i * 8):
                         full = table[mv[i]].full
@@ -842,10 +959,8 @@ class Il2CppLive:
                         lst = objs.setdefault(full, [])
                         if len(lst) < keep:
                             lst.append(pos + i * 8)
-                pos += n
-                done += n
-                if progress:
-                    progress(done, total)
+            if progress:
+                progress(done, total)
         self.objects, self.counts = objs, dict(counts)
         self.known = {c.full for c in table.values()}
         return dict(counts), set(self.known)
@@ -860,7 +975,7 @@ class Il2CppLive:
 
     def instances(self, cls, limit=400, chunk=0x800000, progress=None, use_cache=True, cancel=None):
         """Alle Objekte der Klasse (und ihrer Unterklassen): Klassenzeiger an Offset 0, Monitor-Feld an Offset 8 leer.
-        Nach census() sofort aus dem Cache (jede Adresse wird kurz geprueft); sonst - oder mit use_cache=False - wird der
+        Nach census() sofort aus dem Cache (jede Adresse wird kurz geprüft); sonst - oder mit use_cache=False - wird der
         schreibbare Speicher durchsucht und der Cache aktualisiert.  last_source sagt, was passiert ist."""
         if not self._kstarts:
             try:
@@ -896,16 +1011,11 @@ class Il2CppLive:
             return out
         found, per = [], {kp: [] for kp in kps}
         regs = self.heap_regions()
+        cancelled = False
         for ri, (s, e) in enumerate(regs):
-            pos = s
-            while pos < e and len(found) < limit:
-                if cancel and cancel():
-                    break
-                n = min(chunk, e - pos)
-                try:
-                    buf = self.read(pos, min(n + 16, e - pos))
-                except Exception:  # noqa: BLE001
-                    pos += n
+            jobs = _plan_jobs([(s, e)], chunk, 16)
+            for pos, n, buf in ChunkStream(self._readers(), jobs, cancel):
+                if buf is None:
                     continue
                 for needle, kp in needles.items():
                     i = buf.find(needle, 0, n + 8)
@@ -915,12 +1025,16 @@ class Il2CppLive:
                             found.append(pos + i)
                             per[kp].append(pos + i)
                         i = buf.find(needle, i + 1, n + 8)
-                pos += n
+                if len(found) >= limit:
+                    break
+            if cancel and cancel():
+                cancelled = True
+                break
             if progress:
                 progress(ri + 1, len(regs))
             if len(found) >= limit:
                 break
-        if self.objects is not None and len(found) < limit:
+        if self.objects is not None and len(found) < limit and not cancelled:
             for kp, lst in per.items():
                 self.objects[owner[kp].full] = lst              # vollstaendiger Lauf: Cache dieser Klassen erneuern
                 self.known.add(owner[kp].full)
@@ -946,7 +1060,7 @@ class Il2CppLive:
 # Patch-Bytes (x86-64)
 # ---------------------------------------------------------------------------
 def patch_return_int(value, wide=False):
-    """mov eax, imm32 ; ret   (wide: mov rax, imm64).  Fuer bool/int/enum-Rueckgaben."""
+    """mov eax, imm32 ; ret   (wide: mov rax, imm64).  Fuer bool/int/enum-Rückgaben."""
     if wide:
         return b"\x48\xb8" + struct.pack("<Q", value & 0xFFFFFFFFFFFFFFFF) + b"\xc3"
     return b"\xb8" + struct.pack("<I", value & 0xFFFFFFFF) + b"\xc3"
@@ -969,24 +1083,24 @@ def patch_ret():
 
 def make_patch(method, mode, value=None):
     """Methode + Modus -> Patch-Bytes.
-       mode: 'true' | 'false' | 'value' (Zahl) | 'noop' (Methode ueberspringen)
-       Prueft, ob der Rueckgabetyp zu dem Modus passt - sonst ValueError mit verstaendlicher Meldung."""
+       mode: 'true' | 'false' | 'value' (Zahl) | 'noop' (Methode überspringen)
+       Prueft, ob der Rückgabetyp zu dem Modus passt - sonst ValueError mit verstaendlicher Meldung."""
     ret = method.ret
     prim = PRIMS.get(ret)
     if mode == "noop":
         if ret != "void":
-            raise ValueError(f"'{method.name}' gibt {ret} zurueck - leer machen geht nur bei void (sonst Absturz). "
-                             "Nimm 'Wert zurueckgeben'.")
+            raise ValueError(f"'{method.name}' gibt {ret} zurück - leer machen geht nur bei void (sonst Absturz). "
+                             "Nimm 'Wert zurückgeben'.")
         return patch_ret()
     if ret == "void":
-        raise ValueError(f"'{method.name}' ist void und hat keinen Rueckgabewert - waehle 'Methode leer machen'.")
+        raise ValueError(f"'{method.name}' ist void und hat keinen Rückgabewert - wähle 'Methode leer machen'.")
     if mode in ("true", "false"):
         if prim != "bool":
-            raise ValueError(f"'{method.name}' gibt {ret} zurueck, nicht bool. Nimm 'Wert zurueckgeben'.")
+            raise ValueError(f"'{method.name}' gibt {ret} zurück, nicht bool. Nimm 'Wert zurückgeben'.")
         return patch_return_int(1 if mode == "true" else 0)
     if mode == "value":
         if prim is None:
-            raise ValueError(f"Rueckgabetyp {ret} ist kein einfacher Zahlentyp (Objekt/Struct) - nicht patchbar.")
+            raise ValueError(f"Rückgabetyp {ret} ist kein einfacher Zahlentyp (Objekt/Struct) - nicht patchbar.")
         if prim == "float":
             return patch_return_float(float(value))
         if prim == "double":

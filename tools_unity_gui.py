@@ -17,7 +17,9 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import il2cpp_dump as D
 import ue_quick as Q
-from tools_common import ACCENT, BG, FONT_LABEL, TEXT_DIM, WARN, BaseTab, button, entry, label, tree, with_scroll
+import tools_i18n
+from tools_common import (ACCENT, BG, BG_CARD, BORDER_HVR, ERROR, FONT_LABEL, FONT_MONO, TEXT, TEXT_DIM, WARN, BaseTab,
+                          button, entry, label, tree, with_scroll)
 
 CFG = os.path.join(os.path.expanduser("~"), ".reaperpy_unity.json")
 TICK_MS = 400
@@ -66,6 +68,7 @@ class UnityTab(BaseTab):
     def __init__(self, parent, win):
         super().__init__(parent, win)
         self.game = self.live = None
+        self._fast = True                  # mehrere Lese-Verbindungen (im UI-Thread gesetzt, Jobs lesen nur dieses Feld)
         self.mod_base = None        # IL2CPP-Modul-Basis (live) - eigener Name, BaseTab.base ist die eboot-Basis
         self.targets, self.shown, self.cur = [], [], None
         self.rows = []
@@ -79,138 +82,309 @@ class UnityTab(BaseTab):
         self._pending = None
         self._cfg = _load_cfg()
 
+        self.log_lines = []         # Protokoll dieses Tabs (uebersetzt, zusaetzlich zum Fenster-Protokoll)
+        self._log_raw = []          # (Uhrzeit, Art, Originaltext) - zum Neuaufbau nach Sprachwechsel
+        self._lang = tools_i18n.lang()
+
         top = tk.Frame(self, bg=BG)
         top.pack(fill="x", padx=8, pady=(8, 2))
-        button(top, "SPIEL-ORDNER…", self.pick_game, accent=True).pack(side="left", padx=2)
+        self._big(top, "SPIEL-ORDNER…", self.pick_game).pack(side="left", padx=2)
         self.v_game = tk.StringVar(value=self._cfg.get("game", ""))
-        entry(top, self.v_game, 60).pack(side="left", padx=4, fill="x", expand=True)
-        button(top, "↻ LADEN", self.load).pack(side="left", padx=2)
-        mod = tk.Frame(self, bg=BG)
-        mod.pack(fill="x", padx=8, pady=2)
-        button(mod, "② MODUL ERKENNEN", self.detect_base, accent=True).pack(side="left", padx=2)
-        label(mod, "MODUL-BASIS").pack(side="left", padx=(8, 2))
+        entry(top, self.v_game, 40).pack(side="left", padx=4, fill="x", expand=True)
+        self._big(top, "① LADEN", self.load, accent=True).pack(side="left", padx=2)
+        steps = tk.Frame(self, bg=BG)
+        steps.pack(fill="x", padx=8, pady=2)
+        self._big(steps, "② MODUL ERKENNEN", self.detect_base, accent=True).pack(side="left", padx=2)
+        self._big(steps, "③ SPIEL SCANNEN", self.scan_game, accent=True).pack(side="left", padx=2)
+        label(steps, "MODUL-BASIS").pack(side="left", padx=(12, 2))
         self.v_base = tk.StringVar()
-        entry(mod, self.v_base, 16).pack(side="left", padx=2)
-        label(mod, "STATIC-OFFSET").pack(side="left", padx=(8, 2))
+        entry(steps, self.v_base, 14).pack(side="left", padx=2)
+        label(steps, "STATIC-OFFSET").pack(side="left", padx=(8, 2))
         self.v_static = tk.StringVar(value=hex(D.K_STATIC_FIELDS))
-        entry(mod, self.v_static, 6).pack(side="left", padx=2)
+        entry(steps, self.v_static, 6).pack(side="left", padx=2)
         self.lbl = label(
             self,
-            "① Spiel-Ordner wählen (dump.cs + script.json von Il2CppDumper)   ② Spiel starten, Spielstand laden, "
-            "MODUL ERKENNEN   ③ unten WERTE / METHODEN / NAMEN benutzen",
+            "① Spiel-Ordner wählen und laden (dump.cs + script.json)   ② Spiel starten, Spielstand laden, MODUL ERKENNEN   "
+            "③ SPIEL SCANNEN - danach zeigt WERTE nur, was im Spiel wirklich existiert",
+            justify="left", anchor="w",
         )
-        self.lbl.pack(anchor="w", padx=10, pady=2)
+        self.lbl.pack(fill="x", padx=10, pady=2)
+        self._wrap_to_width(self.lbl)
+        self.info = tk.Text(self, height=4, bg=BG_CARD, fg=TEXT_DIM, font=FONT_LABEL, relief="flat", wrap="word",
+                            highlightthickness=1, highlightbackground=BORDER_HVR, state="disabled")
+        self.info.pack(fill="x", padx=8, pady=(2, 4))
+        self.info_text = ""
+        self._update_info()
 
-        self.nb = ttk.Notebook(self)
-        self.nb.pack(fill="both", expand=True, padx=8, pady=4)
+        # Oben die Seiten, unten das Protokoll - dazwischen ein Griff zum Hoch-/Runterziehen
+        self.vpan = tk.PanedWindow(self, orient="vertical", sashwidth=8, sashrelief="raised", bg=BORDER_HVR, bd=0,
+                                   opaqueresize=True, sashcursor="sb_v_double_arrow")
+        self.vpan.pack(fill="both", expand=True, padx=8, pady=4)
+        self.nb = ttk.Notebook(self.vpan)
+        self.vpan.add(self.nb, minsize=180, stretch="always")
+        logf = tk.Frame(self.vpan, bg=BG)
+        self.vpan.add(logf, minsize=50, stretch="never")
+        label(logf, "PROTOKOLL (Griff darüber zieht die Größe)").pack(anchor="w")
+        self.out = tk.Text(logf, height=7, bg=BG_CARD, fg=TEXT_DIM, font=FONT_LABEL, relief="flat", wrap="word",
+                           highlightthickness=1, highlightbackground=BORDER_HVR, state="disabled")
+        for tag, col in (("ok", ACCENT), ("warn", WARN), ("err", ERROR), ("info", TEXT_DIM)):
+            self.out.tag_configure(tag, foreground=col)
+        with_scroll(logf, self.out)
         self._build_values(tk.Frame(self.nb, bg=BG))
         self._build_methods(tk.Frame(self.nb, bg=BG))
         self._build_names(tk.Frame(self.nb, bg=BG))
+        self.after(250, lambda: self._place_sash(self.vpan, 0.66, vertical=True))
         self.after(300, self._autoload)
         self.after(TICK_MS, self._tick)
+
+    # ------------------------------------------------------------------ Hilfen fuer die Oberflaeche
+    @staticmethod
+    def _big(parent, text, cmd, accent=False):
+        """Gut sichtbarer Schritt-Button (groesser als die normalen Tabellen-Buttons)."""
+        b = button(parent, text, cmd, accent=accent)
+        b.configure(padx=16, pady=8, font=("Consolas", 10, "bold"))
+        return b
+
+    @staticmethod
+    def _wrap_to_width(widget, margin=24):
+        """Langen Text umbrechen statt abschneiden: Umbruchbreite folgt der Breite des Widgets."""
+        def fit(e):
+            try:
+                widget.configure(wraplength=max(120, e.width - margin))
+            except Exception:  # noqa: BLE001
+                pass
+        widget.bind("<Configure>", fit)
+
+    @staticmethod
+    def _place_sash(pan, frac, vertical=False):
+        """Trennbalken auf einen Anteil der Gesamtgroesse setzen (Start-Aufteilung, danach frei verschiebbar)."""
+        try:
+            size = pan.winfo_height() if vertical else pan.winfo_width()
+            if size > 100:
+                pan.sash_place(0, 0, int(size * frac)) if vertical else pan.sash_place(0, int(size * frac), 0)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _emit(self, ts, kind, raw):
+        text = tools_i18n.translate(str(raw))          # erst uebersetzen (die Woerterbuch-Eintraege enthalten das Praefix) ...
+        if text.startswith("UNITY: "):
+            text = text[7:]                            # ... dann das Praefix weglassen (der Tab ist ohnehin "UNITY")
+        try:
+            self.out.configure(state="normal")
+            self.out.insert("end", f"{ts}  {text}\n", kind)
+            self.out.see("end")
+            self.out.configure(state="disabled")
+        except Exception:  # noqa: BLE001
+            pass
+        return text
+
+    def log(self, msg, kind="info"):
+        """Meldung ins Protokoll des Tabs (sichtbar, in der Groesse ziehbar) und ins Fenster-Protokoll."""
+        import time
+        ts = time.strftime("%H:%M:%S")
+        self._log_raw.append((ts, kind, msg))
+        self.log_lines.append((kind, self._emit(ts, kind, msg)))
+        super().log(msg, kind)
+
+    def _relang(self):
+        """Sprache wurde umgeschaltet: Info-Feld und Protokoll neu aufbauen (Textfelder uebersetzt der Baum-Durchlauf nicht)."""
+        self._lang = tools_i18n.lang()
+        self._update_info()
+        try:
+            self.out.configure(state="normal")
+            self.out.delete("1.0", "end")
+            self.out.configure(state="disabled")
+        except Exception:  # noqa: BLE001
+            pass
+        self.log_lines = [(k, self._emit(ts, k, raw)) for ts, k, raw in self._log_raw]
+
+    def _set_status(self, text, color=None):
+        self.lbl.configure(text=text, fg=color or TEXT_DIM)
+
+    def _update_info(self):
+        """Hintergrundinfos: was wurde geladen, was bedeuten die Zahlen, wo steht das Modul, was hat der Scan gefunden."""
+        g = self.game
+        if g is None:
+            lines = ["Noch nichts geladen. Wähle den Ordner, in dem dump.cs und script.json von Il2CppDumper liegen "
+                     "(verschachtelte Ordner sind egal), und drücke ① LADEN."]
+        else:
+            st = g.stats
+            lines = [
+                f"DUMP: {st['classes']} Klassen insgesamt = {st['game']} Spiel-Code (Assembly-CSharp) + {st['lib']} "
+                f"Unity-/System-Bibliotheken; {st['methods']} Methoden, {st['enums']} Enums. "
+                f"{st['pointers']} Klassen haben einen Zeiger in script.json (damit finden wir sie im Spiel).",
+                f"ANZEIGE: {len(self.targets)} Felder (Zahlen, Ja/Nein, Enums), die sich ändern lassen.",
+            ]
+            if self.mod_base:
+                lines.append(f"MODUL: IL2CPP-Code im Spiel bei {self.mod_base:#x}.")
+            else:
+                lines.append("MODUL: noch nicht erkannt - Spiel starten, Spielstand laden, ② MODUL ERKENNEN.")
+            if self.counts is None:
+                lines.append("SCAN: noch nicht gescannt. Klassen sind die Baupläne aus dem Dump; nur Objekte, die gerade im "
+                             "Spiel existieren, haben Werte, die sich ändern lassen. ③ SPIEL SCANNEN findet sie.")
+            else:
+                n = len([1 for v in self.counts.values() if v])
+                lines.append(f"SCAN: {n} Klassen haben Objekte im Speicher. Die Liste zeigt nur diese Klassen.")
+        self.info_text = "\n".join(lines)
+        try:
+            self.info.configure(state="normal")
+            self.info.delete("1.0", "end")
+            self.info.insert("1.0", tools_i18n.translate(self.info_text))
+            self.info.configure(state="disabled")
+        except Exception:  # noqa: BLE001
+            pass
 
     # ------------------------------------------------------------------ Seiten
     def _build_values(self, page):
         self.nb.add(page, text="WERTE")
-        pan = ttk.PanedWindow(page, orient="horizontal")
+        # Klassischer PanedWindow: Trennbalken frei ziehbar (Mindestbreite nur 150/220 px, nicht von den Inhalten blockiert)
+        pan = tk.PanedWindow(page, orient="horizontal", sashwidth=8, sashrelief="raised", bg=BORDER_HVR, bd=0,
+                             opaqueresize=True, sashcursor="sb_h_double_arrow")
         pan.pack(fill="both", expand=True)
         left = tk.Frame(pan, bg=BG)
-        pan.add(left, weight=2)
+        right = tk.Frame(pan, bg=BG)
+        pan.add(left, minsize=150, stretch="always")
+        pan.add(right, minsize=220, stretch="always")
+        self.after(250, lambda: self._place_sash(pan, 0.46))
+
+        # ---- links: Feldliste
         fr = tk.Frame(left, bg=BG)
         fr.pack(fill="x")
         label(fr, "NAME SUCHEN").pack(side="left")
         self.v_q = tk.StringVar()
-        e = entry(fr, self.v_q, 24)
-        e.pack(side="left", padx=4)
+        e = entry(fr, self.v_q, 18)
+        e.pack(side="left", padx=4, fill="x", expand=True)
         e.bind("<KeyRelease>", lambda _e: self._fill_targets())
-        self.v_only = tk.BooleanVar(value=True)
-        tk.Checkbutton(fr, text="nur Spiel-Code", variable=self.v_only, command=self._rebuild_targets, bg=BG,
-                       fg=TEXT_DIM, selectcolor=BG, activebackground=BG, font=FONT_LABEL).pack(side="left", padx=6)
         fr2 = tk.Frame(left, bg=BG)
-        fr2.pack(fill="x", pady=2)
+        fr2.pack(fill="x", pady=(2, 0))
+        self.v_only = tk.BooleanVar(value=True)
         self.v_gen = tk.BooleanVar(value=True)
-        tk.Checkbutton(fr2, text="Compiler-Kram ausblenden", variable=self.v_gen, command=self._rebuild_targets, bg=BG,
-                       fg=TEXT_DIM, selectcolor=BG, activebackground=BG, font=FONT_LABEL).pack(side="left", padx=4)
         self.v_live_only = tk.BooleanVar(value=True)
-        tk.Checkbutton(fr2, text="nur Klassen mit Objekten im Speicher", variable=self.v_live_only,
-                       command=self._fill_targets, bg=BG, fg=TEXT_DIM, selectcolor=BG, activebackground=BG,
-                       font=FONT_LABEL).pack(side="left", padx=4)
-        button(fr2, "② b. SPIEL SCANNEN", self.scan_game, accent=True).pack(side="right", padx=2)
-        self.tl = tree(left, [("k", "KLASSE.FELD"), ("n", "ANZ."), ("t", "TYP"), ("o", "OFFSET")], [300, 50, 70, 60], height=16)
-        with_scroll(left, self.tl)
+        for var, txt, cmd in ((self.v_only, "nur Spiel-Code", self._rebuild_targets),
+                              (self.v_gen, "Compiler-Kram ausblenden", self._rebuild_targets),
+                              (self.v_live_only, "nur Klassen mit Objekten im Speicher", self._fill_targets)):
+            tk.Checkbutton(left, text=txt, variable=var, command=cmd, bg=BG, fg=TEXT_DIM, selectcolor=BG,
+                           activebackground=BG, font=FONT_LABEL, anchor="w").pack(fill="x", padx=4)
+        self.lbl_list = label(left, "", justify="left", anchor="w")
+        self.lbl_list.pack(side="bottom", fill="x")
+        self._wrap_to_width(self.lbl_list, 10)
+        lt = tk.Frame(left, bg=BG)
+        lt.pack(fill="both", expand=True)
+        self.tl = tree(lt, [("k", "KLASSE.FELD"), ("n", "ANZ."), ("t", "TYP"), ("o", "OFFSET")], [260, 48, 70, 60], height=14)
+        self.tl.column("k", minwidth=80, stretch=True)        # Klassenspalte schrumpft/waechst mit dem Trennbalken
+        self.tl.column("n", minwidth=34, stretch=False)
+        self.tl.column("t", minwidth=40, stretch=False)
+        self.tl.column("o", minwidth=40, stretch=False)
+        with_scroll(lt, self.tl)
         self.tl.bind("<<TreeviewSelect>>", lambda _e: self._on_pick())
-        self.lbl_list = label(left, "")
-        self.lbl_list.pack(anchor="w")
 
-        right = tk.Frame(pan, bg=BG)
-        pan.add(right, weight=3)
-        self.lbl_cur = label(right, "← links ein Feld anklicken (z. B. gold, hp, money)", dim=False)
-        self.lbl_cur.pack(anchor="w")
-        bar = tk.Frame(right, bg=BG)
+        # ---- rechts: Bedienleisten unten verankert (zuerst packen), Tabelle fuellt den Rest
+        top = tk.Frame(right, bg=BG)
+        top.pack(side="top", fill="x")
+        self.lbl_cur = label(top, "← links ein Feld anklicken (z. B. gold, hp, money)", dim=False, justify="left", anchor="w")
+        self.lbl_cur.pack(fill="x")
+        self._wrap_to_width(self.lbl_cur, 10)
+        bar = tk.Frame(top, bg=BG)
         bar.pack(fill="x", pady=2)
         self.v_live = tk.BooleanVar(value=True)
         tk.Checkbutton(bar, text="live aktualisieren", variable=self.v_live, bg=BG, fg=TEXT_DIM, selectcolor=BG,
                        activebackground=BG, font=FONT_LABEL).pack(side="left", padx=4)
+        self.v_fast = tk.BooleanVar(value=True)
+        tk.Checkbutton(bar, text="schnell lesen (mehrere Verbindungen)", variable=self.v_fast,
+                       command=lambda: setattr(self, "_fast", bool(self.v_fast.get())),
+                       bg=BG, fg=TEXT_DIM, selectcolor=BG, activebackground=BG, font=FONT_LABEL).pack(side="left", padx=4)
         button(bar, "↻ INSTANZEN NEU", lambda: self.refind(force=True)).pack(side="right", padx=2)
-        self.tr = tree(right, [("f", SNOW), ("v", "LIVE-WERT"), ("a", "OBJEKT-ADRESSE"), ("w", "WERT-ADRESSE")],
-                       [28, 130, 140, 140], height=12,
-                       actions=[("Wert ändern…", self.edit_dialog), (f"{SNOW} Einfrieren", self.freeze_sel),
-                                ("Auftauen", self.unfreeze_sel), ("Alle auftauen", self.unfreeze_all),
-                                (None, None), ("Im Speicher zeigen", self.to_memory)])
-        with_scroll(right, self.tr)
-        self.tr.bind("<Double-1>", lambda _e: self.edit_dialog())
-        ed = tk.Frame(right, bg=BG)
-        ed.pack(fill="x", pady=2)
-        label(ed, "NEUER WERT").pack(side="left")
-        self.v_val = tk.StringVar()
-        ve = entry(ed, self.v_val, 14)
-        ve.pack(side="left", padx=4)
-        ve.bind("<Return>", lambda _e: self.set_value())
-        button(ed, "SETZEN", self.set_value, accent=True).pack(side="left", padx=2)
-        self.v_scope = tk.StringVar(value="Auswahl")
-        ttk.Combobox(ed, textvariable=self.v_scope, values=("Auswahl", "alle Instanzen"), width=14,
-                     state="readonly").pack(side="left", padx=6)
-        for txt, val in (("×2", "*2"), ("+100", "+100"), ("+1000", "+1000"), ("99999", "99999")):
-            button(ed, txt, lambda v=val: self.set_value(v)).pack(side="left", padx=1)
-        fz = tk.Frame(right, bg=BG)
-        fz.pack(fill="x", pady=2)
+
+        ctl = tk.Frame(right, bg=BG)
+        ctl.pack(side="bottom", fill="x")
+        help_ = label(ctl, "Doppelklick ändert den Wert. '+100' und '*2' rechnen vom aktuellen Wert aus. Statische Felder "
+                           "(Singletons, Spielstand-Daten) haben genau eine Zeile.", dim=True, justify="left", anchor="w")
+        help_.pack(side="bottom", fill="x")
+        self._wrap_to_width(help_, 10)
+        fz = tk.Frame(ctl, bg=BG)
+        fz.pack(side="bottom", fill="x", pady=2)
         button(fz, f"{SNOW} EINFRIEREN", self.freeze_sel, accent=True).pack(side="left", padx=2)
         button(fz, "AUFTAUEN", self.unfreeze_sel).pack(side="left", padx=2)
         self.lbl_fz = label(fz, "")
         self.lbl_fz.pack(side="left", padx=8)
-        label(right, "Doppelklick ändert den Wert. '+100' und '*2' rechnen vom aktuellen Wert aus. Statische Felder "
-                     "(Singletons, Spielstand-Daten) haben genau eine Zeile.", dim=True).pack(anchor="w")
+        q = tk.Frame(ctl, bg=BG)
+        q.pack(side="bottom", fill="x", pady=2)
+        label(q, "SCHNELL").pack(side="left")
+        for txt, val in (("×2", "*2"), ("+100", "+100"), ("+1000", "+1000"), ("99999", "99999")):
+            button(q, txt, lambda v=val: self.set_value(v)).pack(side="left", padx=1)
+        sc = tk.Frame(ctl, bg=BG)
+        sc.pack(side="bottom", fill="x", pady=2)
+        label(sc, "WIRKT AUF").pack(side="left")
+        self.v_scope = tk.StringVar(value="Auswahl")
+        ttk.Combobox(sc, textvariable=self.v_scope, values=("Auswahl", "alle Instanzen"), width=16,
+                     state="readonly").pack(side="left", padx=4)
+        ed = tk.Frame(ctl, bg=BG)
+        ed.pack(side="bottom", fill="x", pady=2)
+        label(ed, "NEUER WERT").pack(side="left")
+        self.v_val = tk.StringVar()
+        ve = entry(ed, self.v_val, 14)
+        ve.pack(side="left", padx=4, fill="x", expand=True)
+        ve.bind("<Return>", lambda _e: self.set_value())
+        button(ed, "SETZEN", self.set_value, accent=True).pack(side="left", padx=2)
+
+        rt = tk.Frame(right, bg=BG)
+        rt.pack(fill="both", expand=True)
+        self.tr = tree(rt, [("f", SNOW), ("v", "LIVE-WERT"), ("a", "OBJEKT-ADRESSE"), ("w", "WERT-ADRESSE")],
+                       [28, 120, 130, 130], height=10,
+                       actions=[("Wert ändern…", self.edit_dialog), (f"{SNOW} Einfrieren", self.freeze_sel),
+                                ("Auftauen", self.unfreeze_sel), ("Alle auftauen", self.unfreeze_all),
+                                (None, None), ("Im Speicher zeigen", self.to_memory)])
+        for col, mw in (("f", 22), ("v", 60), ("a", 70), ("w", 70)):
+            self.tr.column(col, minwidth=mw, stretch=(col == "w"))
+        with_scroll(rt, self.tr)
+        self.tr.bind("<Double-1>", lambda _e: self.edit_dialog())
 
     def _build_methods(self, page):
         self.nb.add(page, text="METHODEN (Cheats)")
         fr = tk.Frame(page, bg=BG)
-        fr.pack(fill="x", pady=2)
+        fr.pack(side="top", fill="x", pady=2)
         label(fr, "METHODE SUCHEN").pack(side="left")
         self.v_mq = tk.StringVar()
         e = entry(fr, self.v_mq, 30)
-        e.pack(side="left", padx=4)
+        e.pack(side="left", padx=4, fill="x", expand=True)
         e.bind("<Return>", lambda _e: self._fill_methods())
         button(fr, "SUCHEN", self._fill_methods, accent=True).pack(side="left", padx=2)
-        label(fr, "Beispiele: 'Money', 'IsDead', 'Damage', 'Stamina' - mehrere Wörter = alle müssen vorkommen",
-              dim=True).pack(side="left", padx=8)
-        self.ml = tree(page, [("k", "KLASSE.METHODE"), ("s", "SIGNATUR"), ("r", "RVA")], [300, 420, 90], height=11)
-        with_scroll(page, self.ml)
-        act = tk.Frame(page, bg=BG)
-        act.pack(fill="x", pady=2)
-        button(act, "gibt immer TRUE", lambda: self.apply_patch("true"), accent=True).pack(side="left", padx=2)
-        button(act, "gibt immer FALSE", lambda: self.apply_patch("false")).pack(side="left", padx=2)
-        button(act, "gibt Wert zurück…", lambda: self.apply_patch("value")).pack(side="left", padx=2)
-        button(act, "Methode leer machen (void)", lambda: self.apply_patch("noop")).pack(side="left", padx=2)
-        label(act, "wirkt sofort im laufenden Spiel", dim=True).pack(side="left", padx=8)
-        label(page, "ANGEWENDET").pack(anchor="w")
-        self.al = tree(page, [("s", "AN"), ("t", "PATCH"), ("a", "ADRESSE")], [40, 520, 140], height=5)
-        with_scroll(page, self.al)
+        hint = label(page, "Beispiele: 'Money', 'IsDead', 'Damage', 'Stamina' - mehrere Wörter = alle müssen vorkommen",
+                     dim=True, justify="left", anchor="w")
+        hint.pack(side="top", fill="x")
+        self._wrap_to_width(hint, 10)
+
+        # unten verankert: angewendete Patches
         ab = tk.Frame(page, bg=BG)
-        ab.pack(fill="x", pady=2)
+        ab.pack(side="bottom", fill="x", pady=2)
         button(ab, "AN / AUS", self.toggle_patch).pack(side="left", padx=2)
         button(ab, "ENTFERNEN (Original zurück)", self.remove_patch).pack(side="left", padx=2)
         button(ab, "ALLE ZURÜCK", self.remove_all).pack(side="left", padx=2)
         button(ab, "EXPORT .reapproj…", self.export_patches, accent=True).pack(side="right", padx=2)
+        at = tk.Frame(page, bg=BG)
+        at.pack(side="bottom", fill="x")
+        self.al = tree(at, [("s", "AN"), ("t", "PATCH"), ("a", "ADRESSE")], [40, 420, 120], height=3)
+        self.al.column("t", stretch=True)
+        self.al.column("a", stretch=False)
+        with_scroll(at, self.al)
+        label(page, "ANGEWENDET").pack(side="bottom", anchor="w")
+        act2 = tk.Frame(page, bg=BG)
+        act2.pack(side="bottom", fill="x", pady=1)
+        button(act2, "gibt Wert zurück…", lambda: self.apply_patch("value")).pack(side="left", padx=2)
+        button(act2, "Methode leer machen (void)", lambda: self.apply_patch("noop")).pack(side="left", padx=2)
+        label(act2, "wirkt sofort im laufenden Spiel", dim=True).pack(side="left", padx=8)
+        act = tk.Frame(page, bg=BG)
+        act.pack(side="bottom", fill="x", pady=1)
+        button(act, "gibt immer TRUE", lambda: self.apply_patch("true"), accent=True).pack(side="left", padx=2)
+        button(act, "gibt immer FALSE", lambda: self.apply_patch("false")).pack(side="left", padx=2)
+
+        mt = tk.Frame(page, bg=BG)
+        mt.pack(fill="both", expand=True)
+        self.ml = tree(mt, [("k", "KLASSE.METHODE"), ("s", "SIGNATUR"), ("r", "RVA")], [260, 340, 80], height=8)
+        self.ml.column("k", minwidth=100, stretch=True)
+        self.ml.column("s", minwidth=100, stretch=True)
+        self.ml.column("r", minwidth=50, stretch=False)
+        with_scroll(mt, self.ml)
 
     def _build_names(self, page):
         self.nb.add(page, text="NAMEN (Items, IDs)")
@@ -252,7 +426,8 @@ class UnityTab(BaseTab):
             return D.GameDump(files, log=lambda m: self.win.ui(lambda: self.log(f"UNITY: {m}", "info"))).load()
 
         def ok(g):
-            self.game, self.live, self.mod_base = g, None, None
+            self._drop_live()
+            self.game, self.mod_base = g, None
             self.freezer.clear()
             self.counts, self.inited = None, set()
             self.rows, self.cur = [], None
@@ -260,9 +435,9 @@ class UnityTab(BaseTab):
             _save_cfg(self._cfg)
             self._rebuild_targets()
             self._fill_names()
-            self.lbl.configure(
-                text=f"{g.title}: {len(g.classes)} Klassen, {len(self.targets)} Werte, {len(g.all_methods())} Methoden "
-                     "- jetzt Spiel starten und ② MODUL ERKENNEN", fg=ACCENT)
+            self._update_info()
+            self.lbl.configure(text=f"{g.title}: geladen - jetzt Spiel starten, Spielstand laden und ② MODUL ERKENNEN",
+                               fg=ACCENT)
 
         def err(e):
             self.lbl.configure(text=f"Fehler: {e}", fg="#ff3366")
@@ -291,6 +466,7 @@ class UnityTab(BaseTab):
                 self.static_keys.add(t.key)
         self.targets.sort(key=lambda t: (t.cls.lower(), t.offset))
         self._fill_targets()
+        self._update_info()
 
     def _count_of(self, t):
         """Objekte im Speicher fuer das Ziel (None = noch kein Scan). Statische Felder: 1, wenn die Klasse initialisiert ist."""
@@ -318,7 +494,7 @@ class UnityTab(BaseTab):
         n = len(self.shown)
         hint = ""
         if self.counts is None:
-            hint = "  - ② b. SPIEL SCANNEN zeigt nur Felder von Klassen, die im Spiel wirklich existieren"
+            hint = "  - ③ SPIEL SCANNEN zeigt nur Felder von Klassen, die im Spiel wirklich existieren"
         elif only_live:
             hint = f"  - nur Klassen mit Objekten im Speicher ({len([c for c, v in self.counts.items() if v])} Klassen)"
         self.lbl_list.configure(
@@ -349,6 +525,7 @@ class UnityTab(BaseTab):
                                fg=ACCENT)
             self.log(f"UNITY: Scan fertig, {n} Klassen mit Objekten", "ok")
             self._fill_targets()
+            self._update_info()
 
         self.bg(job, ok, lambda e: (self.lbl.configure(text=f"Fehler beim Scan: {e}", fg="#ff3366"),
                                     self.log(f"UNITY: {e}", "err")))
@@ -381,13 +558,43 @@ class UnityTab(BaseTab):
     def _maps(client):
         return client.get_maps_named() if hasattr(client, "get_maps_named") else client.get_maps()
 
+    EXTRA_READERS = 3                      # zusaetzliche Verbindungen: grosse Bereiche werden parallel gelesen
+
+    def _drop_live(self):
+        old, self.live = self.live, None
+        if old is not None:
+            old.close_readers()
+
+    def _open_readers(self, client):
+        """Weitere Verbindungen zum Payload fuer paralleles Lesen -> (read-Funktionen, close-Funktionen).  Gelingt das
+        nicht, wird mit der einen Verbindung gelesen (nur langsamer)."""
+        if not self._fast:
+            return [], []
+        readers, closers = [], []
+        try:
+            from ps5_client import PS5DebugClient
+            for _ in range(self.EXTRA_READERS):
+                c = PS5DebugClient(client.host, client.port, timeout=15)
+                c.connect()
+                c.pid = client.pid
+                readers.append(c.read_memory)
+                closers.append(c.close)
+        except Exception as e:  # noqa: BLE001
+            self.win.ui(lambda: self.log(f"UNITY: Zusätzliche Verbindungen nicht möglich ({e}) - lese mit einer Verbindung", "warn"))
+        if readers:
+            n = len(readers)
+            self.win.ui(lambda: self.log(f"UNITY: {n} zusätzliche Lese-Verbindung(en) geöffnet", "info"))
+        return readers, closers
+
     def _make_live(self, client, base):
         try:
             st = int(self.v_static.get().strip(), 16)
         except ValueError:
             st = D.K_STATIC_FIELDS
+        readers, closers = self._open_readers(client)
         return D.Il2CppLive(client.read_memory, self.game, base, self._maps(client), static_off=st,
-                            log=lambda m: self.win.ui(lambda: self.log(f"UNITY: {m}", "info")))
+                            log=lambda m: self.win.ui(lambda: self.log(f"UNITY: {m}", "info")),
+                            extra_readers=readers, closers=closers)
 
     def detect_base(self):
         client = self._need_client()
@@ -410,9 +617,10 @@ class UnityTab(BaseTab):
         def ok(r):
             self.mod_base, n = r
             self.v_base.set(hex(self.mod_base))
-            self.live = None
-            self.lbl.configure(text=f"IL2CPP-Modul bei {self.mod_base:#x} bestätigt ({n} Klassen) - WERTE / METHODEN sind bereit",
+            self._drop_live()
+            self.lbl.configure(text=f"IL2CPP-Modul bei {self.mod_base:#x} bestätigt ({n} Klassen) - weiter mit ③ SPIEL SCANNEN",
                                fg=ACCENT)
+            self._update_info()
 
         self.bg(job, ok, lambda e: (self.lbl.configure(text=f"Fehler: {e}", fg="#ff3366"), self.log(f"UNITY: {e}", "err")))
 
@@ -423,6 +631,7 @@ class UnityTab(BaseTab):
             self.mod_base = m or D.find_module_base(client.read_memory, self._maps(client), self.game)
             self.win.ui(lambda: self.v_base.set(hex(self.mod_base)))
         if self.live is None or self.live.base != self.mod_base:
+            self._drop_live()
             self.live = self._make_live(client, self.mod_base)
         return self.live
 
@@ -513,6 +722,8 @@ class UnityTab(BaseTab):
         except Exception:  # noqa: BLE001
             return
         self.after(TICK_MS, self._tick)
+        if tools_i18n.lang() != self._lang:
+            self._relang()
         client = self.win.client
         if self._busy or client is None or self.cur is None or not self.rows:
             return
