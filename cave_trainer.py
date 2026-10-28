@@ -41,6 +41,7 @@ FLAG_MIN_RUN = 0x100                # so viel Null-Bytes muessen am Region-Ende 
 FILL = (0x00, 0xCC)
 LIMIT = 0x7F000000                  # rel32-Reichweite mit Sicherheitsabstand
 NAME_MAX = 60
+ANCHOR_LEN = 16                     # so viele Byte je Funktionsanfang fuer die Versionspruefung
 PACK_SIZE = 14                      # so viele Items hoechstens in einem Paket-Eintrag
 
 
@@ -277,7 +278,7 @@ class Slots:
 
     def __init__(self, read, span, log=print):
         self.read, self.span, self.log = read, span, log
-        self._code, self._data, self._inner = None, None, None
+        self._code, self._data = None, None
 
     def _scan_code(self):
         runs = []
@@ -303,34 +304,35 @@ class Slots:
         self.log(f"[trainer] {len(runs)} Daten-Leerstelle(n) am Ende beschreibbarer Regionen")
         return runs
 
-    def _scan_inner(self, need):
-        """Fallback (z. B. Backport/andere Spielversion ohne Padding am Region-Ende): Fuellbyte-Stuecke (00/CC)
-        mitten im Code, mindestens `need` Byte lang."""
-        runs = []
-        rx = re.compile(b"(?:\x00{%d,}|\xCC{%d,})" % (need, need))
-        CH = 0x100000
+    def code_capacity(self):
+        """Groesse (Byte) der laengsten freien Code-Luecke - so gross darf eine Cave hoechstens sein."""
+        if self._code is None:
+            self._code = self._scan_code()
+        return max(((r[1] - r[0]) & ~0xF for r in self._code), default=0)
+
+    def explain(self, need):
+        """Klartext, warum kein Platz gefunden wurde (Zahlen aus dem laufenden Spiel) - fuer Fehlermeldung und Bericht."""
+        if self._code is None:
+            self._code = self._scan_code()
+        execs = [(s, e) for s, e, p in self.span if p & 4]
+        lines = [f"Gebraucht: {need} Byte; groesste freie Luecke: {self.code_capacity()} Byte "
+                 f"({len(self._code)} Luecke(n) in {len(execs)} ausfuehrbaren Region(en) des Images).",
+                 f"Image-Bereich: {self.span[0][0]:#x}-{self.span[-1][1]:#x}."]
+        busy = []
         for s, e, p in self.span:
-            if not p & 4:
-                continue
-            pos = s
-            while pos < e:
-                size = min(CH + need, e - pos)
-                try:
-                    data = bytes(self.read(pos, size))
-                except Exception:
-                    pos += CH
-                    continue
-                for m in rx.finditer(data):
-                    if pos + m.end() <= e:
-                        runs.append((pos + m.start(), pos + m.end()))
-                pos += CH
-        uniq = {}
-        for a, b in runs:
-            if a not in uniq or b > uniq[a]:
-                uniq[a] = b
-        out = [[a, b] for a, b in sorted(uniq.items(), key=lambda kv: -(kv[1] - kv[0]))]
-        self.log(f"[trainer] {len(out)} Luecke(n) mitten im Code gefunden (Fallback)")
-        return out
+            if p & 4:
+                cnt, _b = _tail_run(self.read, e, s)
+                if cnt < 0x20:
+                    try:
+                        busy.append(f"{e:#x}: endet mit {bytes(self.read(e - 8, 8)).hex(' ')}")
+                    except Exception:  # noqa: BLE001
+                        pass
+        if busy:
+            lines.append("Das Ende dieser Regionen ist NICHT leer (ein anderer Cheat/ein Plugin oder eine noch aktive "
+                         "ReaperPy-Cave belegt es - erst BASIS deaktivieren oder das Spiel neu starten): " + "; ".join(busy[:4]) + ".")
+        lines.append("Wenn der Trainer sehr gross ist: weniger Items je Projekt waehlen (der Tab ITEMS teilt automatisch "
+                     "nach dem freien Platz auf).")
+        return " ".join(lines)
 
     def alloc_code(self, need, near):
         if self._code is None:
@@ -342,16 +344,8 @@ class Slots:
                 continue
             r[1] = cave
             return cave, need
-        if self._inner is None:
-            self._inner = self._scan_inner(need)
-        for r in self._inner:
-            cave = (r[1] - need) & ~0xF
-            if cave < r[0] or abs(cave - near) > LIMIT:
-                continue
-            r[1] = cave
-            self.log("[trainer] Cave liegt in einer Code-Luecke (kein Padding am Region-Ende gefunden)")
-            return cave, need
-        raise TrainerError("Kein freier Code-Platz (Padding am Ende einer ausfuehrbaren Image-Region) fuer die Cave gefunden")
+        raise TrainerError("Kein freier Code-Platz (Padding am Ende einer ausfuehrbaren Image-Region) fuer die Cave "
+                           f"gefunden. {self.explain(need)}")
 
     def alloc_data(self, need, near):
         if self._data is None:
@@ -365,6 +359,37 @@ class Slots:
             return addr, need
         raise TrainerError("Kein beschreibbarer Leerraum im Spiel-Image fuer die Schalter gefunden "
                            "(Null-Stueck am Ende der letzten beschreibbaren Region, mind. 0x100 Byte)")
+
+
+def capacity(read, maps, base, log=lambda _m: None):
+    """Wie gross darf eine Cave in diesem Spiel hoechstens sein? -> dict(code=Byte, data=Byte).  Nur Lesen."""
+    span = image_span(maps, base)
+    if not span:
+        raise TrainerError(f"Die Image-Basis {base:#x} liegt in keiner Speicherregion")
+    sl = Slots(read, span, log)
+    if sl._data is None:
+        sl._data = sl._scan_data()
+    return {"code": sl.code_capacity(), "data": max(((r[1] - r[0]) & ~7 for r in sl._data), default=0)}
+
+
+def fit_options(options, code_capacity, max_options=None, max_rows=None):
+    """Eintraege der Reihe nach auf Projekte verteilen, bis die Cave (cave_size) nicht mehr in `code_capacity` passt
+    (oder MAX_OPTIONS / MAX_ROWS erreicht sind) -> [[Option]].  Passt schon ein einzelner Eintrag nicht -> TrainerError."""
+    max_options = max_options or MAX_OPTIONS
+    max_rows = max_rows or MAX_ROWS
+    out, cur, rows = [], [], 0
+    for o in options:
+        if cave_size([o]) > code_capacity:
+            raise TrainerError(f"Schon der Eintrag '{o.name}' ({len(o.rows)} Zeilen, {cave_size([o])} Byte) passt nicht in "
+                               f"die groesste freie Code-Luecke des Spiels ({code_capacity} Byte)")
+        if cur and (len(cur) + 1 > max_options or rows + len(o.rows) > max_rows or cave_size(cur + [o]) > code_capacity):
+            out.append(cur)
+            cur, rows = [], 0
+        cur.append(o)
+        rows += len(o.rows)
+    if cur:
+        out.append(cur)
+    return out
 
 
 # ======================================================================
@@ -383,7 +408,7 @@ class Plan:
         self.slots = []                 # absolute vtable-Slot-Adressen
         self.options = []
         self.warnings = []
-        self.anchors = {}               # Name -> (rva, AOB-Text): Code-Anker zum Pruefen des Spiel-Builds
+        self.anchors = []               # [(rva, hex)] Funktionsanfaenge zur Versionspruefung (check_project)
 
     def rva(self, addr):
         return addr - self.base
@@ -426,6 +451,11 @@ def plan(read, maps, base, options, impl, orig_pe, slots, log=print, settle=0.4)
 
     p = Plan()
     p.base, p.impl, p.orig_pe, p.slots, p.options = base, impl, orig_pe, sorted(set(slots)), options
+    for a in sorted({impl, orig_pe, *row_impls}):                    # Fingerabdruck dieser Spielversion
+        try:
+            p.anchors.append((a - base, bytes(read(a, ANCHOR_LEN)).hex()))
+        except Exception:  # noqa: BLE001
+            pass
     slots_alloc = Slots(read, span, log)
 
     need_flags = flag_bytes_needed(len(options))
@@ -475,72 +505,15 @@ def base_patch(p, author=""):
     for k, s in enumerate(p.slots):
         variables.append(_var(f"Haken {k + 1} (vtable)", p.rva(s), _spaced(orig), _spaced(entry)))
     return {"name": "00 BASIS - Item-Cave (zuerst aktivieren)", "author": author,
-            "ImageBase": hex(p.base), "Variables": variables}
+            "ImageBase": hex(p.base), "Verify": True, "Variables": variables}
 
 
 def option_patch(p, i, author=""):
     opt = p.options[i]
     what = ", ".join(f"{r.alias} x{r.amount}" for r in opt.rows[:3]) + (" ..." if len(opt.rows) > 3 else "")
-    return {"name": f"{i + 1:02d} {opt.name}", "author": author, "ImageBase": hex(p.base),
+    return {"name": f"{i + 1:02d} {opt.name}", "author": author, "ImageBase": hex(p.base), "Verify": True,
             "Info": f"Schalter-Byte {i} (base+{p.flag_addr + i - p.base:#x}); Cave setzt es nach dem Geben zurueck. {what}",
             "Variables": [_var("OriginSource", p.rva(p.flag_addr + i), "00", "01")]}
-
-
-ANCHOR_LEN = 64
-
-
-def attach_signatures(p, client, maps, log=print):
-    """Erzeugt beim Export AOB-Signaturen fuer die beiden Code-Anker des Trainers (Item-Funktion, ProcessEvent).
-    Nur lesend.  Misslingt eine Signatur, wird das nur geloggt - der Trainer wird trotzdem geschrieben."""
-    import aob
-    for name, addr in (("impl", p.impl), ("process_event", p.orig_pe)):
-        try:
-            sig, _hits = aob.make_signature(client, maps, addr, hook_len=0, wildcard_hook=False,
-                                            min_len=16, max_len=ANCHOR_LEN, log=lambda m: None)
-            p.anchors[name] = (p.rva(addr), sig)
-            log(f"[trainer] Signatur {name} @ base+{p.rva(addr):#x}: {len(sig.split())} Byte")
-        except Exception as e:  # noqa: BLE001
-            p.warnings.append(f"Keine Signatur fuer {name}: {e}")
-            log(f"[trainer] Keine Signatur fuer {name}: {e}")
-    return p.anchors
-
-
-def _matches_at(client, addr, pat, mask):
-    try:
-        data = bytes(client.read_memory(addr, len(pat)))
-    except Exception:  # noqa: BLE001
-        return False
-    return len(data) == len(pat) and all(not m or a == b for a, b, m in zip(data, pat, mask))
-
-
-def check_anchors(client, maps, base, spec):
-    """Passt der Trainer zum laufenden Spiel-Build?  -> [(name, status, adresse)]; status 'ok' | 'moved' | 'missing'.
-    Erst wird nur an der erwarteten Stelle gelesen (schnell), nur bei Abweichung ueber alle Code-Regionen gesucht."""
-    import aob
-    out = []
-    for name, a in (spec.get("anchors") or {}).items():
-        try:
-            rva = int(a["rva"], 0)
-            pat, mask = aob.parse_pattern(a["aob"])
-        except Exception:  # noqa: BLE001
-            continue
-        if _matches_at(client, base + rva, pat, mask):
-            out.append((name, "ok", base + rva))
-            continue
-        hits = aob.find_matches(client, aob.exec_regions(maps), pat, mask, limit=2)
-        out.append((name, "moved", hits[0]) if len(hits) == 1 else (name, "missing", 0))
-    return out
-
-
-def anchor_problem(results, base):
-    """Text fuer den Benutzer, wenn der Trainer nicht zum Build passt, sonst None."""
-    bad = [r for r in results if r[1] != "ok"]
-    if not bad:
-        return None
-    parts = [f"{n}: " + (f"liegt bei base+{a - base:#x} statt am erwarteten Platz" if st == "moved"
-                         else "nicht im Spiel gefunden") for n, st, a in bad]
-    return ("Dieser Trainer passt nicht zu diesem Spiel-Build (" + "; ".join(parts) + "). "
-            "Bitte mit TRAINER ERSTELLEN fuer diesen Build neu bauen - Cave und Haken wuerden sonst ins Leere schreiben.")
 
 
 def spec_document(p, game="", title_id=""):
@@ -552,7 +525,7 @@ def spec_document(p, game="", title_id=""):
         "slot_rvas": [hex(s - p.base) for s in p.slots],
         "cave_rva": hex(p.cave - p.base), "cave_size": len(p.cave_bytes),
         "flag_rva": hex(p.flag_addr - p.base), "flag_size": p.flag_size,
-        "anchors": {n: {"rva": hex(r), "aob": sig} for n, (r, sig) in p.anchors.items()},
+        "anchors": [{"rva": hex(r), "bytes": b} for r, b in p.anchors],
         "options": [o.to_json() for o in p.options],
     }
 
@@ -666,6 +639,77 @@ def merge_options(old, new):
         else:
             out.append(o)
     return out
+
+
+# ======================================================================
+# Passt ein fertiger Trainer zu DIESEM Spiel?  (andere Version / andere Item-Nummern)
+# ======================================================================
+def check_project(out_dir, read, base):
+    """Liest `_trainer_spec.json` und vergleicht mit dem laufenden Spiel (nur Lesen).
+    -> dict(ok_version, problems[list], anchors_checked, base_active)
+    ok_version False = der Trainer wurde fuer eine andere Spielversion/Basis gebaut: NICHT aktivieren."""
+    d = _load_spec_raw(out_dir)
+    if not d:
+        raise TrainerError(f"Kein Trainer-Projekt in {out_dir} ({SPEC_FILE} fehlt)")
+    problems, checked = [], 0
+    spec_base = int(d.get("image_base", "0x0"), 16)
+    if spec_base != base:
+        problems.append(f"Image-Basis: Trainer {spec_base:#x}, Spiel {base:#x}")
+    for a in d.get("anchors", []):
+        rva, want = int(a["rva"], 16), a["bytes"]
+        try:
+            got = bytes(read(base + rva, len(want) // 2)).hex()
+        except Exception as e:  # noqa: BLE001
+            problems.append(f"+{rva:#x} nicht lesbar ({e})")
+            continue
+        checked += 1
+        if got != want:
+            problems.append(f"+{rva:#x}: Spiel hat {got}, Trainer erwartet {want}")
+    if not d.get("anchors"):
+        problems.append("Der Trainer enthaelt keinen Versions-Fingerabdruck (aelter) - mit ITEMS neu bauen")
+    base_active = False
+    try:
+        cave = base + int(d["cave_rva"], 16)
+        n = int(d.get("cave_size", 0))
+        if n:
+            raw = bytes(read(cave, min(n, 64)))
+            base_active = len(set(raw)) > 2
+    except Exception:  # noqa: BLE001
+        pass
+    return {"ok_version": not problems, "problems": problems, "anchors_checked": checked, "base_active": base_active}
+
+
+def refresh_fnames(options, live_by_alias):
+    """FNames (die Item-Nummern aus dem Spiel) in den Zeilen durch die des laufenden Spiels ersetzen.
+    live_by_alias: {alias: 8-Byte-FName}.  -> (neue Optionen, geaendert[alias], fehlt[alias]).  Zeilen ohne FName bleiben."""
+    import ue_cavegen
+    out, changed, missing = [], [], []
+    for o in options:
+        rows = []
+        for r in o.rows:
+            new = live_by_alias.get(r.alias)
+            if getattr(r, "fname", None) is None:
+                rows.append(r)
+                continue
+            if new is None:
+                missing.append(r.alias)
+                rows.append(r)
+                continue
+            new = bytes(new)
+            if new != bytes(r.fname):
+                changed.append(r.alias)
+            if isinstance(r, ue_cavegen.CallRow):
+                d = r.to_json()
+                old_hex = bytes(r.fname).hex()
+                d["fname"] = new.hex()
+                for a in d["call"]["args"]:
+                    if a["kind"] == "fname" and a["value"] == old_hex:
+                        a["value"] = new.hex()
+                rows.append(ue_cavegen.CallRow.from_json(d))
+            else:
+                rows.append(Row(r.alias, new, r.amount))
+        out.append(Option(o.name, rows))
+    return out, changed, missing
 
 
 # ======================================================================

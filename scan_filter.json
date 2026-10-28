@@ -1,0 +1,8 @@
+{
+ "hide": [
+  "libsce",
+  "syslib"
+ ],
+ "custom": "",
+ "off": []
+}

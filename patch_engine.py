@@ -410,6 +410,15 @@ def _apply_simple(backend, reapatch, hook_addr):
             if mem is None:
                 raise RuntimeError(f"Original-Bytes an {addr:#x} nicht lesbar")
             mem = bytes(mem)
+            # Wächter fuer Patches mit "Verify": true (Item-Trainer von ReaperPy): steht dort weder das erwartete
+            # Original noch der Patch, ist es eine ANDERE Spielversion/Basis - nicht blind drueberschreiben.
+            if (getattr(reapatch, "raw", None) or {}).get("Verify") and default_bytes \
+                    and len(default_bytes) == size and mem not in (default_bytes, new_bytes):
+                raise RuntimeError(
+                    f"Passt nicht zu diesem Spiel: an {addr:#x} stehen {mem[:16].hex(' ')} statt der erwarteten "
+                    f"{default_bytes[:16].hex(' ')}. Der Patch wurde fuer eine andere Spielversion (oder Image-Basis) "
+                    "gebaut - NICHT aktiviert. Trainer: im Tab ITEMS 'TRAINER PRUEFEN' / neu bauen; die Basis im "
+                    "Hauptfenster pruefen.")
             original = default_bytes if (mem == new_bytes and default_bytes) else mem
 
             print(f"[patch]  Original @ {addr:#x}: {original.hex(' ')}")
