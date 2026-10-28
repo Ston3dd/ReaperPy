@@ -78,3 +78,49 @@ git add ue_items.py tools_items_gui.py tools_gui.py tools_start_gui.py tools_dis
 git commit -m "New ITEMS tab: find all items and save them as a trainer in three steps"
 git push
 ```
+
+---
+
+# Update 3: Trainer auf anderen Konsolen (kein Platz für die Cave / "schon aktiv" / "nichts kommt an")
+
+## Was ich im Code gefunden habe
+1. **Patches wurden blind geschrieben.** `_apply_simple` hat die Bytes an der Zieladresse nie mit den erwarteten Original-Bytes
+   verglichen. Bei einer anderen Spielversion liegen an deinen Adressen andere Daten: der Patch überschreibt sie (nichts kommt
+   im Spiel an) oder `detect_patched` hält zufällig passende Bytes (z. B. Schalter-Byte `01`) für "schon aktiviert".
+2. **Item-Nummern (FNames) sind fest eingebaut** und stammen aus *deiner* Spielsitzung. Bei jemand anderem können dieselben
+   Items andere Nummern haben -> die Funktion bekommt einen unbekannten Namen, und es passiert nichts.
+3. **Die Cave liegt im Padding am Ende der Code-Regionen** (meist < 4 KB). Die Größe hing nur von der Zeilenzahl ab (bis 400 Items
+   je Projekt = mehrere KB) und wurde nicht gegen den freien Platz geprüft. Wer zuerst deine BASIS aktiviert, hat das Padding
+   belegt; danach findet auch sein eigener Build keinen Platz. Die alte Meldung nannte weder Zahlen noch Grund.
+
+Welche der drei bei deinem Bekannten zutrifft, kann ich von hier nicht sehen - die Absicherungen decken alle drei ab.
+
+## Was neu ist
+- **Versions-Wächter** (`patch_engine.py`): Trainer-Patches (`"Verify": true`) werden verweigert, wenn dort weder das erwartete
+  Original noch der Patch steht. Meldung mit Adresse und Bytes. Normale Community-Patches ohne das Flag laufen wie bisher.
+- **Versions-Fingerabdruck** im Trainer (`_trainer_spec.json` -> `anchors`).
+- **TRAINER PRÜFEN / ANPASSEN …** im Tab ITEMS: vergleicht Fingerabdruck + Item-Nummern mit dem laufenden Spiel; bei anderen Item-Nummern
+  und passender Version schreibt es den Trainer für dein Spiel neu (BASIS muss aus sein). Bei anderer Version: klare Warnung.
+- **Cave-Größe nach freiem Platz**: ITEMS liest den freien Code-Platz und teilt automatisch auf mehrere Projekte auf.
+  Fehlermeldung "Kein freier Code-Platz" nennt jetzt gebraucht / größte Lücke / belegte Region-Enden.
+- **Image-Basis-Prüfung** (`imagebase.py`): vergleicht die Basis im Hauptfenster mit der benannten Speicherkarte (`eboot.bin`).
+  Weicht sie ab: Meldung + Knopf BASIS ÜBERNEHMEN, Speichern gesperrt. Keine Namen in der Karte: "nicht prüfbar" - nie eine geratene Zahl.
+
+## Zum Vorschlag "Adressen zentral in read()/write() umrechnen"
+Nicht eingebaut. Geprüft: 65 Lese-/Schreibaufrufe in 20 Dateien; fast alle bekommen schon LIVE-Adressen (Pointer, Heap, Bibliotheken)
+oder rechnen selbst `IMAGE_BASE + RVA`. Eine zentrale Umrechnung würde diese Adressen ein zweites Mal verschieben; die
+vorgeschlagene Erkennung ("irgendein lesbares Segment", Rückfall auf den ersten Karteneintrag) kann zudem die falsche Region
+treffen - das wäre genau die geratene Zahl. Deine Prüfung (0x400000, und der Phoenix-Studio-Screenshot zeigt `executable[0]-5-400000`)
+spricht für feste Basis. Ich habe daher nur das Prüfen eingebaut: stimmt die Basis nicht, wird es sichtbar gemeldet.
+
+## Dateien (Update 3)
+neu: `imagebase.py`, `tests/test_trainer_portability.py`, `tests/test_imagebase.py`
+geändert: `cave_trainer.py`, `patch_engine.py`, `tools_items_gui.py`, `ue_items.py`, `tools_i18n_en.py`, `tests/test_gui_items.py`,
+`README.md`, `CHANGELOG.md`
+
+## Git (Update 3) - alles zusammen (die Zip enthält Update 1-3)
+```
+git add -A
+git commit -m "Trainer portability: version guard, cave sizing by free space, check/adapt trainer, image base check"
+git push
+```

@@ -1613,22 +1613,55 @@ EN.update({
     "Tabellen, Funktionen und Werte von Hand ansehen.": "Look at tables, functions and values by hand.",
 })
 
+EN.update({
+    # Cave-Platz / Versionspruefung (cave_trainer.py, patch_engine.py)
+    "Kein freier Code-Platz (Padding am Ende einer ausfuehrbaren Image-Region) fuer die Cave gefunden. ": "No free code space (padding at the end of an executable image region) found for the cave. ",
+    "Wenn der Trainer sehr gross ist: weniger Items je Projekt waehlen (der Tab ITEMS teilt automatisch nach dem freien Platz auf).": "If the trainer is very large: choose fewer items per project (the ITEMS tab splits automatically according to the free space).",
+    " Byte) passt nicht in die groesste freie Code-Luecke des Spiels (": " bytes) does not fit into the largest free code gap of the game (",
+    ", Spiel ": ", game ",
+    "Der Trainer enthaelt keinen Versions-Fingerabdruck (aelter) - mit ITEMS neu bauen": "The trainer contains no version fingerprint (older) - rebuild it with ITEMS",
+    "Das Ende dieser Regionen ist NICHT leer (ein anderer Cheat/ein Plugin oder eine noch aktive ReaperPy-Cave belegt es - erst BASIS deaktivieren oder das Spiel neu starten): ": "The end of these regions is NOT empty (another cheat/plugin or a still active ReaperPy cave occupies it - deactivate BASIS first or restart the game): ",
+    ": Spiel hat ": ": game has ",
+    ": endet mit ": ": ends with ",
+    "Passt nicht zu diesem Spiel: an ": "Does not match this game: at ",
+    ". Der Patch wurde fuer eine andere Spielversion (oder Image-Basis) gebaut - NICHT aktiviert. Trainer: im Tab ITEMS 'TRAINER PRUEFEN' / neu bauen; die Basis im Hauptfenster pruefen.": ". The patch was built for a different game version (or image base) - NOT activated. Trainer: use 'CHECK TRAINER' in the ITEMS tab / rebuild; check the base in the main window.",
+})
 
 EN.update({
-    ' Luecke(n) mitten im Code gefunden (Fallback)': ' gap(s) found inside the code (fallback)',
-    '[trainer] Cave liegt in einer Code-Luecke (kein Padding am Region-Ende gefunden)': '[trainer] Cave is in a code gap (no padding found at the region end)',
-    'Keine Signatur fuer ': 'No signature for ',
-    '[trainer] Keine Signatur fuer ': '[trainer] No signature for ',
-    '[trainer] Signatur ': '[trainer] Signature ',
-    'liegt bei base+': 'is at base+',
-    ' statt am erwarteten Platz': ' instead of the expected place',
-    'nicht im Spiel gefunden': 'not found in the game',
-    'Dieser Trainer passt nicht zu diesem Spiel-Build (': 'This trainer does not match this game build (',
-    '). Bitte mit TRAINER ERSTELLEN fuer diesen Build neu bauen - Cave und Haken wuerden sonst ins Leere schreiben.': '). Please rebuild it with CREATE TRAINER for this build - the cave and hooks would otherwise write into nothing.',
+    # Tab ITEMS: Basis-Pruefung, Trainer pruefen/anpassen, Platz fuer die Cave
+    "BASIS ÜBERNEHMEN": "ADOPT BASE",
+    "Image-Basis auf ": "Image base set to ",
+    " gestellt (laut Speicherkarte). Jetzt ITEMS FINDEN erneut klicken.": " (according to the memory map). Now click FIND ITEMS again.",
+    ", verteilt auf ca. ": ", spread over about ",
+    "Trainer-Ordner wählen (mit _trainer_spec.json)": "Choose trainer folder (with _trainer_spec.json)",
+    "Trainer anpassen": "Adapt trainer",
+    "Prüfe den Trainer … (nur Lesen)": "Checking the trainer … (read-only)",
+    "Passe den Trainer an dein Spiel an …": "Adapting the trainer to your game …",
+    " → BASIS ÜBERNEHMEN klicken": " → click ADOPT BASE",
+    " → oben BASIS ÜBERNEHMEN klicken.": " → click ADOPT BASE above.",
+    "Platz fuer die Cave: ": "Space for the cave: ",
+    " Projekt(e)": " project(s)",
+    "Nicht verbunden - im Hauptfenster auf VERBINDEN klicken.": "Not connected - click CONNECT in the main window.",
+    "Prüfen hat nicht geklappt: ": "Checking did not work: ",
+    "Der Trainer passt in diesem Spiel nicht mehr in eine Cave - bitte mit ITEMS neu bauen (teilt automatisch auf mehrere Projekte auf)": "The trainer no longer fits into one cave in this game - please rebuild it with ITEMS (it splits into several projects automatically)",
+    "Trainer angepasst: ": "Trainer adapted: ",
+    "Anpassen hat nicht geklappt: ": "Adapting did not work: ",
+    "TRAINER PRÜFEN / ANPASSEN …": "CHECK / ADAPT TRAINER …",
+    "✔ Passt zur Spielversion (Funktionen und Image-Basis stimmen überein).": "✔ Matches the game version (functions and image base agree).",
+    "✗ Dieser Trainer wurde für eine ANDERE Spielversion / Image-Basis gebaut - NICHT aktivieren:": "✗ This trainer was built for a DIFFERENT game version / image base - do NOT activate it:",
+    "   → Mit ITEMS FINDEN und TRAINER SPEICHERN einen eigenen Trainer für dein Spiel bauen.": "   → Build your own trainer for your game with FIND ITEMS and SAVE TRAINER.",
+    "ℹ Die BASIS-Cave dieses Trainers ist im Spiel gerade aktiv.": "ℹ The BASIS cave of this trainer is currently active in the game.",
+    "ℹ Item-Nummern nicht geprüft: erst ITEMS FINDEN klicken (liest die Nummern deines Spiels).": "ℹ Item numbers not checked: click FIND ITEMS first (it reads the numbers of your game).",
+    "Platz fuer die Cave nicht ermittelt: ": "Space for the cave not determined: ",
+    "✔ Alle ": "✔ All ",
+    " Item-Nummern stimmen mit deinem Spiel überein.": " item numbers match your game.",
+    " Item-Nummern sind in deinem Spiel anders (und ": " item numbers are different in your game (and ",
+    " Items fehlen) - deshalb passiert im Spiel nichts, wenn du einen Eintrag aktivierst.": " items are missing) - that is why nothing happens in the game when you activate an entry.",
+    "Image-Basis stimmt nicht: im Hauptfenster steht ": "Image base does not match: the main window says ",
+    ", laut Speicherkarte beginnt eboot.bin bei ": ", according to the memory map eboot.bin starts at ",
+    "Die Image-Basis kann nicht geprüft werden (die Speicherkarte enthält keine Modulnamen).": "The image base cannot be checked (the memory map contains no module names).",
 })
 
 
 from tools_i18n_unity import EN_UNITY  # noqa: E402
 EN.update(EN_UNITY)
-from tools_i18n_ue_fast import EN_UE_FAST  # noqa: E402
-EN.update(EN_UE_FAST)

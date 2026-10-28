@@ -238,6 +238,21 @@ ReaperPy reads the output of [ps4-unreal-dumper](https://github.com/TetzkatLipHo
    and 64 entries per project) - activate only **one** at a time. The folder is a normal ReaperPy project: choose it,
    activate `00 BASIS` once, then click entries. Saving only reads the game; nothing is changed until you activate BASIS.
 
+**Using a trainer made on another console / checking one.** The item numbers (FNames) inside a trainer come from the game
+session it was built in and can differ on another console; a different game version changes the code addresses. Click
+**CHECK / ADAPT TRAINER ...** and choose the trainer folder: ReaperPy compares the trainer's function fingerprints with your
+running game ("matches the game version" / "built for a DIFFERENT version - do not activate") and the item numbers with
+your game. If only the item numbers differ it offers to **adapt** the trainer (rewrites the files for your game; its BASIS
+must be off). Trainers made by ReaperPy are also protected when activated: if the memory at the patch site is neither the
+expected original nor the patch, activation is refused instead of overwriting something else.
+
+**Space for the cave.** The cave is placed in unused padding at the end of the game's code regions. ITEMS reads how much
+room your game has and splits the trainer into as many projects as needed. If there is still no room, the message shows the
+numbers (needed bytes, largest gap, regions whose end is occupied by another cheat or a still active cave).
+
+**Image base.** ITEMS checks the base set in the main window against the console's memory map (module `eboot.bin`). If they
+differ it says so, shows the base from the map and offers **ADOPT BASE**; it never guesses a number.
+
 Not every game works: if the SDK has no give-function the trainer can build (the tab tells you why), use **UE DISCOVERER ->
 SEARCH INVENTORY ENTRIES** to set quantities directly in memory.
 

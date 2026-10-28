@@ -5,6 +5,14 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 ## Unreleased
 
 ### Added
+- **Trainers on other consoles / game versions (ITEMS tab).** Trainer projects now carry a version fingerprint and are
+  written with `"Verify": true`; activating such a patch is refused when the memory at the patch site is neither the expected
+  original nor the patch (previously the bytes were written blindly, which looked like "already active" or "nothing happens"
+  on another game version). New **CHECK / ADAPT TRAINER**: compares fingerprint and item numbers (FNames) with the running
+  game and can rewrite a trainer with your game's item numbers. The cave size is matched to the free code space of the game
+  (`cave_trainer.capacity` / `fit_options`), so large trainers split into several projects instead of failing with "no space";
+  the "no free code space" message now shows the numbers and why. **Image base check** (`imagebase.py`) against the console's
+  memory map with ADOPT BASE (never guessed). Tests: `tests/test_trainer_portability.py`, `tests/test_imagebase.py`.
 - **New tab ITEMS - all items as a trainer in three steps** (`ue_items.py`, `tools_items_gui.py`). Choose the game folder -> **FIND
   ITEMS** (automatically picks the item table and a buildable give-function, reads all items live, sorts them into
   categories) -> **SAVE TRAINER** (amount per item; entries of 14 per category such as *Fish 1*, *Fish 2*; more than 400 items
@@ -36,44 +44,13 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
   and saves a `.reapproj` in the project's patch folder. Cave types: *Value cannot decrease*, *Fix value* (new,
   `ue_instr.force_cave_patch`) and *NOP*. "Choose hit" lists all hits with the reasons why a cave is or is not possible.
   Offsets below 0x80 are refused (search would be unreliable). Applies to ALL objects using that code (enemies too).
-- **Cave trainer: signatures are created automatically on export** (`cave_trainer.attach_signatures`). When a trainer is saved
-  (ITEMS tab *SAVE TRAINER*, UE DISCOVERER *EXPORT CAVE TRAINER*), ReaperPy builds a unique AOB signature for the two code anchors
-  the cave depends on (the give function and ProcessEvent) and stores them in `_trainer_spec.json` (`anchors`).
-- **Build check before activating a trainer** (`gui.py`, `cave_trainer.check_anchors`). Before `00 BASIS` is activated, the saved
-  signatures are compared with the running game. If the game is a different build (other region, backport), the activation is
-  refused with a clear message to rebuild the trainer for this build, instead of writing into wrong addresses (which showed up as
-  "already active" or as a patch with no effect). Trainers without signatures are not checked.
-- **Image base is detected from the running game** (`imagebase.py`, `gui.py`). On connect the base is read from the process memory
-  map (lowest address of the `eboot` module) and set automatically when it differs from the project setting. If no `eboot` module is
-  found, the log lists the modules. Tests: `tests/test_imagebase.py`.
 
 ### Changed
-- **UNREAL: much faster object index / instance scan** (`fastread.py`, `ue_live.py`, `ue_quick.py`). Building the object index (the
-  step behind *UE-LIVE*, *UE DISCOVERER*, *ITEMS* and every "find instances") used to read one 64 KB page after the other over a
-  single connection. Now the object headers are collected into a few large read windows (`fastread.plan_windows`), read in parallel
-  over several extra connections to the payload while the previous window is parsed, and the name pool is fetched block-wise in
-  parallel instead of name by name. Checkbox *read fast (several connections)* in the UE-LIVE tab (on by default; falls back to
-  fewer connections if they cannot be opened, and to the old one-by-one path if anything goes wrong). The log shows objects, time
-  and number of connections. Extra connections of a replaced game session are closed. `UELive.instances()` also checks the class
-  before the template test, so it no longer walks the owner chain for every object in the game. The result is identical to the old
-  path (same entries, same order). Tests: `tests/test_ue_live_fast.py`.
-- **UNITY: much faster instance scan and census** (`il2cpp_dump.py`, `tools_unity_gui.py`). Big memory ranges are now read in parallel over
-  several extra connections to the payload (checkbox *read fast (several connections)*, on by default; falls back to one connection if
-  they cannot be opened) and the next block is read while the previous one is searched. The census (*SCAN GAME*) no longer tests every
-  8-byte word in a Python loop: with `numpy` installed (optional, `pip install numpy`) it is about 20x faster, without it about 3x.
-  Tests: `tests/test_il2cpp_fast.py`.
-- **Faster reading from the console** (`ps5_client.py`): replies are received straight into a preallocated buffer instead of being
-  concatenated piece by piece, and the socket uses a 4 MB receive buffer and `TCP_NODELAY`.
 - **Cheat searcher layout** redesigned: three columns (hits | scan | sections) with card headers, filled primary buttons,
   right-click menus for hits and address list, rarely used settings moved to an **OPTIONS** dialog (self-test and region
   report are there too). No functions removed.
 
 ### Fixed
-- **Cave trainer: "No free code space ... for the cave"** on builds without padding at the end of a code region (e.g. backports, other
-  regional versions). The allocator now falls back to filler runs (`00` / `CC`) inside the code, like the GoldHEN export already did,
-  and logs when it uses one.
-- **Trainers had no effect on another console:** the image base was a fixed `0x400000` unless changed by hand, so offsets, cave search
-  and "already active" checks ran against the wrong addresses (see *Image base is detected*).
 - English mode: the GoldHEN/etaHEN export dialog, the status line ("connected"), the main log and about 250 error messages
   from the modules were still German. New windows are now translated automatically (`tools_i18n.install_toplevel_hook`).
 - The English dictionary failing to load is no longer silent: a warning appears in the log.
