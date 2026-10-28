@@ -199,6 +199,16 @@ def packages(groups, size=TR.PACK_SIZE):
     return out
 
 
+ROW_COST = 48                       # Schaetzung: so viele Byte Cave je Item-Zeile (fuer die Vorschau; gebaut wird exakt)
+
+
+def rows_per_project(code_capacity):
+    """Wie viele Items passen ungefaehr in eine Cave dieser Groesse (Vorschau; die echte Aufteilung nutzt cave_size)."""
+    if not code_capacity:
+        return TR.MAX_ROWS
+    return max(1, min(TR.MAX_ROWS, (code_capacity - 160) // ROW_COST))
+
+
 def split_projects(pkgs, max_rows=TR.MAX_ROWS, max_options=TR.MAX_OPTIONS):
     """Pakete der Reihe nach auf Projekte verteilen: keins ueberschreitet max_rows Items oder max_options Eintraege."""
     projects, cur, rows = [], [], 0

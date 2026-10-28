@@ -14,9 +14,10 @@ import os
 import subprocess
 import sys
 import tkinter as tk
-from tkinter import ttk
+from tkinter import filedialog, messagebox, ttk
 
 import cave_trainer as TR
+import imagebase as IB
 import ue_items as IT
 import ue_profile as P
 import ue_quick as Q
@@ -41,6 +42,8 @@ class ItemsTab(BaseTab):
         self.table = None                 # (addr, name) der gelesenen Tabelle
         self.items, self.on, self.view = [], [], []
         self.out_dirs = []
+        self.basecheck = None             # imagebase.Result der letzten Pruefung
+        self.cap = None                   # {'code': Byte, 'data': Byte} freier Platz fuer die Cave im Spiel
         self._busy = False
         self.v_q = tk.StringVar()
         self.v_cat = tk.StringVar(value=ALL_CATS)
@@ -83,6 +86,7 @@ class ItemsTab(BaseTab):
         self.lbl_found = tk.Label(top, text="Klicke ITEMS FINDEN - alles Weitere passiert automatisch.", bg=BG_CARD,
                                   fg=TEXT_DIM, font=FONT_LABEL, anchor="w", justify="left", wraplength=820)
         self.lbl_found.pack(side="left", padx=12, fill="x", expand=True)
+        self.b_base = pbtn(top, "BASIS ÜBERNEHMEN", self.adopt_base)          # nur sichtbar, wenn die Basis nicht stimmt
 
         sel = tk.Frame(body, bg=BG_CARD)
         sel.pack(fill="x", pady=(6, 0))
@@ -139,6 +143,7 @@ class ItemsTab(BaseTab):
         self.b_save = pbtn(row, "💾  TRAINER SPEICHERN", self.save, primary=True)
         self.b_save.pack(side="right")
         pbtn(row, "ORDNER ÖFFNEN", self.open_folder).pack(side="right", padx=6)
+        pbtn(row, "TRAINER PRÜFEN / ANPASSEN …", self.check_trainer).pack(side="right")
         self.lbl_done = tk.Label(body, text="", bg=BG_CARD, fg=TEXT_DIM, font=FONT_LABEL, anchor="w", justify="left",
                                  wraplength=1100)
         self.lbl_done.pack(fill="x", pady=(6, 0))
@@ -231,8 +236,17 @@ class ItemsTab(BaseTab):
                     table, rows, cols = pick, r, c
                     break
             funcs, bad = IT.give_candidates(prof, sdk)
+            try:                                                      # stimmt die Image-Basis mit der Konsole ueberein?
+                bc = IB.check_image_base(client.get_maps_named(), self.base)
+            except Exception as e:  # noqa: BLE001
+                bc = IB.Result("unknown", None, self.base, f"Image-Basis nicht prüfbar: {e}")
+            try:                                                      # wie viel Platz hat die Cave in DIESEM Spiel?
+                cap = TR.capacity(client.read_memory, [(m[0], m[1], m[2]) for m in client.get_maps()], self.base)
+            except Exception as e:  # noqa: BLE001
+                self._ilog(f"Platz fuer die Cave nicht ermittelt: {e}")
+                cap = None
             return {"prof": prof, "sig": sig, "fresh": fresh, "live": live, "tables": tables, "cands": cands,
-                    "table": table, "rows": rows or [], "cols": cols or [], "funcs": funcs, "bad": bad}
+                    "table": table, "rows": rows or [], "cols": cols or [], "funcs": funcs, "bad": bad, "cap": cap, "basecheck": bc}
 
         def ok(res):
             self._busy = False
@@ -243,6 +257,8 @@ class ItemsTab(BaseTab):
                 ue.live = res["live"]
             self.prof, self.live_tables, self.cands = res["prof"], res["tables"], res["cands"]
             self.funcs, self.func_bad = res["funcs"], res["bad"]
+            self.cap = res.get("cap")
+            self._set_basecheck(res.get("basecheck"))
             self.func = self.funcs[0] if self.funcs else None
             self.table = res["table"]
             self.cb_table.configure(values=[n for _a, n in IT.order_tables(self.live_tables)])
@@ -257,6 +273,26 @@ class ItemsTab(BaseTab):
             self._found("Das hat nicht geklappt: " + (str(e) or e.__class__.__name__), ERROR)
             self.log(str(e), "err")
         self.bg(job, ok, fail)
+
+    def _set_basecheck(self, bc):
+        self.basecheck = bc
+        if bc is not None and bc.status == "shifted":
+            self.b_base.pack(side="right", padx=(8, 0))
+            self.log(bc.message, "err")
+        else:
+            self.b_base.pack_forget()
+
+    def adopt_base(self):
+        """Die laut Speicherkarte geprüfte Basis im Hauptfenster einstellen (kein Raten: Wert kommt aus der Konsole)."""
+        bc = self.basecheck
+        app = getattr(self.win, "app", None)
+        if bc is None or bc.status != "shifted" or app is None or not hasattr(app, "apply_imgbase"):
+            return
+        app.imgbase_var.set(hex(bc.live_base))
+        app.apply_imgbase()
+        self._set_basecheck(IB.Result("ok", bc.live_base, bc.live_base, ""))
+        self.lbl_done.configure(text=f"Image-Basis auf {bc.live_base:#x} gestellt (laut Speicherkarte). "
+                                     "Jetzt ITEMS FINDEN erneut klicken.", fg=ACCENT)
 
     @staticmethod
     def _func_title(s):
@@ -277,7 +313,9 @@ class ItemsTab(BaseTab):
             why = self.func_bad[0][1] if self.func_bad else "keine Funktion zum Geben von Items im SDK"
             parts.append("✗ Keine Funktion gefunden, die der Trainer bauen kann (" + why + ") - dafür den Weg über "
                          "UE-ENTDECKER → INVENTAR-EINTRÄGE SUCHEN nutzen")
-        good = bool(self.items and self.func)
+        if self.basecheck is not None and self.basecheck.status == "shifted":
+            parts.insert(0, "✗ " + self.basecheck.message + " → BASIS ÜBERNEHMEN klicken")
+        good = bool(self.items and self.func) and not (self.basecheck and self.basecheck.status == "shifted")
         self._found("   |   ".join(parts), ACCENT if good else WARN)
         self.update_summary()
 
@@ -420,7 +458,8 @@ class ItemsTab(BaseTab):
     def _projects(self):
         groups = IT.group_items(self._chosen())
         pkgs = IT.packages(groups)
-        return pkgs, IT.split_projects(pkgs)
+        per = IT.rows_per_project(self.cap["code"] if self.cap else 0)
+        return pkgs, IT.split_projects(pkgs, max_rows=per)
 
     def update_summary(self):
         n_all, chosen = len(self.items), self._chosen()
@@ -431,7 +470,7 @@ class ItemsTab(BaseTab):
             return
         pkgs, projects = self._projects()
         self.lbl_plan.configure(
-            text=f"→ {len(chosen)} Items in {len(pkgs)} Einträgen" + (f", verteilt auf {len(projects)} Projekte"
+            text=f"→ {len(chosen)} Items in {len(pkgs)} Einträgen" + (f", verteilt auf ca. {len(projects)} Projekte"
                                                                       if len(projects) > 1 else ""), fg=TEXT)
 
     def _amount(self):
@@ -469,8 +508,10 @@ class ItemsTab(BaseTab):
         if proj is None or client is None or live is None:
             self.lbl_done.configure(text="Erst Schritt ① und ITEMS FINDEN (Spiel laden, verbinden).", fg=ERROR)
             return
-        pkgs, projects = self._projects()
-        dirs = IT.project_dirs(self._base_dir(), len(projects))
+        if self.basecheck is not None and self.basecheck.status == "shifted":
+            self.lbl_done.configure(text="✗ " + self.basecheck.message + " → oben BASIS ÜBERNEHMEN klicken.", fg=ERROR)
+            return
+        pkgs, _preview = self._projects()
         func, sdk, base, game = self.func, proj.sdk, self.base, getattr(proj, "title", "") or getattr(proj, "name", "")
         self._busy = True
         self.lbl_done.configure(text="Baue den Trainer … (nur Lesen im Spiel, es wird noch nichts verändert)", fg=WARN)
@@ -478,18 +519,17 @@ class ItemsTab(BaseTab):
         def job():
             read = client.read_memory
             options, skipped = IT.make_options(pkgs, func, sdk, live, read, base, amount, log=self._ilog)
-            by_name = {o.name: o for o in options}
             pe, slots, notes = IT.hook_targets(sdk, live, read, base)
             for n in notes:
                 self._ilog("Haken: " + n)
             maps = [(m[0], m[1], m[2]) for m in client.get_maps()]
+            cap = TR.capacity(read, maps, base, log=self._ilog)               # echter freier Platz in diesem Spiel
+            groups = TR.fit_options(options, cap["code"])                     # Projekte so gross, wie die Cave passt
+            dirs = IT.project_dirs(self._base_dir(), len(groups))
+            self._ilog(f"Platz fuer die Cave: {cap['code']} Byte -> {len(groups)} Projekt(e)")
             made = []
-            for d, proj_pkgs in zip(dirs, projects):
-                opts = [by_name[n] for n, _items in proj_pkgs if n in by_name]
-                if not opts:
-                    continue
+            for d, opts in zip(dirs, groups):
                 p = TR.plan(read, maps, base, opts, None, pe, slots, log=self._ilog)
-                TR.attach_signatures(p, client, maps, log=self._ilog)
                 TR.write_project(d, p, game=str(game))
                 made.append((d, len(opts), sum(len(o.rows) for o in opts), p))
             return made, skipped
@@ -534,3 +574,113 @@ class ItemsTab(BaseTab):
                 subprocess.Popen(["xdg-open", d])
         except Exception as e:  # noqa: BLE001
             self.log(f"{d}: {e}", "err")
+
+    # ------------------------------------------------------------------
+    # Fremden / alten Trainer pruefen und an DIESES Spiel anpassen
+    # ------------------------------------------------------------------
+    def check_trainer(self):
+        """Ordner eines fertigen Item-Trainers waehlen -> pruefen (Spielversion, Item-Nummern) und ggf. anpassen."""
+        start = self._base_dir()
+        d = filedialog.askdirectory(parent=self.win, title="Trainer-Ordner wählen (mit _trainer_spec.json)",
+                                    initialdir=start if os.path.isdir(start) else None)
+        if d:
+            self._check_dir(d)
+
+    def _live_names(self):
+        return {TR.clean_name(it["name"]): it["fname"] for it in self.items}
+
+    def _ask_adapt(self, text):
+        return messagebox.askyesno("Trainer anpassen", text, parent=self.win)
+
+    def _check_dir(self, d):
+        client = getattr(self.win, "client", None)
+        if client is None:
+            self.lbl_done.configure(text="Nicht verbunden - im Hauptfenster auf VERBINDEN klicken.", fg=ERROR)
+            return
+        if self._busy:
+            return self.log("Es läuft noch ein Auftrag - kurz warten", "warn")
+        names = self._live_names()
+        self._busy = True
+        self.lbl_done.configure(text="Prüfe den Trainer … (nur Lesen)", fg=WARN)
+
+        def job():
+            res = TR.check_project(d, client.read_memory, self.base)
+            cmp = TR.compare_fnames(d, names) if names else None
+            return res, cmp
+
+        def ok(r):
+            self._busy = False
+            res, cmp = r
+            lines = [f"Trainer: {d}"]
+            if res["ok_version"]:
+                lines.append("✔ Passt zur Spielversion (Funktionen und Image-Basis stimmen überein).")
+            else:
+                lines.append("✗ Dieser Trainer wurde für eine ANDERE Spielversion / Image-Basis gebaut - NICHT aktivieren:")
+                lines += ["      " + x for x in res["problems"][:3]]
+                lines.append("   → Mit ITEMS FINDEN und TRAINER SPEICHERN einen eigenen Trainer für dein Spiel bauen.")
+            if res["base_active"]:
+                lines.append("ℹ Die BASIS-Cave dieses Trainers ist im Spiel gerade aktiv.")
+            adapt = False
+            if cmp is None:
+                lines.append("ℹ Item-Nummern nicht geprüft: erst ITEMS FINDEN klicken (liest die Nummern deines Spiels).")
+            else:
+                good, changed, missing = cmp
+                if not changed and not missing:
+                    lines.append(f"✔ Alle {len(good)} Item-Nummern stimmen mit deinem Spiel überein.")
+                else:
+                    lines.append(f"✗ {len(changed)} Item-Nummern sind in deinem Spiel anders (und {len(missing)} Items fehlen) - "
+                                 "deshalb passiert im Spiel nichts, wenn du einen Eintrag aktivierst.")
+                    adapt = res["ok_version"] and bool(changed)
+            self.lbl_done.configure(text="\n".join(lines), fg=ACCENT if res["ok_version"] and not adapt else WARN)
+            if adapt and self._ask_adapt("Die Item-Nummern dieses Trainers passen nicht zu deinem Spiel.\n\n"
+                                         "Jetzt an dein Spiel anpassen? (Die Dateien in diesem Ordner werden neu geschrieben; "
+                                         "die BASIS des Trainers muss ausgeschaltet sein.)"):
+                self._adapt_dir(d, names)
+
+        def fail(e):
+            self._busy = False
+            self.lbl_done.configure(text="Prüfen hat nicht geklappt: " + (str(e) or e.__class__.__name__), fg=ERROR)
+            self.log(str(e), "err")
+        self.bg(job, ok, fail)
+
+    def _adapt_dir(self, d, names):
+        ue, proj, client = self._ue(), self._proj(), getattr(self.win, "client", None)
+        live = getattr(ue, "live", None)
+        if proj is None or client is None or live is None or not names:
+            self.lbl_done.configure(text="Erst Schritt ① und ITEMS FINDEN (Spiel laden, verbinden).", fg=ERROR)
+            return
+        sdk, base, game = proj.sdk, self.base, getattr(proj, "title", "") or getattr(proj, "name", "")
+        self._busy = True
+        self.lbl_done.configure(text="Passe den Trainer an dein Spiel an …", fg=WARN)
+
+        def job():
+            read = client.read_memory
+            new, changed, missing = TR.refresh_fnames(TR.load_options(d), names)
+            pe, slots, _notes = IT.hook_targets(sdk, live, read, base)
+            maps = [(m[0], m[1], m[2]) for m in client.get_maps()]
+            cap = TR.capacity(read, maps, base, log=self._ilog)
+            if len(TR.fit_options(new, cap["code"])) != 1:
+                raise TR.TrainerError("Der Trainer passt in diesem Spiel nicht mehr in eine Cave - bitte mit ITEMS neu bauen "
+                                      "(teilt automatisch auf mehrere Projekte auf)")
+            p = TR.plan(read, maps, base, new, None, pe, slots, log=self._ilog)
+            TR.write_project(d, p, game=str(game))
+            return changed, missing
+
+        def ok(r):
+            self._busy = False
+            changed, missing = r
+            msg = f"✔ Angepasst: {len(changed)} Item-Nummern ersetzt."
+            if missing:
+                msg += f" {len(missing)} Items gibt es in deinem Spiel nicht - sie behalten die alte Nummer (wirkungslos)."
+            msg += "\nIn ReaperPy den Ordner neu laden (ORDNER), BASIS aktivieren und die Einträge testen."
+            self.lbl_done.configure(text=msg, fg=ACCENT)
+            self.log(f"Trainer angepasst: {d}", "ok")
+
+        def fail(e):
+            self._busy = False
+            msg = str(e) or e.__class__.__name__
+            if "zeigt nicht auf ProcessEvent" in msg:
+                msg += " → Die BASIS dieses Trainers ist noch aktiv: erst ausschalten (oder das Spiel neu starten)."
+            self.lbl_done.configure(text="Anpassen hat nicht geklappt: " + msg, fg=ERROR)
+            self.log(msg, "err")
+        self.bg(job, ok, fail)

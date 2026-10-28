@@ -1,5 +1,5 @@
 """Tab ITEMS (Fake-Tk, kein Display): ITEMS FINDEN -> Haken -> TRAINER SPEICHERN."""
-import os, shutil, sys, tempfile, unittest
+import os, shutil, struct, sys, tempfile, unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
@@ -15,7 +15,11 @@ from test_gui_smoke import FakeWin
 
 
 class Client:
+    moved = 0
     def __init__(self, img): self.img = img
+    def get_maps_named(self):
+        return [(s + self.moved, e + self.moved, p, "eboot.bin") for s, e, p in self.img.maps[:1]] + \
+               [(s, e, p, "anon:x") for s, e, p in self.img.maps[1:]]
     def read_memory(self, a, n): return self.img.read(a, n)
     def get_maps(self): return self.img.maps
 
@@ -104,6 +108,77 @@ class T(unittest.TestCase):
         self.assertIn("mehrere Projekte", self.t.lbl_done._text)
         self.assertTrue(os.path.isdir(os.path.join(self.tmp, "Spiel", "Items 1")))
         self.assertTrue(os.path.isdir(os.path.join(self.tmp, "Spiel", "Items 2")))
+
+
+class BaseCheck(T):
+    def test_matching_base_is_fine(self):
+        self.t.find_items()
+        self.assertEqual(self.t.basecheck.status, "ok")
+
+    def test_wrong_base_is_reported_blocks_saving_and_can_be_adopted(self):
+        self.w.client.moved = 0x10000
+        applied = []
+        app = self.w.app
+        app.imgbase_var = type("V", (), {"set": lambda s, v: applied.append(v)})()
+        app.apply_imgbase = lambda: applied.append("apply")
+        self.t.find_items()
+        self.assertEqual(self.t.basecheck.status, "shifted")
+        self.assertIn("0x410000", self.t.lbl_found._text)
+        self.t.save()
+        self.assertIn("BASIS ÜBERNEHMEN", self.t.lbl_done._text)
+        self.assertFalse(os.path.isdir(os.path.join(self.tmp, "Spiel", "Items")))
+        self.t.adopt_base()
+        self.assertEqual(applied, ["0x410000", "apply"])
+        self.assertEqual(self.t.basecheck.status, "ok")
+
+
+class Portability(T):
+    """Fremder / alter Trainer: pruefen und an die Item-Nummern des eigenen Spiels anpassen."""
+
+    def build(self):
+        self.t.find_items()
+        self.t.save()
+        return os.path.join(self.tmp, "Spiel", "Items")
+
+    def test_check_passes_for_own_trainer(self):
+        d = self.build()
+        self.t._check_dir(d)
+        txt = self.t.lbl_done._text
+        self.assertIn("Passt zur Spielversion", txt)
+        self.assertIn("Alle 3 Item-Nummern stimmen", txt)
+
+    def test_other_console_other_item_numbers_are_detected_and_adapted(self):
+        d = self.build()
+        for it in self.t.items:                                   # andere Konsole: andere FName-Nummern
+            it["fname"] = bytes([x ^ 0x5A for x in it["fname"]])
+        asked = []
+        self.t._ask_adapt = lambda text: asked.append(text) or True
+        self.t._check_dir(d)
+        self.assertEqual(len(asked), 1)
+        self.assertIn("Angepasst: 3 Item-Nummern", self.t.lbl_done._text)
+        ok, changed, missing = TR.compare_fnames(d, self.t._live_names())       # jetzt stimmen sie
+        self.assertEqual((len(ok), changed, missing), (3, [], []))
+        opts = TR.load_options(d)
+        want = self.t.items[0]["fname"]
+        self.assertEqual(opts[0].rows[0].fname, want)
+        self.assertEqual(opts[0].rows[0].spec.args[0]["value"], want)           # der echte Aufruf-Wert
+
+    def test_other_game_version_is_reported_and_not_adapted(self):
+        d = self.build()
+        self.img.write(self.img.impl, b"\x90" * 32)
+        self.t._ask_adapt = lambda text: self.fail("darf nicht anbieten, anzupassen")
+        self.t._check_dir(d)
+        self.assertIn("ANDERE Spielversion", self.t.lbl_done._text)
+
+    def test_adapt_while_base_active_gives_plain_hint(self):
+        d = self.build()
+        for it in self.t.items:
+            it["fname"] = bytes([x ^ 0x5A for x in it["fname"]])
+        self.img.write(self.img.slot, struct.pack("<Q", self.img.pe + 0x40))   # Haken schon gesetzt
+        self.t._ask_adapt = lambda text: True
+        self.t._check_dir(d)
+        self.assertIn("BASIS dieses Trainers ist noch aktiv", self.t.lbl_done._text)
+
 
 
 if __name__ == "__main__":
