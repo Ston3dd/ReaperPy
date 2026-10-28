@@ -1614,5 +1614,19 @@ EN.update({
 })
 
 
+EN.update({
+    ' Luecke(n) mitten im Code gefunden (Fallback)': ' gap(s) found inside the code (fallback)',
+    '[trainer] Cave liegt in einer Code-Luecke (kein Padding am Region-Ende gefunden)': '[trainer] Cave is in a code gap (no padding found at the region end)',
+    'Keine Signatur fuer ': 'No signature for ',
+    '[trainer] Keine Signatur fuer ': '[trainer] No signature for ',
+    '[trainer] Signatur ': '[trainer] Signature ',
+    'liegt bei base+': 'is at base+',
+    ' statt am erwarteten Platz': ' instead of the expected place',
+    'nicht im Spiel gefunden': 'not found in the game',
+    'Dieser Trainer passt nicht zu diesem Spiel-Build (': 'This trainer does not match this game build (',
+    '). Bitte mit TRAINER ERSTELLEN fuer diesen Build neu bauen - Cave und Haken wuerden sonst ins Leere schreiben.': '). Please rebuild it with CREATE TRAINER for this build - the cave and hooks would otherwise write into nothing.',
+})
+
+
 from tools_i18n_unity import EN_UNITY  # noqa: E402
 EN.update(EN_UNITY)

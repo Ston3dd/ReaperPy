@@ -623,6 +623,7 @@ class DiscoverTab(BaseTab):
                 self._ilog("Haken: " + n)
             maps = [(m[0], m[1], m[2]) for m in client.get_maps()]
             p = TR.plan(client.read_memory, maps, base, merged, None, pe, slots, log=self._ilog)
+            TR.attach_signatures(p, client, maps, log=self._ilog)
             files = TR.write_project(out_dir, p, game=str(getattr(getattr(self._uelive(), "proj", None), "name", "") or ""))
             return p, files
 

@@ -14,6 +14,7 @@ from i18n import Translator
 from ps5_notify import Notifier
 from tools_common import style_ttk
 import projects
+import imagebase as IMB
 import session
 import aob as AOB
 
@@ -1072,6 +1073,7 @@ class App:
                     (f"[net] Auto-Detect erfolgreich: Port {port_used}", "ok")))
 
             AOB.clear_cache()
+            self._check_image_base()
             self._connected = True
             self._want_connected = True
             self._lost_notified = False
@@ -1088,6 +1090,51 @@ class App:
             self.q.put(("status", self.tr.t("status_conn_fail", err=e)))
             self.q.put(("log", (self.tr.t("log_conn_fail", err=e), "err")))
             self.q.put(("fx", ("denied", {"error": e})))
+
+    def _trainer_preflight(self, card):
+        """Cave-Trainer: vor dem Aktivieren der BASIS pruefen, ob die gespeicherten Signaturen zum laufenden Build passen.
+        Wirft RuntimeError mit klarem Text statt blind zu schreiben.  Trainer ohne Signaturen werden nicht geprueft."""
+        import json as _json
+        import cave_trainer as _TR
+        if os.path.basename(card.path) != _TR.BASE_FILE:
+            return
+        spec_path = os.path.join(os.path.dirname(card.path), _TR.SPEC_FILE)
+        try:
+            with open(spec_path, encoding="utf-8") as f:
+                spec = _json.load(f)
+            maps = [(m[0], m[1], m[2]) for m in self.backend.client.get_maps()]
+            res = _TR.check_anchors(self.backend.client, maps, self.IMAGE_BASE, spec)
+        except FileNotFoundError:
+            return
+        except Exception as e:  # noqa: BLE001 - Pruefung ist nur eine Hilfe
+            self.q.put(("log", (f"[trainer] Build-Pruefung nicht moeglich: {e}", "warn")))
+            return
+        problem = _TR.anchor_problem(res, self.IMAGE_BASE)
+        if problem:
+            raise RuntimeError(problem)
+        if res:
+            self.q.put(("log", ("[trainer] Build-Pruefung: Signaturen passen zum laufenden Spiel", "ok")))
+
+    def _check_image_base(self):
+        """Image-Basis mit dem laufenden Spiel abgleichen (Thread-sicher: Aenderungen gehen ueber die Queue).
+        Ein falscher Wert (frueher fest 0x400000) fuehrt zu 'kein Platz fuer die Cave', 'schon aktiv' oder
+        Patches ohne Wirkung."""
+        try:
+            maps = self.backend.client.get_maps_named()
+        except Exception as e:
+            self.q.put(("log", (f"[basis] Memory-Maps nicht lesbar: {e}", "warn")))
+            return
+        det, ok, text = IMB.check_base(maps, self.IMAGE_BASE)
+        if det is None:
+            mods = ", ".join(f"{n}@{a:#x}" for n, a, _b, _c in IMB.module_summary(maps, 8))
+            self.q.put(("log", (f"[basis] {text}. Module: {mods}", "warn")))
+            return
+        if ok:
+            self.q.put(("log", (f"[basis] {text}", "info")))
+            return
+        self.q.put(("log", (f"[basis] {text}", "warn")))
+        self.q.put(("log", (f"[basis] Setze Image-Basis automatisch auf {det:#x}", "accent")))
+        self.q.put(("imgbase", det))
 
     # ------------------------------------------------------------------
     # Patches laden / Karten
@@ -1387,6 +1434,7 @@ class App:
                 if not rp.origin_source:
                     raise RuntimeError(self.tr.t("log_patch_noorigin", name=rp.name))
                 hook = self._hook(rp)
+                self._trainer_preflight(card)
                 typ = self.tr.t("type_cave") if is_cave_patch(rp) else self.tr.t("type_patch")
 
                 patched, cave0, _t = detect_patched(self.backend, rp, hook)
@@ -1723,6 +1771,9 @@ class App:
                     self.set_status(val)
                 elif kind == "port":
                     self.port_var.set(str(val))
+                elif kind == "imgbase":
+                    self.imgbase_var.set(hex(val))
+                    self.apply_imgbase()
                 elif kind == "card_state":
                     card, st, cave = val
                     if card.winfo_exists():

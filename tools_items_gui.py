@@ -489,6 +489,7 @@ class ItemsTab(BaseTab):
                 if not opts:
                     continue
                 p = TR.plan(read, maps, base, opts, None, pe, slots, log=self._ilog)
+                TR.attach_signatures(p, client, maps, log=self._ilog)
                 TR.write_project(d, p, game=str(game))
                 made.append((d, len(opts), sum(len(o.rows) for o in opts), p))
             return made, skipped

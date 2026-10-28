@@ -360,7 +360,7 @@ class PlanTests(unittest.TestCase):
 
     def test_no_code_padding_rejected(self):
         img = FakeImage()
-        img.write(img.BASE + 0x10000 - 8, b"\x55" * 8)         # Code reicht bis zum Regionsende
+        img.write(img.BASE, b"\x55" * 0x10000)                  # Code reicht bis zum Regionsende, keine Luecke
         with self.assertRaises(T.TrainerError) as c:
             T.plan(img.read, img.maps, img.BASE, make_options(), img.impl, img.pe, [img.slot], settle=0)
         self.assertIn("Code-Platz", str(c.exception))
@@ -568,3 +568,51 @@ class ProjectTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_alloc_code_falls_back_to_inner_gap():
+    import cave_trainer as CT
+    size = 0x3000
+    mem = bytearray(b"\x90" * size)
+    mem[0x1000:0x1400] = b"\xCC" * 0x400          # Luecke mitten im Code, am Region-Ende kein Padding
+    read = lambda a, n: bytes(mem[a - 0x10000:a - 0x10000 + n])
+    sl = CT.Slots(read, [(0x10000, 0x10000 + size, 5)], log=lambda *_: None)
+    cave, need = sl.alloc_code(0x100, 0x10000)
+    assert 0x11000 <= cave and cave + need <= 0x11400
+
+
+class AnchorTests(unittest.TestCase):
+    class _Client:
+        def __init__(self, mem, base):
+            self.mem, self.base = mem, base
+
+        def read_memory(self, a, n):
+            o = a - self.base
+            return bytes(self.mem[o:o + n]) if 0 <= o and o + n <= len(self.mem) else b""
+
+    def _setup(self):
+        import random
+        rnd = random.Random(1)
+        base = 0x400000
+        mem = bytearray(rnd.randrange(1, 255) for _ in range(0x4000))
+        return base, mem, self._Client(mem, base), [(base, base + 0x4000, 5)]
+
+    def test_signature_roundtrip_ok_and_moved(self):
+        import aob
+        base, mem, cl, maps = self._setup()
+        sig, _ = aob.make_signature(cl, maps, base + 0x800, hook_len=0, wildcard_hook=False, min_len=16, max_len=64)
+        spec = {"anchors": {"impl": {"rva": hex(0x800), "aob": sig}}}
+        self.assertEqual(T.check_anchors(cl, maps, base, spec)[0][1], "ok")
+        # anderer Build: Funktion liegt 0x100 weiter hinten
+        mem[0x900:0x900 + 80] = mem[0x800:0x800 + 80]
+        mem[0x800:0x850] = bytes(range(1, 81))[:0x50]
+        res = T.check_anchors(cl, maps, base, spec)
+        self.assertEqual(res[0][1:], ("moved", base + 0x900))
+        self.assertIn("passt nicht", T.anchor_problem(res, base))
+        self.assertIsNone(T.anchor_problem([("impl", "ok", base + 0x800)], base))
+
+    def test_spec_contains_anchors(self):
+        p = T.Plan()
+        p.anchors = {"impl": (0x10, "48 8B ??")}
+        doc = T.spec_document(p)
+        self.assertEqual(doc["anchors"]["impl"], {"rva": "0x10", "aob": "48 8B ??"})

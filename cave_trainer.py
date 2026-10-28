@@ -277,7 +277,7 @@ class Slots:
 
     def __init__(self, read, span, log=print):
         self.read, self.span, self.log = read, span, log
-        self._code, self._data = None, None
+        self._code, self._data, self._inner = None, None, None
 
     def _scan_code(self):
         runs = []
@@ -303,6 +303,35 @@ class Slots:
         self.log(f"[trainer] {len(runs)} Daten-Leerstelle(n) am Ende beschreibbarer Regionen")
         return runs
 
+    def _scan_inner(self, need):
+        """Fallback (z. B. Backport/andere Spielversion ohne Padding am Region-Ende): Fuellbyte-Stuecke (00/CC)
+        mitten im Code, mindestens `need` Byte lang."""
+        runs = []
+        rx = re.compile(b"(?:\x00{%d,}|\xCC{%d,})" % (need, need))
+        CH = 0x100000
+        for s, e, p in self.span:
+            if not p & 4:
+                continue
+            pos = s
+            while pos < e:
+                size = min(CH + need, e - pos)
+                try:
+                    data = bytes(self.read(pos, size))
+                except Exception:
+                    pos += CH
+                    continue
+                for m in rx.finditer(data):
+                    if pos + m.end() <= e:
+                        runs.append((pos + m.start(), pos + m.end()))
+                pos += CH
+        uniq = {}
+        for a, b in runs:
+            if a not in uniq or b > uniq[a]:
+                uniq[a] = b
+        out = [[a, b] for a, b in sorted(uniq.items(), key=lambda kv: -(kv[1] - kv[0]))]
+        self.log(f"[trainer] {len(out)} Luecke(n) mitten im Code gefunden (Fallback)")
+        return out
+
     def alloc_code(self, need, near):
         if self._code is None:
             self._code = self._scan_code()
@@ -312,6 +341,15 @@ class Slots:
             if cave < r[0] or abs(cave - near) > LIMIT:
                 continue
             r[1] = cave
+            return cave, need
+        if self._inner is None:
+            self._inner = self._scan_inner(need)
+        for r in self._inner:
+            cave = (r[1] - need) & ~0xF
+            if cave < r[0] or abs(cave - near) > LIMIT:
+                continue
+            r[1] = cave
+            self.log("[trainer] Cave liegt in einer Code-Luecke (kein Padding am Region-Ende gefunden)")
             return cave, need
         raise TrainerError("Kein freier Code-Platz (Padding am Ende einer ausfuehrbaren Image-Region) fuer die Cave gefunden")
 
@@ -345,6 +383,7 @@ class Plan:
         self.slots = []                 # absolute vtable-Slot-Adressen
         self.options = []
         self.warnings = []
+        self.anchors = {}               # Name -> (rva, AOB-Text): Code-Anker zum Pruefen des Spiel-Builds
 
     def rva(self, addr):
         return addr - self.base
@@ -447,6 +486,63 @@ def option_patch(p, i, author=""):
             "Variables": [_var("OriginSource", p.rva(p.flag_addr + i), "00", "01")]}
 
 
+ANCHOR_LEN = 64
+
+
+def attach_signatures(p, client, maps, log=print):
+    """Erzeugt beim Export AOB-Signaturen fuer die beiden Code-Anker des Trainers (Item-Funktion, ProcessEvent).
+    Nur lesend.  Misslingt eine Signatur, wird das nur geloggt - der Trainer wird trotzdem geschrieben."""
+    import aob
+    for name, addr in (("impl", p.impl), ("process_event", p.orig_pe)):
+        try:
+            sig, _hits = aob.make_signature(client, maps, addr, hook_len=0, wildcard_hook=False,
+                                            min_len=16, max_len=ANCHOR_LEN, log=lambda m: None)
+            p.anchors[name] = (p.rva(addr), sig)
+            log(f"[trainer] Signatur {name} @ base+{p.rva(addr):#x}: {len(sig.split())} Byte")
+        except Exception as e:  # noqa: BLE001
+            p.warnings.append(f"Keine Signatur fuer {name}: {e}")
+            log(f"[trainer] Keine Signatur fuer {name}: {e}")
+    return p.anchors
+
+
+def _matches_at(client, addr, pat, mask):
+    try:
+        data = bytes(client.read_memory(addr, len(pat)))
+    except Exception:  # noqa: BLE001
+        return False
+    return len(data) == len(pat) and all(not m or a == b for a, b, m in zip(data, pat, mask))
+
+
+def check_anchors(client, maps, base, spec):
+    """Passt der Trainer zum laufenden Spiel-Build?  -> [(name, status, adresse)]; status 'ok' | 'moved' | 'missing'.
+    Erst wird nur an der erwarteten Stelle gelesen (schnell), nur bei Abweichung ueber alle Code-Regionen gesucht."""
+    import aob
+    out = []
+    for name, a in (spec.get("anchors") or {}).items():
+        try:
+            rva = int(a["rva"], 0)
+            pat, mask = aob.parse_pattern(a["aob"])
+        except Exception:  # noqa: BLE001
+            continue
+        if _matches_at(client, base + rva, pat, mask):
+            out.append((name, "ok", base + rva))
+            continue
+        hits = aob.find_matches(client, aob.exec_regions(maps), pat, mask, limit=2)
+        out.append((name, "moved", hits[0]) if len(hits) == 1 else (name, "missing", 0))
+    return out
+
+
+def anchor_problem(results, base):
+    """Text fuer den Benutzer, wenn der Trainer nicht zum Build passt, sonst None."""
+    bad = [r for r in results if r[1] != "ok"]
+    if not bad:
+        return None
+    parts = [f"{n}: " + (f"liegt bei base+{a - base:#x} statt am erwarteten Platz" if st == "moved"
+                         else "nicht im Spiel gefunden") for n, st, a in bad]
+    return ("Dieser Trainer passt nicht zu diesem Spiel-Build (" + "; ".join(parts) + "). "
+            "Bitte mit TRAINER ERSTELLEN fuer diesen Build neu bauen - Cave und Haken wuerden sonst ins Leere schreiben.")
+
+
 def spec_document(p, game="", title_id=""):
     return {
         "format": "reaperpy-item-trainer", "version": 1,
@@ -456,6 +552,7 @@ def spec_document(p, game="", title_id=""):
         "slot_rvas": [hex(s - p.base) for s in p.slots],
         "cave_rva": hex(p.cave - p.base), "cave_size": len(p.cave_bytes),
         "flag_rva": hex(p.flag_addr - p.base), "flag_size": p.flag_size,
+        "anchors": {n: {"rva": hex(r), "aob": sig} for n, (r, sig) in p.anchors.items()},
         "options": [o.to_json() for o in p.options],
     }
 

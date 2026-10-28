@@ -36,6 +36,16 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
   and saves a `.reapproj` in the project's patch folder. Cave types: *Value cannot decrease*, *Fix value* (new,
   `ue_instr.force_cave_patch`) and *NOP*. "Choose hit" lists all hits with the reasons why a cave is or is not possible.
   Offsets below 0x80 are refused (search would be unreliable). Applies to ALL objects using that code (enemies too).
+- **Cave trainer: signatures are created automatically on export** (`cave_trainer.attach_signatures`). When a trainer is saved
+  (ITEMS tab *SAVE TRAINER*, UE DISCOVERER *EXPORT CAVE TRAINER*), ReaperPy builds a unique AOB signature for the two code anchors
+  the cave depends on (the give function and ProcessEvent) and stores them in `_trainer_spec.json` (`anchors`).
+- **Build check before activating a trainer** (`gui.py`, `cave_trainer.check_anchors`). Before `00 BASIS` is activated, the saved
+  signatures are compared with the running game. If the game is a different build (other region, backport), the activation is
+  refused with a clear message to rebuild the trainer for this build, instead of writing into wrong addresses (which showed up as
+  "already active" or as a patch with no effect). Trainers without signatures are not checked.
+- **Image base is detected from the running game** (`imagebase.py`, `gui.py`). On connect the base is read from the process memory
+  map (lowest address of the `eboot` module) and set automatically when it differs from the project setting. If no `eboot` module is
+  found, the log lists the modules. Tests: `tests/test_imagebase.py`.
 
 ### Changed
 - **Cheat searcher layout** redesigned: three columns (hits | scan | sections) with card headers, filled primary buttons,
@@ -43,6 +53,11 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
   report are there too). No functions removed.
 
 ### Fixed
+- **Cave trainer: "No free code space ... for the cave"** on builds without padding at the end of a code region (e.g. backports, other
+  regional versions). The allocator now falls back to filler runs (`00` / `CC`) inside the code, like the GoldHEN export already did,
+  and logs when it uses one.
+- **Trainers had no effect on another console:** the image base was a fixed `0x400000` unless changed by hand, so offsets, cave search
+  and "already active" checks ran against the wrong addresses (see *Image base is detected*).
 - English mode: the GoldHEN/etaHEN export dialog, the status line ("connected"), the main log and about 250 error messages
   from the modules were still German. New windows are now translated automatically (`tools_i18n.install_toplevel_hook`).
 - The English dictionary failing to load is no longer silent: a warning appears in the log.
