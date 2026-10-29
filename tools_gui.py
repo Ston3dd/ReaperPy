@@ -18,6 +18,7 @@ import ps5_ext as X
 from ps5_client import PS5DebugClient
 from reapatch import ReapPatch
 from patch_engine import apply_patch, deactivate_patch, is_cave_patch, asm_to_bytes
+from tools_groups import GroupTab
 from tools_common import (BG, BG_BAR, BG_CARD, ACCENT, ACCENT_DIM, TEXT, TEXT_DIM, WARN,
                           ERROR, FONT_MONO, FONT_LABEL, FONT_HEAD, BaseTab, style_ttk,
                           button, label, entry, textbox, tree, with_scroll, hexs)
@@ -959,10 +960,16 @@ class AobTab(BaseTab):
 # ==================================================================
 class ToolsWindow(tk.Toplevel):
     # Reihenfolge der Anfaenger-Tabs (START kommt zuerst, FORTGESCHRITTEN zuletzt)
-    SIMPLE = ("WERT SUCHEN", "CHEATS BEARBEITEN", "★ ITEMS", "★ WERTE", "★ UE-LIVE", "★ UE-ENTDECKER", "★ CHEAT-MENÜ",
-              "★ UNITY")
+    SIMPLE = ("WERT SUCHEN", "CHEATS BEARBEITEN", "★ UNREAL", "★ UNITY")
     ADVANCED = ("SPEICHER", "DISASSEMBLER", "POINTER", "KONVERTER", "AOB / UPDATE", "DEBUGGER", "KERNEL-LOG",
-                "PYTHON-SKRIPT", "FUNKTION AUFRUFEN", "FUNKTIONS-LOGGER", "JOURNAL / UNDO", "UE-AUTO")
+                "PYTHON-SKRIPT", "FUNKTION AUFRUFEN", "FUNKTIONS-LOGGER", "JOURNAL / UNDO")
+    # Sammel-Tabs: Reitername -> [(interner Tab-Name, Reiter-Beschriftung im Sammel-Tab)] in Arbeitsreihenfolge
+    GROUPS = {
+        "★ UNREAL": (("★ ITEMS", "ITEMS"), ("★ WERTE", "WERTE"), ("★ UE-LIVE", "LIVE"), ("★ CHEAT-MENÜ", "CHEAT-MENÜ"),
+                     ("★ UE-ENTDECKER", "ENTDECKER"), ("UE-AUTO", "EXPERTE")),
+        "★ UNITY": (("★ WERTE UNITY", "SCHNELL"), ("★ UNITY MANUELL", "MANUELL")),
+    }
+    GROUPED = {inner for subs in GROUPS.values() for inner, _t in subs}
 
     def __init__(self, app):
         super().__init__(app.root)
@@ -993,6 +1000,8 @@ class ToolsWindow(tk.Toplevel):
         self.adv_frame = tk.Frame(self.nb, bg=BG)
         self.adv_nb = ttk.Notebook(self.adv_frame)
         self.adv_nb.pack(fill="both", expand=True)
+        self.groups = {name: GroupTab(self.nb, self, name) for name in self.GROUPS}
+        self.unreal_group, self.unity_group = self.groups["★ UNREAL"], self.groups["★ UNITY"]
         self.t_mem = MemoryTab(self.adv_nb, self)
         self.t_dis = DisasmTab(self.adv_nb, self)
         self.t_conv = ConverterTab(self.adv_nb, self)
@@ -1043,29 +1052,39 @@ class ToolsWindow(tk.Toplevel):
         self.discover_tab = None
         self.items_tab = None
         self.values_tab = None
+        self.values_tab_unity = None
+        self.unity_tab = None
         # jeder Zusatz-Tab einzeln: ein defekter Tab darf die anderen nicht mitreissen
         extra = (("tools_extra_gui", "CallerTab", "FUNKTION AUFRUFEN"),
                  ("tools_extra_gui", "LoggerTab", "FUNKTIONS-LOGGER"),
                  ("tools_extra_gui", "JournalTab", "JOURNAL / UNDO"),
                  ("tools_uelive_gui", "UeLiveTab", "★ UE-LIVE"),
                  ("tools_items_gui", "ItemsTab", "★ ITEMS"),
-                 ("tools_values_gui", "ValuesTab", "★ WERTE"),
+                 ("tools_values_gui", "ValuesTab", "★ WERTE", {"engine": "ue"}),
+                 ("tools_values_gui", "ValuesTab", "★ WERTE UNITY", {"engine": "unity"}),
                  ("tools_discover_gui", "DiscoverTab", "★ UE-ENTDECKER"),
                  ("tools_cheatmenu_gui", "CheatMenuTab", "★ CHEAT-MENÜ"),
-                 ("tools_unity_gui", "UnityTab", "★ UNITY"),
+                 ("tools_unity_gui", "UnityTab", "★ UNITY MANUELL"),
                  ("tools_ue_gui", "UeTab", "UE-AUTO"))
-        for modname, clsname, name in extra:
+        group_of = {inner: g for g, subs in self.GROUPS.items() for inner, _t in subs}
+        for modname, clsname, name, *kw in extra:
             try:
                 cls = getattr(__import__(modname), clsname)
-                t = cls(self.adv_nb if name in self.ADVANCED else self.nb, self)
+                parent = self.groups[group_of[name]].nb if name in group_of else (
+                    self.adv_nb if name in self.ADVANCED else self.nb)
+                t = cls(parent, self, **(kw[0] if kw else {}))
                 self.extra_tabs.append(t)
                 tabs.append((t, name))
                 if clsname == "DiscoverTab":
                     self.discover_tab = t
                 if clsname == "ItemsTab":
                     self.items_tab = t
-                if clsname == "ValuesTab":
+                if name == "★ WERTE":
                     self.values_tab = t
+                if name == "★ WERTE UNITY":
+                    self.values_tab_unity = t
+                if clsname == "UnityTab":
+                    self.unity_tab = t
             except Exception as e:
                 msg = f"Tab {name} nicht geladen: {e}"
                 self.after(200, lambda msg=msg: self.log(msg, "err"))
@@ -1078,6 +1097,11 @@ class ToolsWindow(tk.Toplevel):
             self.start_tab = None
             msg = f"Start-Tab nicht geladen: {e}"
             self.after(200, lambda msg=msg: self.log(msg, "err"))
+        for name, subs in self.GROUPS.items():                     # Sammel-Tabs fuellen (nur Tabs, die geladen werden konnten)
+            for inner, label in subs:
+                if inner in by_name:
+                    self.groups[name].add(by_name[inner], label)
+            by_name[name] = self.groups[name]
         for name in self.SIMPLE:
             if name in by_name:
                 self.nb.add(by_name[name], text=name)
@@ -1113,6 +1137,8 @@ class ToolsWindow(tk.Toplevel):
         self.protocol("WM_DELETE_WINDOW", self.close)
         self.nb.bind("<<NotebookTabChanged>>", lambda _e: self.after(30, self.apply_language))
         self.adv_nb.bind("<<NotebookTabChanged>>", lambda _e: self.after(30, self.apply_language))
+        for g in self.groups.values():
+            g.nb.bind("<<NotebookTabChanged>>", lambda _e: self.after(30, self.apply_language))
         self.after(200, self.apply_language)
         self.after(80, self._poll)
         self.bg(self._connect, lambda _r: self._set_state("verbunden", ACCENT),
@@ -1219,13 +1245,18 @@ class ToolsWindow(tk.Toplevel):
 
     # ---- Navigation zwischen Tabs ----
     def show_tab(self, tab):
-        """Tab nach vorne holen - auch wenn er im Notebook FORTGESCHRITTEN liegt."""
+        """Tab nach vorne holen - auch wenn er im Notebook FORTGESCHRITTEN oder in einem Sammel-Tab (UNREAL/UNITY) liegt."""
         if tab is None:
             return
         try:
-            if getattr(tab, "master", None) is self.adv_nb:
+            master = getattr(tab, "master", None)
+            group = getattr(master, "group", None)
+            if master is self.adv_nb:
                 self.nb.select(self.adv_frame)
                 self.adv_nb.select(tab)
+            elif group is not None:
+                self.nb.select(group)
+                master.select(tab)
             else:
                 self.nb.select(tab)
         except Exception:

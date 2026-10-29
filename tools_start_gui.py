@@ -28,10 +28,14 @@ STEPS = [
 EXTRAS = [
     ("Unreal-Engine-Spiel: Items als Trainer", "Alle Items eines Unreal-Spiels automatisch finden und als fertigen "
      "Trainer speichern - in drei Klicks.", "ZU ITEMS", "items_tab"),
-    ("Leben, Gold, Erfahrung, Munition", "Wichtige Werte als fertige Patches - für Unreal Engine und Unity, in drei Klicks.",
-     "ZU WERTE", "values_tab"),
+    ("Unreal-Engine-Spiel: Leben, Gold, Erfahrung, Munition", "Wichtige Werte als fertige Patches - in drei Klicks "
+     "(Reiter UNREAL, Unterreiter WERTE).", "ZU WERTE", "values_tab"),
+    ("Unity-Spiel: Leben, Gold, Erfahrung, Munition", "Wichtige Werte als fertige Patches - in drei Klicks "
+     "(Reiter UNITY, Unterreiter SCHNELL).", "ZU UNITY ▸ SCHNELL", "values_tab_unity"),
     ("Unreal-Engine-Spiel: Spezialfälle", "Tabellen, Funktionen und Werte von Hand ansehen.",
      "UE-ENTDECKER ÖFFNEN", "discover_tab"),
+    ("Unity-Spiel: Spezialfälle", "Felder, Methoden und Namen von Hand ansehen und ändern.",
+     "ZU UNITY ▸ MANUELL", "unity_tab"),
     ("Mehr Werkzeuge", "Speicher, Disassembler, Debugger, Pointer, Skripte und Co. für Fortgeschrittene.",
      "FORTGESCHRITTEN ÖFFNEN", "adv_frame"),
 ]

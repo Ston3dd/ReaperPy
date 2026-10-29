@@ -32,14 +32,17 @@ OWN_AUTHORS = ("ReaperPy Cheat-Menü", "ReaperPy Werte")
 
 
 class ValuesTab(BaseTab):
-    def __init__(self, parent, win):
+    def __init__(self, parent, win, engine=None):
+        """engine: None = beide Spiel-Typen (Auswahl "Automatisch"), "ue" = nur Unreal, "unity" = nur Unity.
+        Mit fester Engine verschwindet alles, was zur anderen gehoert (Ordner-Zeile, Spiel-Typ-Auswahl)."""
         super().__init__(parent, win)
+        self.fixed = {"ue": ENGINES[1], "unity": ENGINES[2]}.get(engine)
         self.kind = None                  # "ue" | "unity": was die Liste gerade enthaelt
         self.rows, self.on = [], []       # Zeilen: dict(cat, label, effect, warn, obj)
         self.menu = None                  # CheatMenu (Unreal)
         self.out_dir = None
         self._busy = False
-        self.v_engine = tk.StringVar(value=ENGINES[0])
+        self.v_engine = tk.StringVar(value=self.fixed or ENGINES[0])
         self.v_xp = tk.StringVar(value=VA.XP_DEFAULT)
 
         tk.Label(self, text="▸  WERTE  →  PATCHES", bg=BG, fg=ACCENT, font=FONT_HEAD).pack(anchor="w", padx=14, pady=(10, 0))
@@ -60,12 +63,14 @@ class ValuesTab(BaseTab):
         outer, body, _h = card(self, "①  SPIEL")
         outer.pack(fill="x", padx=12, pady=(0, 6))
         r1 = tk.Frame(body, bg=BG_CARD)
-        r1.pack(fill="x")
+        if self.fixed != ENGINES[2]:
+            r1.pack(fill="x")
         self.lbl_ue = tk.Label(r1, text="", bg=BG_CARD, fg=TEXT, font=FONT_LABEL, anchor="w")
         self.lbl_ue.pack(side="left", fill="x", expand=True)
         pbtn(r1, "UNREAL-SPIEL-ORDNER WÄHLEN …", self.pick_ue).pack(side="right")
         r2 = tk.Frame(body, bg=BG_CARD)
-        r2.pack(fill="x", pady=(4, 0))
+        if self.fixed != ENGINES[1]:
+            r2.pack(fill="x", pady=(4, 0))
         self.lbl_unity = tk.Label(r2, text="", bg=BG_CARD, fg=TEXT, font=FONT_LABEL, anchor="w")
         self.lbl_unity.pack(side="left", fill="x", expand=True)
         pbtn(r2, "UNITY-ORDNER WÄHLEN …", self.pick_unity).pack(side="right")
@@ -79,8 +84,9 @@ class ValuesTab(BaseTab):
         top.pack(fill="x")
         self.b_find = pbtn(top, "🔎  WICHTIGES FINDEN", self.find, primary=True)
         self.b_find.pack(side="left")
-        clabel(top, "Spiel-Typ").pack(side="left", padx=(14, 4))
-        ttk.Combobox(top, textvariable=self.v_engine, values=list(ENGINES), width=14, state="readonly").pack(side="left")
+        if not self.fixed:
+            clabel(top, "Spiel-Typ").pack(side="left", padx=(14, 4))
+            ttk.Combobox(top, textvariable=self.v_engine, values=list(ENGINES), width=14, state="readonly").pack(side="left")
         self.lbl_found = tk.Label(top, text="Klicke WICHTIGES FINDEN - Leben, Gold, Ausdauer, Munition, Erfahrung ...",
                                   bg=BG_CARD, fg=TEXT_DIM, font=FONT_LABEL, anchor="w", justify="left", wraplength=640)
         self.lbl_found.pack(side="left", padx=12, fill="x", expand=True)
@@ -108,8 +114,9 @@ class ValuesTab(BaseTab):
         outer.pack(side="bottom", fill="x", padx=12, pady=(0, 8))
         row = tk.Frame(body, bg=BG_CARD)
         row.pack(fill="x")
-        clabel(row, "Erfahrung festschreiben auf (Unreal)").pack(side="left")
-        entry(row, self.v_xp, 8).pack(side="left", padx=(6, 12))
+        if self.fixed != ENGINES[2]:                         # nur Unreal schreibt die Erfahrung fest
+            clabel(row, "Erfahrung festschreiben auf (Unreal)").pack(side="left")
+            entry(row, self.v_xp, 8).pack(side="left", padx=(6, 12))
         self.lbl_plan = tk.Label(row, text="", bg=BG_CARD, fg=TEXT, font=FONT_LABEL, anchor="w")
         self.lbl_plan.pack(side="left", fill="x", expand=True)
         self.b_save = pbtn(row, "💾  PATCHES SPEICHERN", self.save, primary=True)

@@ -1722,15 +1722,24 @@ EN.update({
 })
 
 
-# Selbst-Update (self_update.py): Fehlermeldungen, die im Update-Dialog erscheinen
-EN.update({
-    "Adresse nicht erlaubt: ": "Address not allowed: ",
-    "Pruefsumme nicht lesbar": "Checksum not readable",
-    "Release enthaelt kein Windows-Paket": "Release contains no Windows package",
-    "Release enthaelt keine Pruefsumme (.sha256) - nicht automatisch installiert": "Release contains no checksum (.sha256) - not installed automatically",
-    "Weiterleitung auf nicht erlaubten Host: ": "Redirect to a host that is not allowed: ",
-    "Pruefsumme stimmt nicht - Datei verworfen": "Checksum does not match - file discarded",
-})
-
 from tools_i18n_unity import EN_UNITY  # noqa: E402
 EN.update(EN_UNITY)
+
+
+EN.update({
+    "★ UNREAL": "★ UNREAL",
+    "LIVE": "LIVE",
+    "ITEMS": "ITEMS",
+    "MANUELL": "MANUAL",
+    "EXPERTE": "EXPERT",
+    "ENTDECKER": "DISCOVERER",
+    "CHEAT-MENÜ": "CHEAT MENU",
+    "Unreal-Engine-Spiel: Leben, Gold, Erfahrung, Munition": "Unreal Engine game: health, gold, experience, ammo",
+    "Wichtige Werte als fertige Patches - in drei Klicks (Reiter UNREAL, Unterreiter WERTE).": "Important values as ready-made patches - in three clicks (tab UNREAL, sub-tab VALUES).",
+    "Unity-Spiel: Leben, Gold, Erfahrung, Munition": "Unity game: health, gold, experience, ammo",
+    "Wichtige Werte als fertige Patches - in drei Klicks (Reiter UNITY, Unterreiter SCHNELL).": "Important values as ready-made patches - in three clicks (tab UNITY, sub-tab QUICK).",
+    "ZU UNITY ▸ SCHNELL": "GO TO UNITY ▸ QUICK",
+    "Unity-Spiel: Spezialfälle": "Unity game: special cases",
+    "Felder, Methoden und Namen von Hand ansehen und ändern.": "View and change fields, methods and names by hand.",
+    "ZU UNITY ▸ MANUELL": "GO TO UNITY ▸ MANUAL",
+})
