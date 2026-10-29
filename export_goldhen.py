@@ -15,9 +15,11 @@ Code-Cave-Patches (newValue springt per jmp/call auf ein Label)
     allocate_memory).  Deshalb wird die Cave hier FEST in freien Leerraum IM Spiel-Image gelegt
     (Null-/0xCC-Padding am Ende der ausfuehrbaren Region) und als normaler memory-Eintrag
     geschrieben:
-        1) Cave-Eintrag : on = Cave-Code (inkl. 'jmp OriginReturn'), off = Original-Fuellbytes
+        1) Cave-Eintrag : on = Cave-Code (inkl. 'jmp OriginReturn'), off = derselbe Code (Cave bleibt stehen)
         2) Hook-Eintrag : on = jmp rel32 + NOPs,                      off = Original-Befehle
-    Cave zuerst, Hook danach - so zeigt der Hook nie in leeren Speicher.
+    Cave zuerst, Hook danach - so zeigt der Hook nie in leeren Speicher.  Beim Abschalten wird nur der Hook
+    zurueckgesetzt; die Cave NICHT zu nullen verhindert Abstuerze, wenn ein Thread noch in ihr laeuft.
+    Platz: zuerst nicht beschreibbare Code-Regionen (r-x); beschreibbare (rwx) nur als Fallback mit Warnung.
 
 Gelesen wird LIVE von der Konsole (Original-Bytes, Memory-Map, freie Stellen), das Spiel muss also
 laufen und ps5debug verbunden sein.  Aktive Patches sind kein Problem: dann kommen die Original-
@@ -71,10 +73,15 @@ def _read(backend, addr, n):
 # Cave-Platz im Image
 # ======================================================================
 class _Run:
-    __slots__ = ("start", "end", "tail")
+    __slots__ = ("start", "end", "tail", "region", "prot")
 
-    def __init__(self, start, end, tail):
+    def __init__(self, start, end, tail, region=(0, 0), prot=5):
         self.start, self.end, self.tail = start, end, tail
+        self.region, self.prot = region, prot       # Region, in der die Luecke liegt, und deren Schutzbits
+
+
+def _prot_str(p):
+    return ("r" if p & 1 else "-") + ("w" if p & 2 else "-") + ("x" if p & 4 else "-")
 
 
 class CaveAllocator:
@@ -91,6 +98,9 @@ class CaveAllocator:
         self.used_inner = False
         self.used_outside = False       # Cave ausserhalb des zusammenhaengenden Spiel-Images (Fallback)
         self._warned_outside = False
+        self._warned_writable = False
+        self.used_writable = False      # Cave in beschreibbarer (rwx) Region (Fallback)
+        self.last_region = None         # (start, end, prot) der zuletzt vergebenen Cave
 
     # -- Scannen ---------------------------------------------------------
     def _regions(self, scope="image"):
@@ -106,17 +116,17 @@ class CaveAllocator:
                 self.log(f"[cave] WARNUNG: Image-Basis {self.image_base:#x} liegt in keiner Speicherregion - "
                          "Basis im Projekt pruefen; es werden Regionen oberhalb der Basis benutzt")
             if scope == "image":
-                cand = [(s, e) for s, e, p in span if p & 4]
+                cand = [(s, e, p) for s, e, p in span if p & 4]
             else:
                 inside = {(s, e) for s, e, _p in span}
-                cand = [(s, e) for s, e, p in maps if (p & 4) and s >= self.image_base and (s, e) not in inside]
+                cand = [(s, e, p) for s, e, p in maps if (p & 4) and s >= self.image_base and (s, e) not in inside]
         else:
-            cand = [(s, e) for s, e, p in maps if p & 4]
-        return sorted((s, e) for s, e in cand if (e - s) >= 0x1000)
+            cand = [(s, e, p) for s, e, p in maps if p & 4]
+        return sorted((s, e, p) for s, e, p in cand if (e - s) >= 0x1000)
 
     def _scan_tail(self, scope="image"):
         runs = []
-        for s, e in self._regions(scope):
+        for s, e, prot in self._regions(scope):
             n = min(TAIL_SCAN, e - s)
             try:
                 data = _read(self.backend, e - n, n)
@@ -127,7 +137,7 @@ class CaveAllocator:
                 continue
             cnt = len(data) - len(data.rstrip(bytes([last])))
             if cnt >= MIN_RUN:
-                runs.append(_Run(e - cnt, e, True))
+                runs.append(_Run(e - cnt, e, True, (s, e), prot))
         runs.sort(key=lambda r: -(r.end - r.start))
         what = "im Spiel-Image" if scope == "image" and self.image_base else "am Region-Ende"
         self.log(f"[cave] {len(runs)} Padding-Luecke(n) {what} gefunden")
@@ -137,7 +147,7 @@ class CaveAllocator:
         runs = []
         rx = re.compile(b"(?:\x00{128,}|\xCC{128,})")
         CH = 0x100000
-        for s, e in self._regions(scope):
+        for s, e, prot in self._regions(scope):
             pos = s
             while pos < e:
                 size = min(CH + 256, e - pos)
@@ -148,7 +158,7 @@ class CaveAllocator:
                     continue
                 for m in rx.finditer(data):
                     if pos + m.end() <= e:
-                        runs.append(_Run(pos + m.start(), pos + m.end(), False))
+                        runs.append(_Run(pos + m.start(), pos + m.end(), False, (s, e), prot))
                 pos += CH
         # Duplikate aus ueberlappenden Chunks entfernen
         uniq = {}
@@ -165,19 +175,23 @@ class CaveAllocator:
         for scope in scopes:
             if scope not in self._tail:
                 self._tail[scope] = self._scan_tail(scope)
-            for pool_i in range(2):
-                if pool_i == 1 and scope not in self._inner:
-                    self._inner[scope] = self._scan_inner(scope)
-                pool = self._tail[scope] if pool_i == 0 else self._inner.get(scope, [])
-                for r in pool:
-                    cave = (r.end - need) & ~0xF
-                    if cave < r.start:
-                        continue
-                    if self.image_base and cave < self.image_base:
-                        continue
-                    if abs(cave - near) > LIMIT or abs(cave + need - near) > LIMIT:
-                        continue
-                    return r, cave, need, scope
+            # erst nicht beschreibbare Regionen (r-x), beschreibbare (rwx) nur als Fallback; je Stufe erst Segment-Ende, dann Code-Luecken
+            for writable in (False, True):
+                for pool_i in range(2):
+                    if pool_i == 1 and scope not in self._inner:
+                        self._inner[scope] = self._scan_inner(scope)
+                    pool = self._tail[scope] if pool_i == 0 else self._inner.get(scope, [])
+                    for r in pool:
+                        if bool(r.prot & 2) != writable:
+                            continue
+                        cave = (r.end - need) & ~0xF
+                        if cave < r.start:
+                            continue
+                        if self.image_base and cave < self.image_base:
+                            continue
+                        if abs(cave - near) > LIMIT or abs(cave + need - near) > LIMIT:
+                            continue
+                        return r, cave, need, scope
         where = f"im Spiel-Image (ab Basis {self.image_base:#x})" if self.image_base else "im Spiel-Image"
         raise ExportError(f"Kein freier Platz fuer die Cave {where} gefunden")
 
@@ -187,8 +201,15 @@ class CaveAllocator:
     def alloc(self, need, near):
         r, cave, need, scope = self._find(need, near)
         r.end = cave
+        self.last_region = (r.region[0], r.region[1], r.prot)
         if not r.tail:
             self.used_inner = True
+        if r.prot & 2:
+            self.used_writable = True
+            if not self._warned_writable:
+                self._warned_writable = True
+                self.log("[cave] WARNUNG: kein Platz in nicht beschreibbaren Code-Regionen - Cave liegt in einer "
+                         "beschreibbaren (rwx) Region; dort kann das Spiel Daten ablegen")
         if scope != "image":
             self.used_outside = True
             if not self._warned_outside:
@@ -324,9 +345,9 @@ def _build_cave(backend, alloc, rp, hook, target_base, warnings):
             raise ExportError(f"{what}-Adresse {a:#x} liegt unter der Basis {target_base:#x}")
 
     return [
-        {"offset": f"{cave_addr - target_base:X}", "on": _hex(code), "off": _hex(cave_orig)},
+        {"offset": f"{cave_addr - target_base:X}", "on": _hex(code), "off": _hex(code)},
         {"offset": f"{hook - target_base:X}", "on": _hex(hook_bytes), "off": _hex(original)},
-    ], {"cave": cave_addr, "cave_size": len(code), "hook": hook}
+    ], {"cave": cave_addr, "cave_size": len(code), "hook": hook, "region": alloc.last_region}
 
 
 def build_mods(backend, patches, image_base, target_base=TARGET_BASE, log=print):
@@ -346,7 +367,9 @@ def build_mods(backend, patches, image_base, target_base=TARGET_BASE, log=print)
             if PE.is_cave_patch(rp):
                 memory, info = _build_cave(backend, alloc, rp, hook, target_base, rep["warnings"])
                 rep["kind"] = "Cave"
-                rep["msg"] = (f"Hook {hook:#x} -> Cave {info['cave']:#x} ({info['cave_size']} Byte)")
+                rs, re_, rp_ = info["region"] or (0, 0, 0)
+                rep["msg"] = (f"Hook {hook:#x} -> Cave {info['cave']:#x} ({info['cave_size']} Byte) "
+                              f"in Region {rs:#x}-{re_:#x} ({_prot_str(rp_)})")
             else:
                 memory = _build_simple(backend, rp, hook, target_base, rep["warnings"])
                 rep["kind"] = "Patch"
@@ -362,6 +385,10 @@ def build_mods(backend, patches, image_base, target_base=TARGET_BASE, log=print)
         for r in report:
             if r["kind"] == "Cave" and r["status"] == "ok":
                 r["warnings"].append("Cave liegt in einer Code-Luecke statt am Segment-Ende (Fallback)")
+    if alloc.used_writable:
+        for r in report:
+            if r["kind"] == "Cave" and r["status"] == "ok":
+                r["warnings"].append("Cave liegt in einer beschreibbaren (rwx) Region (Fallback) - vor dem Einsatz pruefen")
     if alloc.used_outside:
         for r in report:
             if r["kind"] == "Cave" and r["status"] == "ok":

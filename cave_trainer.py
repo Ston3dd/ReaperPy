@@ -516,6 +516,15 @@ def option_patch(p, i, author=""):
             "Variables": [_var("OriginSource", p.rva(p.flag_addr + i), "00", "01")]}
 
 
+def _anchors_json(anchors):
+    """Plan.anchors -> JSON.  Zwei Formen:
+    dict {name: (rva, aob)}      -> {name: {"rva", "aob"}}   (Signatur mit Wildcards, ueberlebt verschobene Funktionen)
+    Liste [(rva, hex)]            -> [{"rva", "bytes"}]       (feste Bytes, check_project)"""
+    if isinstance(anchors, dict):
+        return {n: {"rva": hex(r), "aob": a} for n, (r, a) in anchors.items()}
+    return [{"rva": hex(r), "bytes": b} for r, b in anchors]
+
+
 def spec_document(p, game="", title_id=""):
     return {
         "format": "reaperpy-item-trainer", "version": 1,
@@ -525,7 +534,7 @@ def spec_document(p, game="", title_id=""):
         "slot_rvas": [hex(s - p.base) for s in p.slots],
         "cave_rva": hex(p.cave - p.base), "cave_size": len(p.cave_bytes),
         "flag_rva": hex(p.flag_addr - p.base), "flag_size": p.flag_size,
-        "anchors": [{"rva": hex(r), "bytes": b} for r, b in p.anchors],
+        "anchors": _anchors_json(p.anchors),
         "options": [o.to_json() for o in p.options],
     }
 
@@ -677,6 +686,65 @@ def check_project(out_dir, read, base):
     except Exception:  # noqa: BLE001
         pass
     return {"ok_version": not problems, "problems": problems, "anchors_checked": checked, "base_active": base_active}
+
+
+def check_anchors(client, maps, base, spec):
+    """Vergleicht die Signaturen aus `_trainer_spec.json` mit dem laufenden Spiel (nur Lesen).
+    -> [(name, status, addr)]  status: "ok" (an der erwarteten Stelle), "moved" (genau ein Treffer woanders, addr),
+    "missing" (kein Treffer), "ambiguous" (mehrere Treffer), "unreadable".  Ohne Anchors -> [].
+    Alte Specs (Liste mit festen Bytes) werden byteweise verglichen: "ok" / "changed"."""
+    import aob
+    anchors = (spec or {}).get("anchors") or {}
+    out = []
+    if isinstance(anchors, list):
+        for a in anchors:
+            rva, want = int(a["rva"], 16), bytes.fromhex(a["bytes"])
+            try:
+                got = bytes(client.read_memory(base + rva, len(want)))
+            except Exception:  # noqa: BLE001
+                got = b""
+            out.append((f"+{rva:#x}", "ok" if got == want else ("changed" if got else "unreadable"), base + rva))
+        return out
+    regions = aob.exec_regions(maps)
+    for name, a in anchors.items():
+        rva = int(a["rva"], 16) if isinstance(a["rva"], str) else int(a["rva"])
+        pat, mask = aob.parse_pattern(a["aob"])
+        addr = base + rva
+        try:
+            got = bytes(client.read_memory(addr, len(pat)))
+        except Exception:  # noqa: BLE001
+            got = b""
+        if len(got) == len(pat) and all(g == b for g, b, m in zip(got, pat, mask) if m):
+            out.append((name, "ok", addr))
+            continue
+        hits = aob.find_matches(client, regions, pat, mask, limit=3)
+        if len(hits) == 1:
+            out.append((name, "moved", hits[0]))
+        elif hits:
+            out.append((name, "ambiguous", hits[0]))
+        else:
+            out.append((name, "missing", 0))
+    return out
+
+
+def anchor_problem(res, base):
+    """Ergebnis von check_anchors -> None (alles passt / nichts zu pruefen) oder eine Meldung fuer den Benutzer."""
+    bad = []
+    for name, status, addr in res:
+        if status == "ok":
+            continue
+        if status == "moved":
+            bad.append(f"{name}: liegt im laufenden Spiel bei +{addr - base:#x}")
+        elif status == "changed":
+            bad.append(f"{name}: Bytes weichen ab")
+        elif status == "ambiguous":
+            bad.append(f"{name}: Signatur nicht eindeutig")
+        else:
+            bad.append(f"{name}: nicht gefunden")
+    if not bad:
+        return None
+    return ("Der Trainer passt nicht zum laufenden Spiel (andere Version/Build?) - nicht aktiviert: "
+            + "; ".join(bad))
 
 
 def refresh_fnames(options, live_by_alias):
