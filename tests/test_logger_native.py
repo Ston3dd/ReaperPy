@@ -1,6 +1,6 @@
 """Fuehrt den Logger-Stub NATIV aus (gcc/as/ld noetig, sonst uebersprungen): Hook in einer
 Testfunktion, mehrere Aufrufe inkl. Ringpuffer-Ueberlauf, Register-/Flag-Erhaltung."""
-import os, shutil, struct, subprocess, sys, tempfile, unittest
+import os, platform, shutil, struct, subprocess, sys, tempfile, unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import logger as L
 from pathlib import Path
@@ -44,7 +44,8 @@ int main(void){
   return 0; }
 """
 
-@unittest.skipUnless(shutil.which("gcc") and shutil.which("as") and shutil.which("ld"), "keine Toolchain")
+@unittest.skipUnless(platform.system() == "Linux" and platform.machine() in ("x86_64", "AMD64")
+                     and shutil.which("gcc") and shutil.which("as") and shutil.which("ld"), "keine Toolchain")
 class T(unittest.TestCase):
     def sh(self, *cmd):
         subprocess.run(cmd, check=True, capture_output=True, cwd=self.d)

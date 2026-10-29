@@ -1,6 +1,7 @@
 """Tests fuer cheatmenu_cave.py: Cheat-Menue-Eintrag -> Treffer -> passende Code Cave (nativ ausgefuehrt)."""
 import json
 import os
+import platform
 import shutil
 import struct
 import subprocess
@@ -51,7 +52,8 @@ spend_gold:
   ret
 .p2align 4,0xCC
 """
-HAVE = shutil.which("as") and shutil.which("objdump") and shutil.which("gcc") and shutil.which("objcopy")
+# Die Cave-Texte sind SysV-x86-64-Assembler (rdi/rsi): nur dort nativ ausfuehren, nicht unter Windows (MS-ABI)
+HAVE = platform.system() == "Linux" and platform.machine() in ("x86_64", "AMD64") and shutil.which("as") and shutil.which("objdump") and shutil.which("gcc") and shutil.which("objcopy")
 
 
 def entry(label, kind, cls, member, typ, offset, **kw):

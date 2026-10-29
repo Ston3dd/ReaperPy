@@ -1,5 +1,5 @@
 """Scan + Patch-Bau gegen echten Maschinencode (GNU as, int3-Padding) und nativer Cave-Ausfuehrung."""
-import os, shutil, struct, subprocess, sys, tempfile, unittest
+import os, platform, shutil, struct, subprocess, sys, tempfile, unittest
 from types import SimpleNamespace
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import ue_instr as U
@@ -41,7 +41,8 @@ unrelated:
   ret
 .p2align 4,0xCC
 """
-HAVE = shutil.which("as") and shutil.which("objdump") and shutil.which("gcc")
+# SysV-x86-64-Assembler: nur unter Linux x86-64 nativ ausfuehren (unter Windows andere Aufrufkonvention)
+HAVE = platform.system() == "Linux" and platform.machine() in ("x86_64", "AMD64") and shutil.which("as") and shutil.which("objdump") and shutil.which("gcc")
 
 
 def build_dump(d):
