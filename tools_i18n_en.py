@@ -1743,3 +1743,7 @@ EN.update({
     "Felder, Methoden und Namen von Hand ansehen und ändern.": "View and change fields, methods and names by hand.",
     "ZU UNITY ▸ MANUELL": "GO TO UNITY ▸ MANUAL",
 })
+
+EN.update({
+    ' Code-Luecke(n) mitten im Code (kein Padding am Region-Ende)': ' code gap(s) inside the code (no padding at the end of the region)',
+})

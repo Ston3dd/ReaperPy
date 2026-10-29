@@ -580,7 +580,7 @@ class UnityTab(BaseTab):
                 readers.append(c.read_memory)
                 closers.append(c.close)
         except Exception as e:  # noqa: BLE001
-            self.win.ui(lambda: self.log(f"UNITY: Zusätzliche Verbindungen nicht möglich ({e}) - lese mit einer Verbindung", "warn"))
+            self.win.ui(lambda err=e: self.log(f"UNITY: Zusätzliche Verbindungen nicht möglich ({err}) - lese mit einer Verbindung", "warn"))
         if readers:
             n = len(readers)
             self.win.ui(lambda: self.log(f"UNITY: {n} zusätzliche Lese-Verbindung(en) geöffnet", "info"))

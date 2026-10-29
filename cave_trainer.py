@@ -39,6 +39,11 @@ MAX_ROWS = 400                      # Zeilen (Items) insgesamt: haelt die Cave k
 FLAG_ALIGN = 8
 FLAG_MIN_RUN = 0x100                # so viel Null-Bytes muessen am Region-Ende frei sein
 FILL = (0x00, 0xCC)
+INNER_MIN_RUN = 0x40                # Ausweichplatz: so lang muss ein CC-Stueck (Padding zwischen Funktionen) mindestens sein
+INNER_TRIGGER = 0x1000              # nur wenn am Region-Ende weniger als das frei ist, wird mitten im Code gesucht
+INNER_SCAN_MAX = 96 << 20           # hoechstens so viel Code wird dafuer gelesen
+INNER_BLOCK = 1 << 20
+INNER_KEEP = 256                    # die groessten Luecken genuegen
 LIMIT = 0x7F000000                  # rel32-Reichweite mit Sicherheitsabstand
 NAME_MAX = 60
 ANCHOR_LEN = 16                     # so viele Byte je Funktionsanfang fuer die Versionspruefung
@@ -290,7 +295,43 @@ class Slots:
                 runs.append([e - cnt, e])
         runs.sort(key=lambda r: -(r[1] - r[0]))
         self.log(f"[trainer] {len(runs)} Code-Padding-Luecke(n) am Region-Ende")
+        if max(((r[1] - r[0]) & ~0xF for r in runs), default=0) < INNER_TRIGGER:
+            inner = self._scan_inner(runs)
+            if inner:
+                self.log(f"[trainer] {len(inner)} Code-Luecke(n) mitten im Code (kein Padding am Region-Ende)")
+                runs = sorted(runs + inner, key=lambda r: -(r[1] - r[0]))
         return runs
+
+    def _scan_inner(self, tail_runs):
+        """Ausweichplatz: lange 0xCC-Stuecke (Padding zwischen Funktionen) mitten in ausfuehrbaren Regionen.
+        Liest hoechstens INNER_SCAN_MAX Byte, blockweise; nur Lesen."""
+        pat = re.compile(b"\xcc{%d,}" % INNER_MIN_RUN)
+        found, scanned = [], 0
+        for s, e, p in self.span:
+            if not p & 4:
+                continue
+            region, pos = [], s
+            while pos < e and scanned < INNER_SCAN_MAX:
+                n = min(INNER_BLOCK, e - pos)
+                try:
+                    buf = bytes(self.read(pos, n))
+                except Exception:  # noqa: BLE001 - nicht lesbare Seiten: diese Region nicht weiter durchsuchen
+                    break
+                if len(buf) != n:
+                    break
+                scanned += n
+                for m in pat.finditer(buf):
+                    a, b = pos + m.start(), pos + m.end()
+                    if region and region[-1][1] == a:          # Stueck ueber die Blockgrenze hinweg
+                        region[-1][1] = b
+                    else:
+                        region.append([a, b])
+                pos += n
+            found += region
+        busy = [(r[0], r[1]) for r in tail_runs]
+        found = [r for r in found if not any(r[0] < b and a < r[1] for a, b in busy)]
+        found.sort(key=lambda r: -(r[1] - r[0]))
+        return found[:INNER_KEEP]
 
     def _scan_data(self):
         runs = []
