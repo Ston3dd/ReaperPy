@@ -121,7 +121,7 @@ the registers when it stops, **STEP** / **STEP OVER** / **STEP OUT**, **CONTINUE
 - **CONNECT** - connects to the payload, with a watchdog that reconnects when the console drops (optional). A notification on the PS5 confirms the connection.
 - **DE / EN** - language switch (also switches all tool tabs).
 - **Notes per game** - free text that is shown again when you open the same game.
-- **Auto update** - on start ReaperPy asks the GitHub Releases API for the newest release (read only, nothing is sent). If it is newer you are asked first; on **Yes** the Windows zip is downloaded, its SHA-256 is checked against the `.sha256` file of the release and the files are unpacked into the program folder (configuration, profiles, library and logs are never touched; a failed update is rolled back). Then restart ReaperPy. Only the packaged EXE updates itself; from source you just get the release page. Switch off with `"auto_update_check": false`, use another repository with `"update_repo": "owner/name"`; the old `update_url` JSON file still works.
+- **Auto-update** - checks GitHub Releases on start; a newer release is offered with its notes, downloaded, unpacked into the program folder and you are asked to restart. Your config, profiles and logs are kept. Off: `"auto_update_check": false`; other repo: `"update_repo": "owner/name"`. A git checkout is never overwritten (use `git pull`).
 
 ## The Tools window - every tab explained
 

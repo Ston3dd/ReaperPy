@@ -5,18 +5,12 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 ## Unreleased
 
 ### Added
-- **Auto update**: on start ReaperPy checks the newest GitHub release; after a confirmation it downloads the Windows zip,
-  verifies the SHA-256 from the release, unpacks next to the program (rollback on errors, user data untouched) and asks
-  for a restart. Switch off with `"auto_update_check": false`.
-- GitHub Actions: tests on every push/PR (Linux + Windows, with keystone and capstone), release build on `v*` tags
-  (zip + `.sha256` attached to the GitHub release, notes taken from this file).
-
-### Changed
-- Log output of long byte blocks is shortened to the first 32 bytes plus `... (+N bytes)`.
-- All text files are read/written with explicit UTF-8 (guard test added).
+- **Self-update from GitHub Releases.** On start (4 s after the window opens) ReaperPy asks GitHub for the latest release. If it is newer, a dialog shows the release notes and offers **Install now / Later / Skip this version**. *Install now* downloads the release zip, checks its SHA-256, unpacks it into a staging folder, replaces the program files with a backup + automatic rollback, and then says that ReaperPy has to be restarted (with a **Restart now** button). Config, profiles, logs, library and `applied.json` are never overwritten. A git checkout is never touched (it only tells you to `git pull`). START tab -> *Check for updates* runs the same flow manually. Turn it off with `"auto_update_check": false`; use another repository with `"update_repo": "owner/name"`. The old `update_url` (own JSON file) still works and only shows a hint. Tests: `tests/test_updater.py`.
 
 ### Fixed
-- File handles left open in `ue_auto.load_dump` and `ue_auto.main_game`; the test suite no longer produces `ResourceWarning`s.
+- `cave_trainer.check_anchors()` / `anchor_problem()` were used by the GUI and the tests but did not exist; `spec_document()` crashed with signature-style anchors.
+- Export: the code cave now prefers non-writable code regions (`r-x`); writable (`rwx`) regions are only a fallback and log a warning. The report names the region. On disable only the hook is restored and the cave stays (zeroing it could crash a thread still running inside).
+- Missing English texts for the UE-LIVE connection fallback messages.
 
 ## 5.9.0 - 2026-10-29
 

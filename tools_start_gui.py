@@ -153,9 +153,8 @@ class StartTab(BaseTab):
         import update_check
         import version
         url = self.win.app.cfg.get("update_url", "")
-        if not url:
-            self.log("Keine Update-Adresse eingestellt - in reaperpy_config.json 'update_url' auf eine JSON-Datei "
-                     "{\"version\": ..., \"url\": ...} setzen", "info")
+        if not url:                                  # Standard: GitHub Releases, mit Installieren-Dialog
+            self.win.app.check_for_updates(manual=True)
             return
         self.bg(lambda: update_check.check(url, version.__version__), self._update_result)
 
