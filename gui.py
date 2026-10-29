@@ -1125,17 +1125,18 @@ class App:
         except Exception as e:
             self.q.put(("log", (f"[basis] Memory-Maps nicht lesbar: {e}", "warn")))
             return
-        det, ok, text = IMB.check_base(maps, self.IMAGE_BASE)
-        if det is None:
+        res = IMB.check_image_base(maps, self.IMAGE_BASE)
+        if res.status == "unknown":
             mods = ", ".join(f"{n}@{a:#x}" for n, a, _b, _c in IMB.module_summary(maps, 8))
-            self.q.put(("log", (f"[basis] {text}. Module: {mods}", "warn")))
+            self.q.put(("log", (f"[basis] {res.message} Module: {mods}", "warn")))
             return
-        if ok:
-            self.q.put(("log", (f"[basis] {text}", "info")))
+        if res.status == "ok":
+            self.q.put(("log", (f"[basis] {res.message}", "info")))
             return
-        self.q.put(("log", (f"[basis] {text}", "warn")))
-        self.q.put(("log", (f"[basis] Setze Image-Basis automatisch auf {det:#x}", "accent")))
-        self.q.put(("imgbase", det))
+        self.q.put(("log", (f"[basis] {res.message}", "warn")))
+        if res.live_base:
+            self.q.put(("log", (f"[basis] Setze Image-Basis automatisch auf {res.live_base:#x}", "accent")))
+            self.q.put(("imgbase", res.live_base))
 
     # ------------------------------------------------------------------
     # Patches laden / Karten

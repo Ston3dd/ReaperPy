@@ -42,3 +42,17 @@ def check_image_base(named_maps, base, names=MAIN_MODULES):
                   f"Image-Basis stimmt nicht: im Hauptfenster steht {base:#x}, laut Speicherkarte beginnt eboot.bin bei "
                   f"{live:#x} (Unterschied {live - base:+#x}). Mit dieser Basis finden Trainer keine Cave und Patches "
                   "treffen falsche Adressen.")
+
+
+def module_summary(named_maps, limit=12):
+    """Kurzuebersicht fuers Log: [(name, niedrigster Start, hoechstes Ende, Anzahl Regionen)] nach Start sortiert."""
+    mods = {}
+    for m in named_maps or ():
+        if isinstance(m, dict):
+            s, e, n = m.get("start"), m.get("end"), m.get("name", "")
+        else:
+            s, e, n = m[0], m[1], (m[3] if len(m) > 3 else "")
+        r = mods.setdefault(str(n) or "(ohne Name)", [int(s), int(e), 0])
+        r[0], r[1], r[2] = min(r[0], int(s)), max(r[1], int(e)), r[2] + 1
+    rows = sorted(((n, a, b, c) for n, (a, b, c) in mods.items()), key=lambda r: r[1])
+    return rows[:limit]
