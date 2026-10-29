@@ -13,6 +13,7 @@ import ue_instr as U
 import ue_quick as Q
 import values_auto as VA
 from test_gui_smoke import FakeWin
+from pathlib import Path
 
 
 class Client:
@@ -74,14 +75,14 @@ class UnityFlow(unittest.TestCase):
         d = os.path.join(self.tmp, "Spiel", "Unity-Werte")
         files = [f for f in os.listdir(d) if f.endswith(".reapproj")]
         self.assertEqual(len(files), sum(self.t.on))
-        doc = json.load(open(os.path.join(d, files[0]), encoding="utf-8"))
+        doc = json.loads(Path(os.path.join(d, files[0])).read_text(encoding="utf-8"))
         self.assertTrue(doc["Verify"])
         self.assertIn("0x400000", self.t.lbl_done._text)               # Modul-Basis wird genannt
 
     def test_save_twice_does_not_pile_up_copies_but_keeps_foreign_files(self):
         self.t.find()
         d = os.path.join(self.tmp, "Spiel", "Unity-Werte"); os.makedirs(d)
-        json.dump({"name": "fremd", "author": "jemand", "Variables": []}, open(os.path.join(d, "fremd.reapproj"), "w"))
+        Path(os.path.join(d, "fremd.reapproj")).write_text(json.dumps({"name": "fremd", "author": "jemand", "Variables": []}), encoding="utf-8")
         self.t.save(); n1 = len(os.listdir(d))
         self.t.save(); n2 = len(os.listdir(d))
         self.assertEqual(n1, n2)
@@ -162,7 +163,7 @@ class UnrealFlow(TC.Real):
         txt = self.t.lbl_done._text
         self.assertIn("Fertig: 3 Patches", txt)
         d = os.path.join(self.tmp, "Spiel", "Werte")
-        names = [json.load(open(os.path.join(d, f), encoding="utf-8"))["name"] for f in os.listdir(d)]
+        names = [json.loads(Path(os.path.join(d, f)).read_text(encoding="utf-8"))["name"] for f in os.listdir(d)]
         self.assertTrue(any("777" in n for n in names))
         self.assertIn("ALLE Objekte", txt)
 

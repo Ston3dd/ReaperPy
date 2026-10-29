@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import ghost_tk; ghost_tk.install()  # noqa: E402,E702
 import test_il2cpp as TI  # noqa: E402
 import il2cpp_dump as D  # noqa: E402
+from pathlib import Path
 
 
 class Client(TI.FakeMem):
@@ -52,8 +53,8 @@ class Win:
 class UnityTabFlow(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        open(os.path.join(self.tmp.name, "dump.cs"), "w").write(TI.DUMP)
-        open(os.path.join(self.tmp.name, "script.json"), "w").write(json.dumps(TI.SCRIPT))
+        Path(os.path.join(self.tmp.name, "dump.cs")).write_text(TI.DUMP, encoding="utf-8")
+        Path(os.path.join(self.tmp.name, "script.json")).write_text(json.dumps(TI.SCRIPT), encoding="utf-8")
         mem_maps = [(TI.BASE, TI.BASE + 0x10000, 5), (0x5000000, 0x5001000, 1), (0x8000000, 0x8001000, 3),
                     (TI.KLASS, TI.KLASS + 0x1000, 3)]
         c = Client(mem_maps)

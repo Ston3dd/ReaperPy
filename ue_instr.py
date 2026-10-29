@@ -155,7 +155,7 @@ class ObjdumpDisasm:
             with open(p, "wb") as f:
                 f.write(data)
             r = subprocess.run(["objdump", "-D", "-b", "binary", "-mi386:x86-64", "-M", "intel",
-                                f"--adjust-vma={addr:#x}", p], capture_output=True, text=True)
+                                f"--adjust-vma={addr:#x}", p], capture_output=True, text=True, encoding="utf-8", errors="replace")
         out = []
         for line in r.stdout.splitlines():
             m = _OBJ_LINE.match(line)

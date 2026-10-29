@@ -11,6 +11,8 @@
  "auto_reconnect": false,
  "tools_expert": false,
  "update_url": "",
+ "update_repo": "",
+ "auto_update_check": true,
  "ps5_notifications": true,
  "ps5_notify_hits": false
 }

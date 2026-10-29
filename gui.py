@@ -3,7 +3,7 @@
 Neu in 4.1: Karten mit Akzentstreifen, Bibliothek, Auto-Reconnect (PID-Watchdog),
 Sitzungen, Fortschrittsbalken bei Sammel-Aktionen.
 """
-import json, os, queue, shutil, threading, time, tkinter as tk
+import json, os, queue, shutil, sys, threading, time, tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
 
 from ps5_backend import PS5Backend
@@ -13,6 +13,7 @@ from patch_engine import (apply_patch, deactivate_patch, detect_patched, is_cave
 from i18n import Translator
 from ps5_notify import Notifier
 from tools_common import style_ttk
+import paths
 import projects
 import imagebase as IMB
 import session
@@ -731,7 +732,7 @@ class App:
         # add="+": überschreibt keine Bindings anderer Fenster; _wheel filtert selbst
         self.root.bind_all("<MouseWheel>", self._wheel, add="+")
         self.root.bind_all("<KeyPress>", self._on_key, add="+")        # Cheat-Hotkeys (Programmfenster)
-        self.root.after(4000, self._update_check_async)               # nur wenn "update_url" gesetzt ist
+        self.root.after(4000, self._update_check_async)               # nur lesen; abschaltbar mit "auto_update_check": false
 
     def _wheel(self, e):
         """Mausrad scrollt die Karten nur, wenn der Zeiger im Hauptfenster über der Kartenfläche steht
@@ -1649,20 +1650,85 @@ class App:
         self.q.put(("game_changed", None))
 
     def _update_check_async(self):
-        """Hintergrund-Pruefung auf neue Version (nur mit eingestellter "update_url"; laedt nichts herunter)."""
-        url = self.cfg.get("update_url", "")
-        if not url or not self.cfg.get("auto_update_check", True):
+        """Hintergrund-Pruefung auf neue Version beim Start (nur lesen).  Mit "update_url" die einfache JSON-Datei,
+        sonst die neuesten GitHub-Releases (Repository aus "update_repo").  Abschalten: "auto_update_check": false."""
+        if not self.cfg.get("auto_update_check", True):
             return
+        url = self.cfg.get("update_url", "")
+        repo = self.cfg.get("update_repo", "") or None
+        import self_update
         import update_check
         import version
 
         def job():
-            self.q.put(("update", update_check.check(url, version.__version__)))
+            if paths.is_frozen():
+                self_update.cleanup_old(self._app_target_dir())          # .old-Reste eines frueheren Updates
+            if url:
+                res = update_check.check(url, version.__version__)
+            else:
+                res = self_update.check(repo or self_update.DEFAULT_REPO, version.__version__)
+            self.q.put(("update", res))
         threading.Thread(target=job, daemon=True).start()
 
+    @staticmethod
+    def _app_target_dir():
+        return os.path.dirname(os.path.abspath(sys.executable)) if paths.is_frozen() else paths.app_dir()
+
     def _on_update(self, res):
-        if res.status == "newer":
-            self.log_msg(self.tr.t("log_update_new", ver=res.remote, cur=res.local, url=res.url or "-"), "accent")
+        if res.status != "newer":
+            return
+        self.log_msg(self.tr.t("log_update_new", ver=res.remote, cur=res.local, url=res.url or "-"), "accent")
+        rel = getattr(res, "release", None)
+        if rel is not None:
+            self._offer_update(rel, res.local)
+
+    def _offer_update(self, rel, current):
+        """Nachfrage: installieren (gepackte EXE) oder Release-Seite oeffnen.  Es passiert nichts ohne Ja."""
+        import self_update
+        t = self.tr.t
+        target = self._app_target_dir()
+        auto = self_update.can_self_update(target, paths.is_frozen()) and rel.asset_url and rel.sha_url
+        if auto:
+            notes = (rel.notes or "").strip()[:600]
+            if messagebox.askyesno(t("update_title"), t("update_ask_install", ver=rel.version, cur=current, notes=notes)):
+                self._start_update(rel, target)
+            return
+        key = "update_no_asset" if paths.is_frozen() else "update_ask_open"
+        if rel.html_url and messagebox.askyesno(t("update_title"), t(key, ver=rel.version, cur=current)):
+            import webbrowser
+            webbrowser.open(rel.html_url)
+
+    def _start_update(self, rel, target):
+        import self_update
+        t = self.tr.t
+
+        def progress(stage, done, total):
+            if stage == "download":
+                pct = int(done * 100 / total) if total else 0
+                if pct % 10 == 0:
+                    self.q.put(("log", (t("log_update_dl", ver=rel.version, pct=pct), "info")))
+            elif stage == "verify":
+                self.q.put(("log", (t("log_update_verify"), "info")))
+            elif stage == "install" and done == 1:
+                self.q.put(("log", (t("log_update_install"), "info")))
+
+        def job():
+            try:
+                n = self_update.run_update(rel, target, progress=progress)
+                self.q.put(("update_done", (True, rel.version, n)))
+            except Exception as e:  # noqa: BLE001 - jeder Fehler: Meldung statt Absturz, Altbestand ist zurueckgedreht
+                self.q.put(("update_done", (False, rel.version, f"{e.__class__.__name__}: {e}")))
+        threading.Thread(target=job, daemon=True, name="reaperpy-update").start()
+
+    def _on_update_done(self, val):
+        ok, ver, extra = val
+        t = self.tr.t
+        if ok:
+            self.log_msg(t("log_update_ok", ver=ver, n=extra), "ok")
+            messagebox.showinfo(t("update_title"), t("update_done_msg", ver=ver))
+        else:
+            self.log_msg(t("log_update_fail", err=extra), "err")
+            messagebox.showerror(t("update_title"), t("update_fail_msg", err=extra))
 
     def _detect_codes(self):
         """Arbeits-Thread: Vordergrund-Spiel erkennen und passende Codes (Patches) vorschlagen -> UI-Queue."""
@@ -1789,6 +1855,8 @@ class App:
                     self._apply_codes(val)
                 elif kind == "update":
                     self._on_update(val)
+                elif kind == "update_done":
+                    self._on_update_done(val)
                 elif kind == "fx":
                     import hackfx
                     hackfx.show(self.root, val[0], val[1], self.cfg)

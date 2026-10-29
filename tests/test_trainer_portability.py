@@ -9,6 +9,7 @@ import patch_engine as PE
 import reapatch
 import test_cave_trainer as TS
 import ue_cavegen as CG
+from pathlib import Path
 
 
 class Backend:
@@ -103,7 +104,7 @@ class CheckProject(Project):
     def test_old_project_without_anchors_is_flagged(self):
         import json
         sp = os.path.join(self.dir, T.SPEC_FILE)
-        d = json.load(open(sp)); d.pop("anchors"); json.dump(d, open(sp, "w"))
+        d = json.loads(Path(sp).read_text(encoding="utf-8")); d.pop("anchors"); Path(sp).write_text(json.dumps(d), encoding="utf-8")
         r = T.check_project(self.dir, self.img.read, self.img.BASE)
         self.assertFalse(r["ok_version"])
         self.assertTrue(any("Fingerabdruck" in x for x in r["problems"]))

@@ -1,6 +1,7 @@
 import os, sys, tempfile, unittest, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import cheatfmt as C, gh_import
+from pathlib import Path
 
 DOC = C.new_doc("Test Game", "CUSA12345", "01.05", "eboot.bin", ["Alice", "Bob"], [
     {"name": "Infinite HP", "type": "checkbox", "memory": [
@@ -59,7 +60,7 @@ class T(unittest.TestCase):
             self.assertEqual(C.default_filename(DOC, "mc4"), "CUSA12345_01.05.mc4")
             # mc4 ohne Endung wird am Inhalt erkannt
             raw = os.path.join(d, "noext")
-            open(raw, "wb").write(C.build_mc4(DOC))
+            Path(raw).write_bytes(C.build_mc4(DOC))
             self.assertEqual(C.detect(raw), "mc4")
             self.assertEqual(len(C.load_file(raw)["mods"]), 2)
 
@@ -69,7 +70,7 @@ class T(unittest.TestCase):
             notes = []
             w, sk = gh_import.import_into(d, p, 0x400000, 0x400000, notes=notes)
             self.assertEqual(len(w), 2)
-            data = json.load(open(os.path.join(d, w[0]), encoding="utf-8"))
+            data = json.loads(Path(os.path.join(d, w[0])).read_text(encoding="utf-8"))
             self.assertIn("Variables", data)
 
     def test_other_section_skipped(self):

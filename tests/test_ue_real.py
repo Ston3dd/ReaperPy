@@ -2,9 +2,10 @@
 import os, sys, unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import uesdk, uecheat
+from pathlib import Path
 
 FX = os.path.join(os.path.dirname(__file__), "fixtures")
-rd = lambda n: open(os.path.join(FX, n), encoding="utf-8").read()
+rd = lambda n: Path(os.path.join(FX, n)).read_text(encoding="utf-8")
 
 
 class T(unittest.TestCase):

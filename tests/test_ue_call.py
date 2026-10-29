@@ -2,9 +2,10 @@ import os, struct, sys, unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
 import uesdk, ue_call as K, ue_live as L, test_ue_live as TL
+from pathlib import Path
 
 FX = os.path.join(os.path.dirname(__file__), "fixtures")
-PARAMS = uesdk.parse_params_text(open(os.path.join(FX, "engine_params_excerpt.hpp")).read())
+PARAMS = uesdk.parse_params_text(Path(os.path.join(FX, "engine_params_excerpt.hpp")).read_text(encoding="utf-8"))
 SET = PARAMS["/Script/Engine.GameplayStatics.SetGlobalTimeDilation"]
 LOC = PARAMS["/Script/Engine.Actor.K2_GetActorLocation"]
 

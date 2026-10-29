@@ -2,6 +2,7 @@ import os, shutil, subprocess, sys, tempfile, unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
 import ue_instr as U
+from pathlib import Path
 
 HAVE = shutil.which("as") and shutil.which("objdump") and shutil.which("gcc") and shutil.which("nm")
 
@@ -42,15 +43,15 @@ tail_thunk:
 
 def build(asm):
     d = tempfile.mkdtemp()
-    open(os.path.join(d, "t.s"), "w").write(asm)
+    Path(os.path.join(d, "t.s")).write_text(asm, encoding="utf-8")
     subprocess.run(["as", "--64", "-o", os.path.join(d, "t.o"), os.path.join(d, "t.s")], check=True)
     subprocess.run(["objcopy", "-O", "binary", "-j", ".text", os.path.join(d, "t.o"), os.path.join(d, "t.bin")], check=True)
     syms = {}
-    for line in subprocess.run(["nm", os.path.join(d, "t.o")], capture_output=True, text=True).stdout.splitlines():
+    for line in subprocess.run(["nm", os.path.join(d, "t.o")], capture_output=True, text=True, encoding="utf-8").stdout.splitlines():
         p = line.split()
         if len(p) == 3:
             syms[p[2]] = int(p[0], 16) + 16
-    return b"\xCC" * 16 + open(os.path.join(d, "t.bin"), "rb").read(), syms
+    return b"\xCC" * 16 + Path(os.path.join(d, "t.bin")).read_bytes(), syms
 
 
 @unittest.skipUnless(HAVE, "Toolchain fehlt")
@@ -79,7 +80,7 @@ class T(unittest.TestCase):
     def test_ret_patches_native(self):
         asm = ".intel_syntax noprefix\n.text\n.globl f\nf:\n  mov dword ptr [rdi], 5\n  mov eax, 7\n  ret\n"
         d = tempfile.mkdtemp()
-        open(os.path.join(d, "f.s"), "w").write(asm)
+        Path(os.path.join(d, "f.s")).write_text(asm, encoding="utf-8")
         C = r'''
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -94,14 +95,14 @@ int main(int argc, char **argv){
   int v = 0; int r = f(&v);
   printf("%d %d\n", v, r); return 0; }
 '''
-        open(os.path.join(d, "m.c"), "w").write(C.replace("#include <sys/mman.h>", "#include <sys/mman.h>\n#include <stdlib.h>"))
+        Path(os.path.join(d, "m.c")).write_text(C.replace("#include <sys/mman.h>", "#include <sys/mman.h>\n#include <stdlib.h>"), encoding="utf-8")
         subprocess.run(["gcc", "-o", os.path.join(d, "m"), os.path.join(d, "m.c"), os.path.join(d, "f.s")], check=True, capture_output=True)
         for mode, expect_r in (("false", 0), ("one", 1), ("true", 1)):
             code = U.RET_MODES[mode][0]
-            out = subprocess.run([os.path.join(d, "m")] + [f"{b:02x}" for b in code], capture_output=True, text=True).stdout.split()
+            out = subprocess.run([os.path.join(d, "m")] + [f"{b:02x}" for b in code], capture_output=True, text=True, encoding="utf-8").stdout.split()
             self.assertEqual(out[0], "0", mode)                       # *p wurde NICHT geschrieben
             self.assertEqual(int(out[1]) & 0xFF, expect_r, mode)
-        out = subprocess.run([os.path.join(d, "m"), "c3"], capture_output=True, text=True).stdout.split()
+        out = subprocess.run([os.path.join(d, "m"), "c3"], capture_output=True, text=True, encoding="utf-8").stdout.split()
         self.assertEqual(out[0], "0")
         p = U.func_ret_patch(self.dump, self.sym["thunk0"], 0x1234, "false", "UFoo.Bar", "AA BB ?? CC")
         v = p["Variables"][0]

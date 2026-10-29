@@ -3,6 +3,7 @@ import json, os, shutil, sys, tempfile, unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
 import test_ue_funcs as TF, ue_project as P, ue_instr as U, ue_auto
+from pathlib import Path
 
 HAVE = shutil.which("as") and shutil.which("objdump") and shutil.which("nm")
 
@@ -31,17 +32,16 @@ def make_game():
            "\tfloat                                              Health;                        // 0x0348 (0x0004) [0x0018001040022a01] FloatProperty\n"
            "\tfloat                                              MaxHealth;                     // 0x034c (0x0004) [0x0018001040022a01] FloatProperty\n"
            "\tbool                                               bIsEnableMuteki;               // 0x0350 (0x0001) [0x0018001040022a21] BoolProperty\n\npublic:\n" + fn + "};\n")
-    open(os.path.join(d, "SDK", "SDK_HEADERS", "Game_classes.hpp"), "w", newline="").write(hdr.replace("\n", "\r\n"))
-    json.dump({"title": "PPSA00000", "base": 0x400000, "gnames": 0x1000, "gobjects": 0x2000,
-               "offsets": {"UObject_Class": 16, "UObject_Name": 24, "UObject_Outer": 32}}, open(os.path.join(d, "offsets.json"), "w"))
+    Path(os.path.join(d, "SDK", "SDK_HEADERS", "Game_classes.hpp")).write_bytes(hdr.replace("\n", "\r\n").encode("utf-8"))
+    Path(os.path.join(d, "offsets.json")).write_text(json.dumps({"title": "PPSA00000", "base": 0x400000, "gnames": 0x1000, "gobjects": 0x2000,
+               "offsets": {"UObject_Class": 16, "UObject_Name": 24, "UObject_Outer": 32}}), encoding="utf-8")
     pad = (len(code) + 0xFFF) & ~0xFFF
     total = pad + 0x1000
-    open(os.path.join(d, "dump.bin"), "wb").write(code.ljust(total, b"\0"))
-    json.dump({"title_id": "PPSA00000", "name": "eboot.bin", "regions": [
+    Path(os.path.join(d, "dump.bin")).write_bytes(code.ljust(total, b"\0"))
+    Path(os.path.join(d, "dump.json")).write_text(json.dumps({"title_id": "PPSA00000", "name": "eboot.bin", "regions": [
         {"name": "executable", "start": 0x400000, "end": 0x400000 + pad, "prot": 5, "offset": 0},
-        {"name": "executable", "start": 0x400000 + pad, "end": 0x400000 + total, "prot": 3, "offset": pad}]},
-        open(os.path.join(d, "dump.json"), "w"))
-    open(os.path.join(d, "GObjects.txt"), "w").write("[00000000] {0x300b060000} Package /Script/CoreUObject\r\n")
+        {"name": "executable", "start": 0x400000 + pad, "end": 0x400000 + total, "prot": 3, "offset": pad}]}), encoding="utf-8")
+    Path(os.path.join(d, "GObjects.txt")).write_text("[00000000] {0x300b060000} Package /Script/CoreUObject\r\n", encoding="utf-8")
     return d, sym
 
 
@@ -78,11 +78,12 @@ class T(unittest.TestCase):
         d, sym = make_game()
         # Header mit VAs statt RVAs
         p = os.path.join(d, "SDK", "SDK_HEADERS", "Game_classes.hpp")
-        t = open(p, newline="").read()
+        t = Path(p).read_bytes().decode("utf-8")
         import re
         t = re.sub(r"native (0x[0-9a-f]+)", lambda m: f"native {int(m.group(1), 16) + 0x400000:#x}", t)
-        open(p, "w", newline="").write(t)
+        Path(p).write_bytes(t.encode("utf-8"))
         proj = P.GameProject(d, log=lambda m: None).load()
+        self.addCleanup(proj.close)
         self.assertEqual(proj.native_info[0], "va")
         fns = {f["name"]: f for f in proj.functions(0)}
         self.assertEqual(proj.resolve_impl(fns["AddHP2"])[0], 0x400000 + sym["impl2"])
@@ -90,6 +91,7 @@ class T(unittest.TestCase):
     def test_without_dump(self):
         d, _ = make_game(); os.remove(os.path.join(d, "dump.bin"))
         proj = P.GameProject(d, log=lambda m: None).load()
+        self.addCleanup(proj.close)
         self.assertIsNone(proj.dm)
         self.assertTrue(proj.candidates(8))
         with self.assertRaises(RuntimeError): proj.code()
@@ -114,7 +116,7 @@ class CliGame(unittest.TestCase):
             self.assertIn("Impl RVA", txt)
             files = os.listdir(os.path.join(d, "P"))
             self.assertTrue(any("AddHP3" in f for f in files), files)
-            rep = json.load(open(os.path.join(d, "ue_report.json")))
+            rep = json.loads(Path(os.path.join(d, "ue_report.json")).read_text(encoding="utf-8"))
             self.assertTrue(rep["functions"] and rep["candidates"])
         finally:
             os.chdir(cwd)

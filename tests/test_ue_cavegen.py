@@ -73,7 +73,7 @@ class NativeCalls(unittest.TestCase):
         help_bin = TS.build_helpers(self.tmp, CAVE_OFF)
         # eigene Hilfsdatei mit 80-Byte-Log
         src = os.path.join(self.tmp, "h2.s")
-        with open(src, "w") as f:
+        with open(src, "w", encoding="utf-8") as f:
             f.write(HELPERS.replace("call CAVE", f"call {CAVE_OFF}"))
         obj, elf, binf = (os.path.join(self.tmp, n) for n in ("h2.o", "h2.elf", "h2.bin"))
         subprocess.run(["as", "--64", "-o", obj, src], check=True)

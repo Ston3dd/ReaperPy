@@ -3,6 +3,7 @@ import os, shutil, struct, subprocess, sys, tempfile, unittest
 from types import SimpleNamespace
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import ue_instr as U
+from pathlib import Path
 
 ASM = """
 .intel_syntax noprefix
@@ -44,10 +45,10 @@ HAVE = shutil.which("as") and shutil.which("objdump") and shutil.which("gcc")
 
 
 def build_dump(d):
-    open(os.path.join(d, "t.s"), "w").write(ASM)
+    Path(os.path.join(d, "t.s")).write_text(ASM, encoding="utf-8")
     subprocess.run(["as", "--64", "-o", os.path.join(d, "t.o"), os.path.join(d, "t.s")], check=True)
     subprocess.run(["objcopy", "-O", "binary", "-j", ".text", os.path.join(d, "t.o"), os.path.join(d, "t.bin")], check=True)
-    return b"\xCC" * 16 + open(os.path.join(d, "t.bin"), "rb").read()      # wie im echten Image: Padding davor
+    return b"\xCC" * 16 + Path(os.path.join(d, "t.bin")).read_bytes()      # wie im echten Image: Padding davor
 
 
 @unittest.skipUnless(HAVE, "Toolchain fehlt")
@@ -128,11 +129,11 @@ int main(void){ static char buf[0x1000]; int *gold=(int*)(buf+0x100); *gold=500;
   int r1=run(buf, 300); int a=*gold; run(buf, 800); int b=*gold; printf("%d %d %d\n", r1, a, b); return 0; }
 '''
         d = tempfile.mkdtemp()
-        open(os.path.join(d, "c.s"), "w").write(asm)
-        open(os.path.join(d, "m.c"), "w").write(c if kind == "float" else cint)
+        Path(os.path.join(d, "c.s")).write_text(asm, encoding="utf-8")
+        Path(os.path.join(d, "m.c")).write_text(c if kind == "float" else cint, encoding="utf-8")
         subprocess.run(["gcc", "-o", os.path.join(d, "m"), os.path.join(d, "m.c"), os.path.join(d, "c.s")], check=True,
                        capture_output=True)
-        return subprocess.run([os.path.join(d, "m")], capture_output=True, text=True).stdout.split()
+        return subprocess.run([os.path.join(d, "m")], capture_output=True, text=True, encoding="utf-8").stdout.split()
 
     def test_cave_float_never_decreases(self):
         h = [x for x in self.scan({0x348: ["Health"]}, {0x34C}) if x.ins.mnem == "movss"][0]

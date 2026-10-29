@@ -9,6 +9,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import cheatlist as CL
 import gameprofile as GP
+from pathlib import Path
 
 
 class Profile(unittest.TestCase):
@@ -43,15 +44,15 @@ class Profile(unittest.TestCase):
         gp = GP.load("PPSA99999", self.d)
         self.assertEqual((gp.notes, gp.favorites), ("", set()))
         p = os.path.join(self.d, "PPSA11111.json")
-        with open(p, "w") as f:
+        with open(p, "w", encoding="utf-8") as f:
             f.write("{kaputt")
         gp = GP.load("PPSA11111", self.d)
         self.assertEqual(gp.favorites, set())
         self.assertTrue(os.path.exists(p + ".bad"))                              # Original bleibt erhalten
-        with open(p, "w") as f:
+        with open(p, "w", encoding="utf-8") as f:
             json.dump([1, 2], f)
         self.assertEqual(GP.load("PPSA11111", self.d).notes, "")
-        with open(p, "w") as f:
+        with open(p, "w", encoding="utf-8") as f:
             json.dump({"favorites": ["a", 5], "groups": None, "discover": {"zu": "wenig"}}, f)
         gp = GP.load("PPSA11111", self.d)
         self.assertEqual((gp.favorites, gp.groups, gp.discover), ({"a"}, {}, None))
@@ -79,7 +80,7 @@ class Profile(unittest.TestCase):
 
     def test_save_failure_is_reported_not_raised(self):
         blocker = os.path.join(self.d, "datei")
-        open(blocker, "w").close()
+        Path(blocker).write_text("", encoding="utf-8")
         self.assertFalse(GP.GameProfile("k", os.path.join(blocker, "x")).save())
 
 

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, python: "3.10" }
+          - { os: ubuntu-latest, python: "3.12" }
+          - { os: windows-latest, python: "3.12" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      # Toolchain fuer die Tests, die echten Assembler-/C-Code bauen (as, objcopy, gcc)
+      - name: System packages (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y binutils gcc
+      - name: Python packages
+        run: python -m pip install -r requirements.txt
+      # keystone-engine + capstone sind installiert -> die sonst uebersprungenen Tests laufen mit
+      - name: Tests
+        run: python -X dev -m unittest discover -s tests -v
+
+  lint:
+    name: Lint (ruff, informational)
+    runs-on: ubuntu-latest
+    continue-on-error: true      # erst blockierend machen, wenn der Bestand sauber ist
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install ruff
+      - run: ruff check .

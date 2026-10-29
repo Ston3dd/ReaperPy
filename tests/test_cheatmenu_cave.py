@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import cheatmenu as M
 import cheatmenu_cave as C
 import ue_instr as U
+from pathlib import Path
 
 ASM = """
 .intel_syntax noprefix
@@ -121,7 +122,7 @@ class Pure(unittest.TestCase):
         a, b = C.save_patch(d, p), C.save_patch(d, p)
         self.assertNotEqual(a, b)
         self.assertTrue(a.endswith(".reapproj") and os.path.exists(os.path.join(d, a)))
-        self.assertEqual(json.load(open(os.path.join(d, b), encoding="utf-8"))["name"], p["name"])
+        self.assertEqual(json.loads(Path(os.path.join(d, b)).read_text(encoding="utf-8"))["name"], p["name"])
 
     def test_code_from_console_reads_the_main_exec_region(self):
         mem = bytes(range(256)) * 64
@@ -158,11 +159,11 @@ class Real(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         d = tempfile.mkdtemp()
-        open(os.path.join(d, "t.s"), "w").write(ASM)
+        Path(os.path.join(d, "t.s")).write_text(ASM, encoding="utf-8")
         subprocess.run(["as", "--64", "-o", os.path.join(d, "t.o"), os.path.join(d, "t.s")], check=True)
         subprocess.run(["objcopy", "-O", "binary", "-j", ".text", os.path.join(d, "t.o"), os.path.join(d, "t.bin")],
                        check=True)
-        dump = b"\xCC" * 16 + open(os.path.join(d, "t.bin"), "rb").read()
+        dump = b"\xCC" * 16 + Path(os.path.join(d, "t.bin")).read_bytes()
         cls.code = {"buf": dump, "lo": 0, "hi": len(dump), "base_va": 0x400000, "dump_rva": 0, "range": (0, len(dump))}
         cls.dis = U.ObjdumpDisasm()
 
@@ -184,11 +185,11 @@ class Real(unittest.TestCase):
         c = ("#include <stdio.h>\n" + proto + "\nint main(void){ static char buf[0x1000];\n" + setup +
              "\n  return 0; }\n")
         d = tempfile.mkdtemp()
-        open(os.path.join(d, "c.s"), "w").write(asm)
-        open(os.path.join(d, "m.c"), "w").write(c)
+        Path(os.path.join(d, "c.s")).write_text(asm, encoding="utf-8")
+        Path(os.path.join(d, "m.c")).write_text(c, encoding="utf-8")
         subprocess.run(["gcc", "-o", os.path.join(d, "m"), os.path.join(d, "m.c"), os.path.join(d, "c.s")],
                        check=True, capture_output=True)
-        out = subprocess.run([os.path.join(d, "m")], capture_output=True, text=True).stdout.split()
+        out = subprocess.run([os.path.join(d, "m")], capture_output=True, text=True, encoding="utf-8").stdout.split()
         self.assertEqual(out, check)
 
     # ------------------------------------------------------------------ Treffer

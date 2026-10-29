@@ -7,6 +7,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import autocodes as A
+from pathlib import Path
 
 
 class T(unittest.TestCase):
@@ -18,7 +19,7 @@ class T(unittest.TestCase):
                          "Mein Zeug": ["x.reapproj"]}.items():
             os.makedirs(os.path.join(self.root, d))
             for f in files:
-                open(os.path.join(self.root, d, f), "w").close()
+                Path(os.path.join(self.root, d, f)).write_text("", encoding="utf-8")
         self.cfg = {"projects_root": self.root, "library_dir": os.path.join(self.root, "lib"), "projects": {}}
 
     def fg(self, pid=7, tid="PPSA11111", name="Super Game", ver="01.02"):

@@ -20,11 +20,11 @@ import uesdk
 
 
 def load_dump(path):
-    f = open(path, "rb")
-    try:
-        return mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-    except Exception:
-        return f.read()
+    with open(path, "rb") as f:                 # mmap haelt ein eigenes Handle, die Datei darf hier zu
+        try:
+            return mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+        except Exception:
+            return f.read()
 
 
 def targets_for(sdk, cands):
@@ -205,6 +205,13 @@ def main_game(a):
     """--game: alles aus einem Spielordner."""
     import ue_project
     proj = ue_project.GameProject(a.game, native=a.native).load()
+    try:
+        return _main_game(a, proj)
+    finally:
+        proj.close()            # auch bei fruehem return / Fehler (Dump-Handle)
+
+
+def _main_game(a, proj):
     f = proj.files
     print(f"Spiel {proj.title or '?'}  Basis {proj.base:#x}")
     print("  gefunden: " + ", ".join(f"{k}={'ja' if v else 'NEIN'}" for k, v in f.items()))
@@ -288,7 +295,6 @@ def main_game(a):
                 print(f"  --func-patch {spec}: {e}")
     if wrote:
         print(f"{len(wrote)} Patch-Datei(en) nach {a.out}")
-    proj.close()
     return 0
 
 

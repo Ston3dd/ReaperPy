@@ -116,7 +116,7 @@ def make_options():
 
 def build_helpers(tmp, cave_abs_off):
     src = os.path.join(tmp, "h.s")
-    with open(src, "w") as f:
+    with open(src, "w", encoding="utf-8") as f:
         f.write(HELPERS.replace("call CAVE", f"call {cave_abs_off}"))
     obj, elf, binf = (os.path.join(tmp, n) for n in ("h.o", "h.elf", "h.bin"))
     subprocess.run(["as", "--64", "-o", obj, src], check=True)
@@ -270,7 +270,7 @@ class NativeCave(unittest.TestCase):
         with open(raw, "wb") as f:
             f.write(self.code)
         out = subprocess.run(["objdump", "-D", "-b", "binary", "-mi386:x86-64", "-M", "intel", raw],
-                             check=True, capture_output=True, text=True).stdout
+                             check=True, capture_output=True, text=True, encoding="utf-8").stdout
         for needle in ("xor    eax,eax", "or     rax,QWORD PTR [rip+", "xchg   BYTE PTR [rip+", "test   al,al",
                        "push   rdi", "push   rsi", "push   rdx", "movabs rsi,0x807060504030201", "mov    edx,0x1869f",
                        "mov    ecx,0x1", "xor    r8d,r8d", "xor    edi,edi", "call", "pop    rdx", "pop    rsi", "pop    rdi",

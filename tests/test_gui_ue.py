@@ -5,6 +5,7 @@ import ghost_tk; ghost_tk.install()
 from test_gui_smoke import FakeWin
 import test_ue_project as TP, test_ue_live as TL
 import tkinter.filedialog as fd
+from pathlib import Path
 
 HAVE = shutil.which("as") and shutil.which("objdump") and shutil.which("nm")
 
@@ -22,6 +23,7 @@ class T(unittest.TestCase):
         self.reloaded = []; self.w.app.load_patches = lambda: self.reloaded.append(1)
         self.w.to_debug_watch = lambda a, n: self.w.went.append(("watch", a, n))
         self.t = G.UeTab(None, self.w)
+        self.addCleanup(lambda: self.t.proj and self.t.proj.close())      # die GUI oeffnet das Projekt selbst
         fd.askdirectory = lambda *a, **k: self.d
 
     def test_folder_pick_and_flow(self):
@@ -52,7 +54,7 @@ class T(unittest.TestCase):
         t.v_mode.set("true"); t.func_patch()
         f = [x for x in os.listdir(self.w.app.PATCH_DIR) if "AddHP4" in x]
         self.assertTrue(f, os.listdir(self.w.app.PATCH_DIR))
-        p = json.load(open(os.path.join(self.w.app.PATCH_DIR, f[0])))
+        p = json.loads(Path(os.path.join(self.w.app.PATCH_DIR, f[0])).read_text(encoding="utf-8"))
         self.assertEqual(p["Variables"][0]["newValue"], "B0 01 C3")
         t.func_goto(); self.assertEqual(last(self.w), ("dis", 0x400000 + self.sym["impl4"]))
 
@@ -65,15 +67,14 @@ class T(unittest.TestCase):
         mod, heap = bytes(im.regions[TL.BASE]), bytes(im.regions[TL.HEAP])
         hp_off = ref["p1"] + 0x80 - TL.HEAP
         heap = bytearray(heap); heap[hp_off:hp_off + 4] = struct.pack("<f", 42.25); heap = bytes(heap)
-        open(os.path.join(d, "dump.bin"), "wb").write(mod + heap)
-        json.dump({"regions": [{"name": "executable", "start": TL.BASE, "end": TL.BASE + len(mod), "prot": 3, "offset": 0},
-                               {"name": "anon", "start": TL.HEAP, "end": TL.HEAP + len(heap), "prot": 3, "offset": len(mod)}]},
-                  open(os.path.join(d, "dump.json"), "w"))
-        json.dump({"base": TL.BASE, "gobjects": 0x100, "gnames": 0x400}, open(os.path.join(d, "offsets.json"), "w"))
+        Path(os.path.join(d, "dump.bin")).write_bytes(mod + heap)
+        Path(os.path.join(d, "dump.json")).write_text(json.dumps({"regions": [{"name": "executable", "start": TL.BASE, "end": TL.BASE + len(mod), "prot": 3, "offset": 0},
+                               {"name": "anon", "start": TL.HEAP, "end": TL.HEAP + len(heap), "prot": 3, "offset": len(mod)}]}), encoding="utf-8")
+        Path(os.path.join(d, "offsets.json")).write_text(json.dumps({"base": TL.BASE, "gobjects": 0x100, "gnames": 0x400}), encoding="utf-8")
         os.makedirs(os.path.join(d, "SDK", "SDK_HEADERS"))
-        open(os.path.join(d, "SDK", "SDK_HEADERS", "A_classes.hpp"), "w").write(
+        Path(os.path.join(d, "SDK", "SDK_HEADERS", "A_classes.hpp")).write_text(
             "class UHealthComponent : public UActorComponent\n{\npublic:\n"
-            "\tfloat Health; // 0x0080 (0x0004) [0x0018001040022a01] FloatProperty\n};\n")
+            "\tfloat Health; // 0x0080 (0x0004) [0x0018001040022a01] FloatProperty\n};\n", encoding="utf-8")
         self.t.v["game"].set(d)
         fd.askdirectory = lambda *a, **k: d
         import io, contextlib, ue_auto
@@ -119,16 +120,15 @@ class UFuncCall(unittest.TestCase):
         import tools_ue_gui as G, ps5_more, ue_project, uesdk
         im, ref = TL.build(True)
         d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, "SDK", "SDK_HEADERS"))
-        open(os.path.join(d, "SDK", "SDK_HEADERS", "G_classes.hpp"), "w").write(
+        Path(os.path.join(d, "SDK", "SDK_HEADERS", "G_classes.hpp")).write_text(
             "// Class /Script/Game.HealthComponent\nclass UHealthComponent : public UActorComponent\n{\npublic:\n"
             "\tfloat Health; // 0x0080 (0x0004) [0x0018001040022a01] FloatProperty\n"
-            "public:\n\t// void TakeDamage(float Amount);  // flags 0x04020401  native 0x1000\n};\n")
-        open(os.path.join(d, "SDK", "SDK_HEADERS", "G_parameters.hpp"), "w").write(
+            "public:\n\t// void TakeDamage(float Amount);  // flags 0x04020401  native 0x1000\n};\n", encoding="utf-8")
+        Path(os.path.join(d, "SDK", "SDK_HEADERS", "G_parameters.hpp")).write_text(
             "// Function /Script/Game.HealthComponent.TakeDamage\n// 0x0008\nstruct UHealthComponent_TakeDamage_Params\n{\n"
             "\tfloat Amount; // 0x0000 (0x0004) [0x0018001040000280] FloatProperty\n"
-            "\tuint8_t Pad_0000[0x4]; // 0x0004 (0x0004) MISSED OFFSET\n};\n")
-        json.dump({"base": TL.BASE, "gobjects": 0x100, "gnames": 0x400, "process_event": 0x9000, "process_event_index": 3},
-                  open(os.path.join(d, "offsets.json"), "w"))
+            "\tuint8_t Pad_0000[0x4]; // 0x0004 (0x0004) MISSED OFFSET\n};\n", encoding="utf-8")
+        Path(os.path.join(d, "offsets.json")).write_text(json.dumps({"base": TL.BASE, "gobjects": 0x100, "gnames": 0x400, "process_event": 0x9000, "process_event_index": 3}), encoding="utf-8")
         w = FakeWin(); w.base = TL.BASE
         fake = w.client
         class Hybrid:                          # liest UE-Abbild, Parameter-Puffer liegen im Fake-Speicher
@@ -145,6 +145,7 @@ class UFuncCall(unittest.TestCase):
         seen = {}
         ps5_more.call = lambda c, rip, *a, safe=True, gap=0.15: seen.update(rip=rip, a=a, pre=c.read_memory(a[2], 8)) or 0
         t.proj = ue_project.GameProject(d, log=lambda m: None).load()
+        self.addCleanup(t.proj.close)
         t.funcs = t.proj.functions(0)
         t.tf.insert("", "end", iid="0", values=("UHealthComponent", "TakeDamage", "", "", "", ""))
         idx = next(i for i, f in enumerate(t.funcs) if f["name"] == "TakeDamage")

@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 import il2cpp_dump as D
+from pathlib import Path
 
 DUMP = """// Image 0: Assembly-CSharp.dll - 0
 // Image 1: mscorlib.dll - 3
@@ -74,8 +75,8 @@ class T(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         sub = os.path.join(self.tmp.name, "a", "b")
         os.makedirs(sub)
-        open(os.path.join(sub, "dump.cs"), "w").write(DUMP)
-        json.dump(SCRIPT, open(os.path.join(sub, "script.json"), "w"), indent=2)
+        Path(os.path.join(sub, "dump.cs")).write_text(DUMP, encoding="utf-8")
+        Path(os.path.join(sub, "script.json")).write_text(json.dumps(SCRIPT, indent=2), encoding="utf-8")
         self.g = D.GameDump(D.find_game_files(self.tmp.name), log=lambda m: None).load()
 
     def tearDown(self):

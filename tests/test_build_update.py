@@ -204,21 +204,23 @@ class StartButtonAndHandler(unittest.TestCase):
         app._on_update(U.Result("newer", "5.7.0", "5.8.0", "https://x/dl"))
         self.assertEqual(out, [("accent", "[update] New version 5.8.0 available (installed: 5.7.0) - download: https://x/dl")])
 
-    def test_async_check_is_off_without_url_or_when_disabled(self):
+    def test_async_check_runs_by_default_and_only_off_when_disabled(self):
         import gui
         app = object.__new__(gui.App)
         started = []
         orig = gui.threading.Thread
         gui.threading.Thread = lambda **k: started.append(k) or types.SimpleNamespace(start=lambda: None)
         try:
-            app.cfg = {}
+            app.cfg = {"auto_update_check": False}
             app._update_check_async()
             app.cfg = {"update_url": "https://x/v.json", "auto_update_check": False}
             app._update_check_async()
             self.assertEqual(started, [])
-            app.cfg = {"update_url": "https://x/v.json"}
+            app.cfg = {}                                              # Standard: GitHub-Releases pruefen
             app._update_check_async()
-            self.assertEqual(len(started), 1)
+            app.cfg = {"update_url": "https://x/v.json"}              # alte JSON-Variante bleibt moeglich
+            app._update_check_async()
+            self.assertEqual(len(started), 2)
         finally:
             gui.threading.Thread = orig
 

@@ -1,6 +1,7 @@
 import os, struct, sys, unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import scanner as SC
+from pathlib import Path
 
 
 class FakeIO:
@@ -68,6 +69,11 @@ class Flags(unittest.TestCase):
         self.assertIn("ANGEFORDERT: Parallel nein", scanner(ALL).speed_mode())
         self.assertIn("Parallel nein", scanner(SC.TSE_RESIDENT).speed_mode())
 
+
+
+def tearDownModule():
+    while _SOCKS:
+        _SOCKS.pop().close()
 
 
 if __name__ == "__main__":
@@ -154,8 +160,12 @@ class SpeedReport(unittest.TestCase):
 import socket, threading, time
 
 
+_SOCKS = []
+
+
 def pair():
     a, b = socket.socketpair()
+    _SOCKS.extend((a, b))             # wird in tearDownModule geschlossen
     return a, SC._IO(type("C", (), {"sock": b})())
 
 
@@ -294,11 +304,10 @@ class SnapshotRamLimit(unittest.TestCase):
 
     def test_gui_offers_at_most_2048_mb_and_defaults_to_it(self):
         import ast
-        src = open(os.path.join(os.path.dirname(__file__), "..", "tools_scan_gui.py"), encoding="utf-8").read()
+        src = Path(os.path.join(os.path.dirname(__file__), "..", "tools_scan_gui.py")).read_text(encoding="utf-8")
         choices = next(ast.literal_eval(n.value) for n in ast.parse(src).body
                        if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "RAM_CHOICES")
         self.assertEqual(SC.MAX_SNAPSHOT_RAM_MB, 2048)
         self.assertLessEqual(max(choices.values()), SC.MAX_SNAPSHOT_RAM_MB)
         self.assertIn("list(RAM_CHOICES)[2]", src)                # Standard-Auswahl = 2048 MB
         self.assertEqual(list(choices.values())[2], 2048)
-

@@ -54,6 +54,8 @@ class Fake(threading.Thread):
                     s.sendall(struct.pack("<I", 0) + struct.pack("<QQ", len(hits), 4096) + struct.pack("<I", 0) + OK)
         except EOFError:
             pass
+        finally:
+            s.close()
 
 
 class T(unittest.TestCase):
@@ -65,7 +67,10 @@ class T(unittest.TestCase):
         self.pool = 0x70000000
         self.c.allocate_memory = lambda n: self.pool
         self.c.write_memory = lambda a, d: self.f.writes.append((a, bytes(d)))
-    def tearDown(self): self.c.sock.close()
+    def tearDown(self):
+        self.c.sock.close()
+        self.f.join(2)                  # Server-Thread beenden lassen, erst danach den Listen-Socket schliessen
+        self.f.srv.close()
 
     def test_foreground(self):
         self.assertEqual(M.foreground_app(self.c), (77, "CUSA12345", "Mein Spiel", "01.05"))

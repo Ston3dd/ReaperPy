@@ -3,6 +3,7 @@ import json, os, shutil, sys, tempfile, unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
 import ue_auto as A, ue_instr as U, uesdk, uecheat, reapatch
+from pathlib import Path
 
 HAVE = shutil.which("as") and shutil.which("objdump")
 SDK = """class UHealthComponent final : public UActorComponent
@@ -29,10 +30,10 @@ class T(unittest.TestCase):
     def test_pipeline(self):
         import test_ue_instr as TI
         d = tempfile.mkdtemp()
-        os.makedirs(os.path.join(d, "sdk")); open(os.path.join(d, "sdk", "Game_classes.hpp"), "w").write(SDK)
-        open(os.path.join(d, "Offsets.json"), "w").write(json.dumps({"OFFSET_GOBJECTS": "0x1234"}))
+        os.makedirs(os.path.join(d, "sdk")); Path(os.path.join(d, "sdk", "Game_classes.hpp")).write_text(SDK, encoding="utf-8")
+        Path(os.path.join(d, "Offsets.json")).write_text(json.dumps({"OFFSET_GOBJECTS": "0x1234"}), encoding="utf-8")
         dump = TI.build_dump(d)
-        open(os.path.join(d, "Dump.bin"), "wb").write(dump)
+        Path(os.path.join(d, "Dump.bin")).write_bytes(dump)
         sdk = uesdk.load(os.path.join(d, "sdk"), os.path.join(d, "Offsets.json"))
         self.assertEqual(sdk.offset("gobjects"), 0x1234)
         cands = uecheat.find_candidates(sdk, 8)
@@ -70,8 +71,8 @@ class T(unittest.TestCase):
     def test_cli(self):
         import test_ue_instr as TI, io, contextlib
         d = tempfile.mkdtemp(); os.makedirs(os.path.join(d, "sdk"))
-        open(os.path.join(d, "sdk", "a.hpp"), "w").write(SDK)
-        open(os.path.join(d, "Dump.bin"), "wb").write(TI.build_dump(d))
+        Path(os.path.join(d, "sdk", "a.hpp")).write_text(SDK, encoding="utf-8")
+        Path(os.path.join(d, "Dump.bin")).write_bytes(TI.build_dump(d))
         cwd = os.getcwd(); os.chdir(d)
         try:
             buf = io.StringIO()

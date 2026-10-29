@@ -3,6 +3,7 @@ Testfunktion, mehrere Aufrufe inkl. Ringpuffer-Ueberlauf, Register-/Flag-Erhaltu
 import os, shutil, struct, subprocess, sys, tempfile, unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import logger as L
+from pathlib import Path
 
 BASE, RING = 0x20000000, 16
 FN, STUB = BASE + 0x1000, BASE + 0x2000
@@ -50,8 +51,8 @@ class T(unittest.TestCase):
 
     def test_native(self):
         self.d = tempfile.mkdtemp()
-        w = lambda n, t: open(os.path.join(self.d, n), "w").write(t)
-        r = lambda n: open(os.path.join(self.d, n), "rb").read()
+        w = lambda n, t: Path(os.path.join(self.d, n)).write_text(t, encoding="utf-8")
+        r = lambda n: Path(os.path.join(self.d, n)).read_bytes()
         w("fn.s", FN_ASM); self.sh("as", "--64", "-o", "fn.o", "fn.s")
         self.sh("objcopy", "-O", "binary", "-j", ".text", "fn.o", "fn.bin")
         stolen = r("fn.bin")[2:10]
@@ -61,9 +62,9 @@ class T(unittest.TestCase):
         w("stub.s", body); self.sh("as", "--64", "-o", "stub.o", "stub.s")
         self.sh("ld", f"-Ttext={STUB:#x}", "--oformat", "binary", "-o", "stub.bin", "stub.o")
         rel = STUB - (HOOK + 5)
-        open(os.path.join(self.d, "hook.bin"), "wb").write(b"\xE9" + struct.pack("<i", rel) + b"\x90\x90\x90")
+        Path(os.path.join(self.d, "hook.bin")).write_bytes(b"\xE9" + struct.pack("<i", rel) + b"\x90\x90\x90")
         w("h.c", C_SRC); self.sh("gcc", "-O0", "-o", "h", "h.c")
-        res = subprocess.run(["./h"], cwd=self.d, capture_output=True, text=True)
+        res = subprocess.run(["./h"], cwd=self.d, capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(res.returncode, 0, res.stderr)
         rets = {int(a): int(b) for a, b in (l.split() for l in res.stdout.splitlines())}
         for i in range(40):                                  # Flags + rdx bleiben unberuehrt

@@ -2,6 +2,7 @@ import json, os, shutil, subprocess, sys, tempfile, unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
 import dumpmem as D
+from pathlib import Path
 
 REGIONS = [
     {"name": "executable", "start": 0x400000, "end": 0x500000, "prot": 5, "offset": 0},
@@ -18,8 +19,8 @@ def make_dump(d, code=b""):
     buf[0:len(code)] = code
     buf[0x100000:0x100008] = b"DATA1234"
     buf[0x180000:0x180008] = (0x1122334455667788).to_bytes(8, "little")
-    p = os.path.join(d, "dump.bin"); open(p, "wb").write(buf)
-    j = os.path.join(d, "dump.json"); json.dump({"name": "eboot.bin", "title_id": "PPSA00000", "regions": REGIONS}, open(j, "w"))
+    p = os.path.join(d, "dump.bin"); Path(p).write_bytes(buf)
+    j = os.path.join(d, "dump.json"); Path(j).write_text(json.dumps({"name": "eboot.bin", "title_id": "PPSA00000", "regions": REGIONS}), encoding="utf-8")
     return p, j
 
 
@@ -50,12 +51,13 @@ class T(unittest.TestCase):
         d = tempfile.mkdtemp()
         asm = ".intel_syntax noprefix\n.text\n" + "".join(
             f".p2align 4,0xCC\nf{i}:\n  push rbx\n  mov eax, {i}\n  pop rbx\n  ret\n" for i in range(40))
-        open(os.path.join(d, "t.s"), "w").write(asm)
+        Path(os.path.join(d, "t.s")).write_text(asm, encoding="utf-8")
         subprocess.run(["as", "--64", "-o", os.path.join(d, "t.o"), os.path.join(d, "t.s")], check=True)
         subprocess.run(["objcopy", "-O", "binary", "-j", ".text", os.path.join(d, "t.o"), os.path.join(d, "t.bin")], check=True)
-        code = b"\xCC" * 16 + open(os.path.join(d, "t.bin"), "rb").read()
+        code = b"\xCC" * 16 + Path(os.path.join(d, "t.bin")).read_bytes()
         p, j = make_dump(d, code)
         dm = D.DumpMemory(p, j)
+        self.addCleanup(dm.close)
         starts = [i for i in range(16, len(code), 16) if code[i - 1] in (0xCC, 0xC3) and code[i] != 0xCC][:30]
         rvas = starts                                                  # Position = RVA (Base 0x400000, Offset 0)
         conv, r, v = D.native_convention(dm, rvas, 0x400000)
@@ -68,10 +70,10 @@ class T(unittest.TestCase):
         d = tempfile.mkdtemp()
         os.makedirs(os.path.join(d, "SDK", "SDK_HEADERS")); os.makedirs(os.path.join(d, "Anderes Spiel"))
         for n in ("A_classes.hpp", "A_structs.hpp", "A_parameters.hpp"):
-            open(os.path.join(d, "SDK", "SDK_HEADERS", n), "w").write("//")
+            Path(os.path.join(d, "SDK", "SDK_HEADERS", n)).write_text("//", encoding="utf-8")
         for n in ("offsets.json", "dump.json", "GObjects.txt", "dump.bin.engine.json"):
-            open(os.path.join(d, n), "w").write("{}")
-        open(os.path.join(d, "dump.bin"), "wb").write(b"0")
+            Path(os.path.join(d, n)).write_text("{}", encoding="utf-8")
+        Path(os.path.join(d, "dump.bin")).write_bytes(b"0")
         f = D.find_game_files(d)
         self.assertTrue(f["sdk"].endswith("SDK_HEADERS")); self.assertTrue(f["dump_bin"].endswith("dump.bin"))
         for k in ("offsets", "dump_json", "gobjects", "engine"):
@@ -82,12 +84,12 @@ class T(unittest.TestCase):
         d = tempfile.mkdtemp(); g = os.path.join(d, "dumps", "CUSA31820")
         os.makedirs(os.path.join(g, "SDK", "SDK_HEADERS"))
         for n in ("Engine_classes.hpp", "Engine_structs.hpp", "Engine_parameters.hpp"):
-            open(os.path.join(g, "SDK", "SDK_HEADERS", n), "w").write("//")
+            Path(os.path.join(g, "SDK", "SDK_HEADERS", n)).write_text("//", encoding="utf-8")
         for n in ("offsets.json", "GObjects.txt", "GameDefines.hpp"):
-            open(os.path.join(g, "SDK", n), "w").write("{}")
+            Path(os.path.join(g, "SDK", n)).write_text("{}", encoding="utf-8")
         for n in ("dump.json", "dump.bin.engine.json", "rpc_stub.txt"):
-            open(os.path.join(g, n), "w").write("{}")
-        open(os.path.join(g, "dump.bin"), "wb").write(b"0")
+            Path(os.path.join(g, n)).write_text("{}", encoding="utf-8")
+        Path(os.path.join(g, "dump.bin")).write_bytes(b"0")
         f = D.find_game_files(d)                                   # Eltern-Ordner reicht
         self.assertTrue(f["sdk"].endswith("SDK_HEADERS"))
         self.assertTrue(f["offsets"].endswith(os.path.join("SDK", "offsets.json")))
@@ -97,18 +99,18 @@ class T(unittest.TestCase):
         """Dein Fall: --game ...\\dumps\\PPSA33286\\SDK  (dump.bin liegt eine Ebene darueber)"""
         d = tempfile.mkdtemp(); g = os.path.join(d, "dumps", "PPSA33286")
         os.makedirs(os.path.join(g, "SDK", "SDK_HEADERS"))
-        open(os.path.join(g, "SDK", "SDK_HEADERS", "A_classes.hpp"), "w").write("//")
+        Path(os.path.join(g, "SDK", "SDK_HEADERS", "A_classes.hpp")).write_text("//", encoding="utf-8")
         for n in ("offsets.json", "GObjects.txt"):
-            open(os.path.join(g, "SDK", n), "w").write("{}")
+            Path(os.path.join(g, "SDK", n)).write_text("{}", encoding="utf-8")
         for n in ("dump.json", "dump.bin.engine.json"):
-            open(os.path.join(g, n), "w").write("{}")
-        open(os.path.join(g, "dump.bin"), "wb").write(b"0")
+            Path(os.path.join(g, n)).write_text("{}", encoding="utf-8")
+        Path(os.path.join(g, "dump.bin")).write_bytes(b"0")
         f = D.find_game_files(os.path.join(g, "SDK"))
         self.assertTrue(f["dump_bin"].endswith("dump.bin") and f["dump_json"].endswith("dump.json") and f["engine"])
         self.assertTrue(f["offsets"].endswith("offsets.json") and f["sdk"].endswith("SDK_HEADERS"))
 
     def test_real_fixture_regions(self):
-        regs = json.load(open(os.path.join(FX, "dump_excerpt.json")))["regions"]
+        regs = json.loads(Path(os.path.join(FX, "dump_excerpt.json")).read_text(encoding="utf-8"))["regions"]
         self.assertEqual(regs[0]["start"], 0x400000)
         self.assertEqual(regs[1]["offset"], 0x6178000)
 

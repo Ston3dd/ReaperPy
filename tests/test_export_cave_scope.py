@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import cave_trainer
 import export_goldhen as E
+from pathlib import Path
 
 BASE = 0x400000
 # (start, end, prot, fuellbyte am Ende, Laenge des Fuellers)
@@ -78,9 +79,9 @@ class CaveScopeTests(unittest.TestCase):
         import tempfile, json
         d = tempfile.mkdtemp()
         patch = os.path.join(d, "Inf Hp.reapproj")
-        json.dump({"name": "Inf Hp", "ImageBase": hex(BASE), "Variables": [
+        Path(patch).write_text(json.dumps({"name": "Inf Hp", "ImageBase": hex(BASE), "Variables": [
             {"label": "OriginSource", "offset": "0xb2c491", "defaultValue": "90 90 90 90 90",
-             "newValue": "90 90 90 90 90"}]}, open(patch, "w"))
+             "newValue": "90 90 90 90 90"}]}), encoding="utf-8")
         rp = reapatch.ReapPatch.load(patch)
         be = Backend()
         be.pid = 1

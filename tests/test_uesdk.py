@@ -1,8 +1,9 @@
 import os, sys, json, tempfile, unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import uesdk, uecheat
+from pathlib import Path
 
-HDR = open(os.path.join(os.path.dirname(__file__), "sample_sdk.hpp"), encoding="utf-8").read() if os.path.exists(
+HDR = Path(os.path.join(os.path.dirname(__file__), "sample_sdk.hpp")).read_text(encoding="utf-8") if os.path.exists(
     os.path.join(os.path.dirname(__file__), "sample_sdk.hpp")) else ""
 
 

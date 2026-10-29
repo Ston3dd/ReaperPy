@@ -11,6 +11,16 @@ import re
 import struct
 import time
 
+LOG_HEX_BYTES = 32      # laengere Byte-Folgen werden im Log gekuerzt (ganze Hooks/Caves koennen hunderte Bytes haben)
+
+
+def fmt_bytes(data, limit=LOG_HEX_BYTES):
+    """Hex fuers Log: die ersten `limit` Bytes, bei mehr '... (+N bytes)'.  Aendert nichts an den Daten selbst."""
+    data = bytes(data)
+    if len(data) <= limit:
+        return data.hex(" ")
+    return f"{data[:limit].hex(' ')} ... (+{len(data) - limit} bytes)"
+
 
 # ==================================================================
 # Hilfsfunktionen
@@ -182,8 +192,8 @@ def _verify_write(backend, addr, expected, label="write"):
     if bytes(actual) == bytes(expected):
         return True
     print(f"[verify] {label} @ {addr:#x} STIMMT NICHT ÜBEREIN!")
-    print(f"[verify]   Erwartet: {bytes(expected).hex(' ')}")
-    print(f"[verify]   Gelesen:  {bytes(actual).hex(' ')}")
+    print(f"[verify]   Erwartet: {fmt_bytes(expected)}")
+    print(f"[verify]   Gelesen:  {fmt_bytes(actual)}")
     return False
 
 
@@ -328,7 +338,7 @@ def _apply_cave(backend, reapatch, hook_addr, size_hint=0x4000):
     if orig is None:
         raise RuntimeError(f"Hook {hook_addr:#x} nicht lesbar")
     original_bytes = bytes(orig)
-    print(f"[cave]   Original @ {hook_addr:#x}: {original_bytes.hex(' ')}")
+    print(f"[cave]   Original @ {hook_addr:#x}: {fmt_bytes(original_bytes)}")
 
     # --- 2. Cave-Adresse suchen ---
     cave_addr = backend.find_cave(hook_addr, size_hint)
@@ -357,7 +367,7 @@ def _apply_cave(backend, reapatch, hook_addr, size_hint=0x4000):
     # --- 6. Hook schreiben (KEIN set_rwx!) ---
     hook_bytes = build_hook(backend, hook_addr, cave_addr, length=8)
     backend.write(hook_addr, hook_bytes)
-    print(f"[cave]   Hook-Bytes: {hook_bytes.hex(' ')} @ {hook_addr:#x}")
+    print(f"[cave]   Hook-Bytes: {fmt_bytes(hook_bytes)} @ {hook_addr:#x}")
 
     if not _verify_write(backend, hook_addr, hook_bytes, "Hook"):
         raise RuntimeError("Hook-Write fehlgeschlagen!")
@@ -421,8 +431,8 @@ def _apply_simple(backend, reapatch, hook_addr):
                     "Hauptfenster pruefen.")
             original = default_bytes if (mem == new_bytes and default_bytes) else mem
 
-            print(f"[patch]  Original @ {addr:#x}: {original.hex(' ')}")
-            print(f"[patch]  Neuer Code @ {addr:#x}: {new_bytes.hex(' ')}")
+            print(f"[patch]  Original @ {addr:#x}: {fmt_bytes(original)}")
+            print(f"[patch]  Neuer Code @ {addr:#x}: {fmt_bytes(new_bytes)}")
 
             # KEIN set_rwx auf Hook!
             backend.write(addr, new_bytes)
@@ -492,7 +502,7 @@ def deactivate_patch(backend, reapatch, state):
             # sonst koennte ein Spiel-Thread in eine schon geloeschte Cave springen
             for s in reversed(sites):
                 backend.write(s["addr"], s["original_bytes"])
-                print(f"[restore] {s['addr']:#x} -> {bytes(s['original_bytes']).hex(' ')}")
+                print(f"[restore] {s['addr']:#x} -> {fmt_bytes(s['original_bytes'])}")
             time.sleep(0.1)
             return True
 
@@ -513,7 +523,7 @@ def deactivate_patch(backend, reapatch, state):
 
     # KEIN set_rwx auf Hook!
     backend.write(hook_addr, original)
-    print(f"[restore] Hook {hook_addr:#x} -> {original.hex(' ')}")
+    print(f"[restore] Hook {hook_addr:#x} -> {fmt_bytes(original)}")
 
     # Cave-Protection zurück auf RW
     if cave_addr:

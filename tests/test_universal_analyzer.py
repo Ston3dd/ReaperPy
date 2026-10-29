@@ -2,12 +2,13 @@ import os, tempfile, unittest, zipfile
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from universal_analyzer import analyze_dump
+from pathlib import Path
 class UniversalAnalyzerTests(unittest.TestCase):
  def test_scan_folder_and_filter_build_cost(self):
   with tempfile.TemporaryDirectory() as d:
    os.makedirs(os.path.join(d,'SDK_HEADERS'))
    p=os.path.join(d,'SDK_HEADERS','Player_classes.hpp')
-   open(p,'w').write('class UPlayerInventory : public UObject {\n int32 Health;\n void GiveItem(FName ItemId, int32 Count);\n int32 BuildingMaterialCost;\n void OpenDebugMenu();\n};')
+   Path(p).write_text('class UPlayerInventory : public UObject {\n int32 Health;\n void GiveItem(FName ItemId, int32 Count);\n int32 BuildingMaterialCost;\n void OpenDebugMenu();\n};', encoding="utf-8")
    r=analyze_dump(d)
    cats=' '.join(x['category'] for x in r['candidates'])
    syms=' '.join(x['symbol'] for x in r['candidates'])
@@ -23,7 +24,7 @@ class UniversalAnalyzerTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    src=os.path.join(d,'src'); os.makedirs(src)
    for i in range(4):
-    with open(os.path.join(src,f'{i}.hpp'),'w') as f:f.write(f'void SetMoney{i}(int32 Amount);\n')
+    with open(os.path.join(src,f'{i}.hpp'),'w',encoding='utf-8') as f:f.write(f'void SetMoney{i}(int32 Amount);\n')
    cp=os.path.join(d,'checkpoint.json'); ev=threading.Event()
    def progress(done,total,current):
     if done==1: ev.set()
@@ -40,7 +41,7 @@ class UniversalAnalyzerTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    os.makedirs(os.path.join(d,'SDK_HEADERS'))
    p=os.path.join(d,'SDK_HEADERS','Inventory_classes.hpp')
-   with open(p,'w') as f:
+   with open(p,'w',encoding='utf-8') as f:
     f.write('class UItemDefinition : public UObject {\n int32 ItemQuantity;\n void GiveItem(FName ItemId, int32 Count);\n};\nclass UBuildingRecipe : public UObject {\n int32 BuildingMaterialCost;\n};')
    r=analyze_dump(d)
    self.assertIn('capability_profiles',r)
@@ -64,7 +65,7 @@ class UniversalAnalyzerTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    src=os.path.join(d,'src'); os.makedirs(src)
    for i in range(3):
-    with open(os.path.join(src,f'{i}.hpp'),'w') as f:f.write(f'class UPlayer{i} {{ int32 Health; void SetMoney(int32 Amount); }};')
+    with open(os.path.join(src,f'{i}.hpp'),'w',encoding='utf-8') as f:f.write(f'class UPlayer{i} {{ int32 Health; void SetMoney(int32 Amount); }};')
    cp=os.path.join(d,'checkpoint.json'); ev=threading.Event()
    def progress(done,total,current):
     if done==1: ev.set()

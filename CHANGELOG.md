@@ -2,6 +2,22 @@
 
 Older release notes (German) are in [`docs/history/`](docs/history/).
 
+## Unreleased
+
+### Added
+- **Auto update**: on start ReaperPy checks the newest GitHub release; after a confirmation it downloads the Windows zip,
+  verifies the SHA-256 from the release, unpacks next to the program (rollback on errors, user data untouched) and asks
+  for a restart. Switch off with `"auto_update_check": false`.
+- GitHub Actions: tests on every push/PR (Linux + Windows, with keystone and capstone), release build on `v*` tags
+  (zip + `.sha256` attached to the GitHub release, notes taken from this file).
+
+### Changed
+- Log output of long byte blocks is shortened to the first 32 bytes plus `... (+N bytes)`.
+- All text files are read/written with explicit UTF-8 (guard test added).
+
+### Fixed
+- File handles left open in `ue_auto.load_dump` and `ue_auto.main_game`; the test suite no longer produces `ResourceWarning`s.
+
 ## 5.9.0 - 2026-10-29
 
 Collects everything since 5.7.0, including the UE-LIVE work that was tracked as "5.8" in

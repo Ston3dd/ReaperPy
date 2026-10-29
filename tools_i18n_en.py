@@ -1722,5 +1722,15 @@ EN.update({
 })
 
 
+# Selbst-Update (self_update.py): Fehlermeldungen, die im Update-Dialog erscheinen
+EN.update({
+    "Adresse nicht erlaubt: ": "Address not allowed: ",
+    "Pruefsumme nicht lesbar": "Checksum not readable",
+    "Release enthaelt kein Windows-Paket": "Release contains no Windows package",
+    "Release enthaelt keine Pruefsumme (.sha256) - nicht automatisch installiert": "Release contains no checksum (.sha256) - not installed automatically",
+    "Weiterleitung auf nicht erlaubten Host: ": "Redirect to a host that is not allowed: ",
+    "Pruefsumme stimmt nicht - Datei verworfen": "Checksum does not match - file discarded",
+})
+
 from tools_i18n_unity import EN_UNITY  # noqa: E402
 EN.update(EN_UNITY)

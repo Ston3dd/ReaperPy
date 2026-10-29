@@ -4,6 +4,7 @@ import os, sys, tempfile, unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import regionfilter as RF
 import scanner as SC
+from pathlib import Path
 
 MB = 1048576
 MAPS = [
@@ -172,7 +173,7 @@ class Persistence(unittest.TestCase):
     def test_missing_or_broken_file_gives_defaults(self):
         self.assertEqual(RF.load_state("/nonexistent/x.json").hide, set(RF.DEFAULT_HIDE))
         with tempfile.TemporaryDirectory() as d:
-            p = os.path.join(d, "f.json"); open(p, "w").close() or open(p, "w").write("{kaputt")
+            p = os.path.join(d, "f.json"); Path(p).write_text("", encoding="utf-8") or Path(p).write_text("{kaputt", encoding="utf-8")
             self.assertEqual(RF.load_state(p).hide, set(RF.DEFAULT_HIDE))
 
 

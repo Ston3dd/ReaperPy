@@ -15,6 +15,7 @@ import ghost_tk; ghost_tk.install()  # noqa: E402,E702
 import test_il2cpp as TI  # noqa: E402
 import test_unity_tab as TU  # noqa: E402
 import tools_i18n as I  # noqa: E402
+from pathlib import Path
 
 GERMAN = re.compile(
     r"[äöüÄÖÜß]|\b(und|oder|nicht|kein|keine|ein|eine|der|die|das|dem|den|für|mit|wird|werden|Spiel|Klasse|Klassen|"
@@ -85,7 +86,7 @@ class UnityI18n(unittest.TestCase):
         I.set_lang("en")
         bad = []
         for fn in ("il2cpp_dump.py", "tools_unity_gui.py"):
-            tree = ast.parse(open(os.path.join(HERE, "..", fn), encoding="utf-8").read())
+            tree = ast.parse(Path(os.path.join(HERE, "..", fn)).read_text(encoding="utf-8"))
             docs = set()
             for n in ast.walk(tree):
                 if isinstance(n, (ast.Module, ast.ClassDef, ast.FunctionDef)) and n.body and isinstance(n.body[0], ast.Expr) \
@@ -117,7 +118,7 @@ class UnityI18n(unittest.TestCase):
     def test_german_texts_use_real_umlauts(self):
         bad = []
         for fn in ("il2cpp_dump.py", "tools_unity_gui.py"):
-            tree = ast.parse(open(os.path.join(HERE, "..", fn), encoding="utf-8").read())
+            tree = ast.parse(Path(os.path.join(HERE, "..", fn)).read_text(encoding="utf-8"))
             docs = set()
             for n in ast.walk(tree):
                 if isinstance(n, (ast.Module, ast.ClassDef, ast.FunctionDef)) and n.body and isinstance(n.body[0], ast.Expr) \

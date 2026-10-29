@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import il2cpp_dump as D
 import test_cheatmenu_cave as TC
 import values_auto as VA
+from pathlib import Path
 
 
 def game(spec):
@@ -110,7 +111,7 @@ class Unreal(TC.Real):
         self.assertIn("keine Schreibzugriffe", failed[0][1])
         files = sorted(os.listdir(self.out))
         self.assertEqual(len(files), 3)
-        xp = json.load(open(os.path.join(self.out, done[2]["file"]), encoding="utf-8"))
+        xp = json.loads(Path(os.path.join(self.out, done[2]["file"])).read_text(encoding="utf-8"))
         self.assertIn("99999", xp["name"])
 
     def test_force_fallback_uses_a_number_never_auto(self):

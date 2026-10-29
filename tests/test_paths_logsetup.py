@@ -10,6 +10,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import logsetup
 import paths
+from pathlib import Path
 
 
 class Paths(unittest.TestCase):
@@ -153,7 +154,7 @@ class Logs(unittest.TestCase):
 
     def test_broken_log_dir_never_raises(self):
         blocker = os.path.join(self.tmp, "datei")
-        open(blocker, "w").close()
+        Path(blocker).write_text("", encoding="utf-8")
         self.assertIsNone(logsetup.init(os.path.join(blocker, "unter"), hook_exceptions=False))
         logsetup.log("geht trotzdem")                                        # kein Absturz
 

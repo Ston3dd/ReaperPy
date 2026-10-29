@@ -15,6 +15,7 @@ import ue_instr as U
 from test_gui_smoke import FakeWin
 
 import tkinter.messagebox as mb  # das Fake-Modul
+from pathlib import Path
 
 
 class Proj:
@@ -91,7 +92,7 @@ class T(unittest.TestCase):
         self.pick(self.hp)
         self.t.cave_auto()
         self.assertEqual(self.files(), ["UHealthComponent.Health - Wert kann nicht sinken.reapproj"])
-        p = json.load(open(os.path.join(self.dir, self.files()[0]), encoding="utf-8"))
+        p = json.loads(Path(os.path.join(self.dir, self.files()[0])).read_text(encoding="utf-8"))
         self.assertEqual(p["Variables"][0]["newValue"], "jmp OriginTarget")
         self.assertEqual(self.w.app.reloaded, 1)
         self.assertTrue(any("Cave gespeichert" in m for m in self.logs("ok")))
