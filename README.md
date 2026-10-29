@@ -132,6 +132,7 @@ the registers when it stops, **STEP** / **STEP OVER** / **STEP OUT**, **CONTINUE
 | **START** | Three big steps for beginners with plain-language status: connected? codes found? Leads to the simple tools. |
 | **FIND VALUE** | The cheat searcher. Layout: found addresses on the left, scan controls on the right, your **address list** at the bottom. See [below](#find-value-the-cheat-searcher). |
 | **EDIT CHEATS** | Write a patch: name, author, offset from the image base. *Simple patch / NOP* (original bytes -> new bytes) or *Code cave* (assembly in a separate box, `jmp OriginReturn` goes back). Assembler or hex bytes are accepted; saved as `.reapproj`. |
+| **VALUES** | Health, stamina, gold, experience, ammo ... as ready-made patches, for **Unreal Engine and Unity**, in three steps (game folder -> FIND THE IMPORTANT STUFF -> SAVE PATCHES). See [below](#unreal-engine-games). |
 | **ITEMS** | The easy way for Unreal Engine games: **all items as a ready-made trainer in three steps** (game folder -> FIND ITEMS -> SAVE TRAINER). See [below](#unreal-engine-games). |
 | **UE-LIVE** | Live values of an Unreal Engine game: pick a member, see all live instances, change / freeze them. |
 | **UE DISCOVERER** | Analyses the SDK and tells you what is there to find: item structs, item tables, give-functions, stat enums, cheat managers - with a check whether a cave trainer can be built for each ("✔" / "✗ not possible: reason"). |
@@ -237,6 +238,19 @@ ReaperPy reads the output of [ps4-unreal-dumper](https://github.com/TetzkatLipHo
    no "Item" in the names). Very large lists are spread over several projects (`Items 1`, `Items 2` ...; at most 400 items
    and 64 entries per project) - activate only **one** at a time. The folder is a normal ReaperPy project: choose it,
    activate `00 BASIS` once, then click entries. Saving only reads the game; nothing is changed until you activate BASIS.
+
+**Health, gold, experience, ammo (tab VALUES).** One tab for both engines; same three steps.
+- *Unreal Engine:* the values of the player character come from the SDK (health, stamina, mana, shield, ammo, money,
+  experience) and are checked on the running character. SAVE PATCHES searches the game code for the instructions that write
+  each ticked value and builds a code cave per value: **value cannot drop**; if the game uses a subtract instruction
+  (`sub`/`dec`) that instruction is switched off instead (ammo and gold stop dropping, picking things up still works);
+  otherwise the value is fixed to a number. **Experience** is fixed to the number you enter (default 99999 = level-up).
+- *Unity (IL2CPP):* methods are recognised by name from `dump.cs` (`TakeDamage`, `SpendMoney`, `UseStamina`, `UseAmmo`,
+  `get_ExpToNextLevel` ...). Each row says in plain words what happens (method made empty / always returns yes / returns 1).
+  Enemy-looking classes are marked and not pre-ticked. The patches read the original bytes live and carry `"Verify"`, so a
+  different game version refuses them. Set the image base to the shown IL2CPP module base before activating.
+- Patches apply to **all** objects that use the code (enemies too). Unity name recognition is a heuristic - check the list;
+  XP can only be handled when the game has a "needed XP for next level" method.
 
 **Using a trainer made on another console / checking one.** The item numbers (FNames) inside a trainer come from the game
 session it was built in and can differ on another console; a different game version changes the code addresses. Click

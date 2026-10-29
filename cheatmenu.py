@@ -87,7 +87,8 @@ ENGINE = [
 # Kategorien aus uecheat.py, die als Weg 2 ins Menue kommen: (Kategorie, Anzeigename, Art)
 GAME_CATS = [("Cheat-Schalter", "Schalter", "toggle"), ("Leben", "Leben", "value"), ("Ausdauer", "Ausdauer", "value"),
              ("Mana/Energie", "Mana/Energie", "value"), ("Schild/Rüstung", "Schild/Rüstung", "value"),
-             ("Munition", "Munition", "value"), ("Währung", "Geld", "value")]
+             ("Munition", "Munition", "value"), ("Währung", "Geld", "value"),
+             ("Erfahrung", "Erfahrung/Level", "value")]
 PER_CAT = 3
 
 

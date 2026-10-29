@@ -1662,6 +1662,57 @@ EN.update({
     "Die Image-Basis kann nicht geprüft werden (die Speicherkarte enthält keine Modulnamen).": "The image base cannot be checked (the memory map contains no module names).",
 })
 
+EN.update({
+    # Tab WERTE (tools_values_gui.py, values_auto.py)
+    "★ WERTE": "★ VALUES",
+    "②  WICHTIGES FINDEN": "②  FIND THE IMPORTANT STUFF",
+    "🔎  WICHTIGES FINDEN": "🔎  FIND THE IMPORTANT STUFF",
+    "③  PATCHES SPEICHERN": "③  SAVE PATCHES",
+    "💾  PATCHES SPEICHERN": "💾  SAVE PATCHES",
+    "WERT / METHODE": "VALUE / METHOD",
+    "WIRKUNG": "EFFECT",
+    "Noch nichts angehakt.": "Nothing ticked yet.",
+    "Baue die Patches … (nur Lesen im Spiel, es wird nichts verändert)": "Building the patches … (read-only in the game, nothing is changed)",
+    "Suche im Spiel-Code und baue die Patches … (einige Minuten möglich, nur Lesen)": "Searching the game code and building the patches … (may take a few minutes, read-only)",
+    "Tab UNITY nicht gefunden - ohne ihn kann das Spiel nicht geladen werden": "Tab UNITY not found - the game cannot be loaded without it",
+    "✔  Unreal-Spiel geladen: ": "✔  Unreal game loaded: ",
+    "–  Kein Unreal-Spiel geladen (Ordner mit offsets.json und SDK_HEADERS).": "–  No Unreal game loaded (folder with offsets.json and SDK_HEADERS).",
+    "✔  Unity-Spiel geladen: ": "✔  Unity game loaded: ",
+    "–  Kein Unity-Spiel geladen (Ordner mit dump.cs und script.json).": "–  No Unity game loaded (folder with dump.cs and script.json).",
+    "Erst WICHTIGES FINDEN und etwas anhaken (Schritt ②).": "Click FIND THE IMPORTANT STUFF first and tick something (step ②).",
+    "Unity-Werte: ": "Unity values: ",
+    " gebaut, ": " built, ",
+    "Erst WICHTIGES FINDEN (Spiel laden, verbinden).": "Click FIND THE IMPORTANT STUFF first (load the game, connect).",
+    "UNREAL-SPIEL-ORDNER WÄHLEN …": "CHOOSE UNREAL GAME FOLDER …",
+    "UNITY-ORDNER WÄHLEN …": "CHOOSE UNITY FOLDER …",
+    "Spiel-Typ": "Game type",
+    "Erfahrung festschreiben auf (Unreal)": "Fix experience to (Unreal)",
+    "So benutzt du sie: In ReaperPy diesen Ordner als Projekt wählen und die Image-Basis auf die IL2CPP-Modul-Basis ": "How to use them: in ReaperPy choose this folder as a project and set the image base to the IL2CPP module base ",
+    " stellen, dann die Patches aktivieren.": ", then activate the patches.",
+    "Die Patches prüfen vor dem Schreiben die Original-Bytes: bei einer anderen Spielversion werden sie verweigert statt etwas zu überschreiben. Methoden gelten für alle Objekte dieser Klasse.": "The patches check the original bytes before writing: on a different game version they are refused instead of overwriting something. Methods apply to all objects of this class.",
+    "Der Erfahrungs-Wert muss eine Zahl sein (z. B. 99999).": "The experience value must be a number (e.g. 99999).",
+    "So benutzt du sie: In ReaperPy diesen Ordner als Projekt wählen und die Patches aktivieren. Sie suchen ihre Stelle per Signatur im Code. Achtung: sie gelten für ALLE Objekte, die diesen Code benutzen (auch Gegner).": "How to use them: in ReaperPy choose this folder as a project and activate the patches. They find their spot by signature in the code. Caution: they apply to ALL objects that use this code (enemies too).",
+    "Leben, Gold, Erfahrung, Munition": "Health, gold, experience, ammo",
+    "Wichtige Werte als fertige Patches - für Unreal Engine und Unity, in drei Klicks.": "Important values as ready-made patches - for Unreal Engine and Unity, in three clicks.",
+    "ZU WERTE": "GO TO VALUES",
+    ": Die Methode ist im Spiel schon gepatcht/leer (erst alle Patches ausschalten, dann neu bauen - sonst sind die Original-Bytes unbekannt)": ": The method is already patched/empty in the game (switch all patches off first, then rebuild - otherwise the original bytes are unknown)",
+    "keine Schreibzugriffe auf diesen Wert im Spiel-Code gefunden": "no write accesses to this value found in the game code",
+    " Treffer, aber keine passende Cave baubar": " hits, but no suitable cave can be built",
+    # Anzeigewerte der Liste
+    "Methode leer machen (tut nichts)": "Make the method empty (does nothing)",
+    "liefert immer 'ja'": "always returns 'yes'",
+    "liefert immer 'nein'": "always returns 'no'",
+    "liefert immer ": "always returns ",
+    "Klassenname sieht nach Gegner aus - würde auch Gegner betreffen": "Class name looks like an enemy - would affect enemies too",
+    "wird auf den eingestellten Wert festgeschrieben (Level-Up)": "is fixed to the chosen value (level-up)",
+    "Schalter wird festgeschrieben": "switch is fixed",
+    "Wert sinkt nicht mehr (oder Abziehen wird abgeschaltet)": "value no longer drops (or subtracting is switched off)",
+    "Erfahrung/Level": "Experience/Level",
+    "Mana/Energie": "Mana/Energy",
+    "Schild/Rüstung": "Shield/Armor",
+    "Cooldown": "Cooldown",
+})
+
 
 from tools_i18n_unity import EN_UNITY  # noqa: E402
 EN.update(EN_UNITY)

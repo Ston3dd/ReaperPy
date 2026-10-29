@@ -5,7 +5,7 @@ import os
 import re
 
 HERE = os.path.join(os.path.dirname(__file__), "..")
-FILES = ["tools_common.py", "tools_gui.py", "tools_scan_gui.py", "tools_sections_gui.py", "tools_items_gui.py", "tools_pointer_gui.py", "tools_debug_gui.py", "tools_extra_gui.py", "tools_ue_gui.py", "tools_uelive_gui.py", "tools_discover_gui.py", "tools_cheatmenu_gui.py", "tools_unity_gui.py", "cheatmenu.py", "script_tab.py", "klog_tab.py", "session.py", "tools_start_gui.py", "tools_ctx.py", "ue_profile.py"]
+FILES = ["tools_common.py", "tools_gui.py", "tools_scan_gui.py", "tools_sections_gui.py", "tools_items_gui.py", "tools_values_gui.py", "tools_pointer_gui.py", "tools_debug_gui.py", "tools_extra_gui.py", "tools_ue_gui.py", "tools_uelive_gui.py", "tools_discover_gui.py", "tools_cheatmenu_gui.py", "tools_unity_gui.py", "cheatmenu.py", "script_tab.py", "klog_tab.py", "session.py", "tools_start_gui.py", "tools_ctx.py", "ue_profile.py"]
 ALLCONST = {"tools_start_gui.py", "ue_profile.py"}
 CTX = ("button", "label", "card", "clabel", "pbtn", "_check", "_small", "entry", "textbox", "tree", "tk.Label", "tk.Button", "tk.Checkbutton", "tk.Radiobutton", "tk.LabelFrame",
        "ttk.Label", "ttk.Button", "ttk.Checkbutton", "ttk.LabelFrame", "ttk.Radiobutton", "add", "heading", "configure", "config", "set",
