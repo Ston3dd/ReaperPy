@@ -1580,8 +1580,23 @@ EN.update({
     "💾  TRAINER SPEICHERN": "💾  SAVE TRAINER",
     "ITEM": "ITEM",
     "SPIEL-ORDNER WÄHLEN …": "CHOOSE GAME FOLDER …",
-    "Item-Tabelle": "Item table",
-    "(automatisch gewählt - nur ändern, falls die Liste falsch aussieht)": "(chosen automatically - only change it if the list looks wrong)",
+    "Item-Liste": "Item list",
+    "Auswahl selbst ändern (nur für Fortgeschrittene)": "Change the choice myself (advanced users only)",
+    "auch unpassende zeigen": "also show unsuitable ones",
+    "Der Trainer erreicht das Spiel-Objekt dieser Funktion nicht - sie bewirkt vermutlich nichts (oder stürzt ab). Besser eine andere Funktion wählen, falls es eine gibt.": "The trainer cannot reach the game object this function belongs to - it probably does nothing (or crashes). Pick another function if there is one.",
+    "passt nur mit Einschränkung (": "fits only with limits (",
+    "⚠ Geben-Funktion: ": "⚠ Give function: ",
+    "Objekt nicht erreichbar": "object not reachable",
+    "kein Item-Geben (Name ohne Item/Inventar/Loot)": "not a give-item function (name without Item/Inventory/Loot)",
+    "kein normales Item-Geben": "not a normal give-item function",
+    "gehoert zur Anzeige": "belongs to the display",
+    "Spezial-Items": "special items",
+    "Name + Menge": "name + amount",
+    "Nummer + Menge": "number + amount",
+    "Klasse + Menge": "class + amount",
+    "nur Name": "name only",
+    "nur Nummer": "number only",
+    "Name + Zahl": "name + number",
     "ALLE AN": "ALL ON",
     "Menge je Item": "Amount per item",
     "ORDNER ÖFFNEN": "OPEN FOLDER",
@@ -1603,7 +1618,7 @@ EN.update({
     "✔ Geben-Funktion: ": "✔ Give function: ",
     "✗ Keine Funktion gefunden, die der Trainer bauen kann (": "✗ No function found that the trainer can build (",
     ") - dafür den Weg über UE-ENTDECKER → INVENTAR-EINTRÄGE SUCHEN nutzen": ") - use UE-DISCOVERER → SEARCH INVENTORY ENTRIES instead",
-    "✗ Keine Item-Tabelle automatisch erkannt - oben bei 'Item-Tabelle' eine auswählen (Namen mit Item / Inventory / Loot zuerst)": "✗ No item table detected automatically - pick one at 'Item table' above (names with Item / Inventory / Loot come first)",
+    "✗ Keine Item-Liste automatisch erkannt - oben 'Auswahl selbst ändern' ankreuzen und eine Liste wählen (Namen mit Item / Weapon / Loot stehen oben)": "✗ No item list detected automatically - tick 'Change the choice myself' above and pick a list (names with Item / Weapon / Loot are at the top)",
     "✗ Im Spiel wurden keine Tabellen gefunden - Spielstand geladen (nicht im Hauptmenü)?": "✗ No tables found in the game - is a save loaded (not the main menu)?",
     "Erst Items anhaken (Schritt ②).": "Tick some items first (step ②).",
     "Es gibt keine baubare Geben-Funktion - siehe Meldung bei Schritt ②.": "There is no buildable give function - see the message at step ②.",
@@ -1769,6 +1784,8 @@ for _k, _v in _ADD.items():
 
 from tools_i18n_unity import EN_UNITY  # noqa: E402
 EN.update(EN_UNITY)
+from tools_i18n_unity_items import EN_UNITY_ITEMS  # noqa: E402
+EN.update(EN_UNITY_ITEMS)
 
 
 EN.update({

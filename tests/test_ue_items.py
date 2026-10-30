@@ -106,7 +106,77 @@ class Choosing(unittest.TestCase):
         live = [(0x10, "DT_Enemies"), (0x20, "DT_Items")]
         ranked = IT.choose_table(IT.table_candidates(self.prof), live)
         self.assertEqual(ranked[0][1], (0x20, "DT_Items"))
-        self.assertEqual([n for _a, n in IT.order_tables(live)], ["DT_Items", "DT_Enemies"])
+        self.assertEqual([n for _a, n in IT.order_tables(live)], ["DT_Items"])      # Junk (Gegner ...) fliegt raus
+
+
+# Nachgebautes "verwirrendes" Spiel: viele DataTables, nur eine ist die Item-Liste; viele Funktionen mit "Item" im Namen.
+GAME_C = "".join([
+    TP.cls("FItemParam", "FTableRowBase", [("FName", "ItemId", 0x08, 8), ("int32", "Price", 0x10, 4),
+                                           ("int32", "MaxStack", 0x14, 4)], kind="struct"),
+    TP.cls("FFxParam", "FTableRowBase", [("FName", "FxId", 0x08, 8), ("float", "Scale", 0x10, 4)], kind="struct"),
+    TP.cls("FZombieAIParam", "FTableRowBase", [("FName", "ZombieId", 0x08, 8), ("float", "Speed", 0x10, 4)], kind="struct"),
+    TP.cls("APlayerController", "AController", [("class UItemBagComponent*", "ItemBag", 0x300, 8)]),
+    TP.cls("UItemBagComponent", "UActorComponent", [], ["void AddItem(class FName ItemName, int32 Count);"]),
+    TP.cls("UMyInventorySubsystem", "UGameInstanceSubsystem", [],
+           ["void AddImportantItem(class FName ItemName, int32 Count);", "void AddItemInventory(class FName ItemName, int32 Count);"]),
+    TP.cls("UMyCheatManager", "UCheatManager", [],
+           ["void AddSelectItem(class FName ItemName, int32 Count);", "void AddPresetItem(class FName ItemName, int32 Count);"]),
+    TP.cls("AItemModelViewActor", "AActor", [], ["void SpawnItem(class FName ItemName, int32 Count);"]),
+])
+GAME_C_TABLES = ["DT_FxParam_Player", "DT_ItemParam", "DT_UIMapParam", "DT_ZombieAIParam", "DT_TextIconTag",
+                 "DT_UISoundParam", "DT_TriggerEffectParam", "DT_WorkbenchBuildParam"]
+
+
+class ConfusingGame(unittest.TestCase):
+    """Spiel mit vielen Tabellen/Funktionen: nur die passenden werden gezeigt, die beste automatisch gewaehlt."""
+    @classmethod
+    def setUpClass(cls):
+        objs = [(i + 1, 0x7000_1000 + 0x1000 * i, "DataTable", f"DataTable /Game/Data/{n}.{n}")
+                for i, n in enumerate(GAME_C_TABLES)]
+        cls.sdk = TP.sdk_from(GAME_C, objs)
+        cls.prof = P.build(cls.sdk)
+        cls.live = [(0x7000_1000 + 0x1000 * i, n) for i, n in enumerate(GAME_C_TABLES)]
+
+    def test_name_relevance(self):
+        good = ["DT_ItemParam", "DT_Items", "DT_WeaponParam", "DT_ConsumableData", "DT_LootTable", "DT_ITEMPARAM"]
+        bad = ["DT_FxParam_Player", "DT_UIMapParam", "DT_ZombieAIParam", "DT_TextIconTag", "DT_UISoundParam",
+               "DT_TriggerEffectParam", "DT_WorkbenchBuildParam", "DT_Enemies", "DT_ItemTextParam"]
+        for n in good:
+            self.assertGreaterEqual(IT.table_relevance(n), IT.REL_MIN, n)
+        for n in bad:
+            self.assertLess(IT.table_relevance(n), IT.REL_MIN, n)
+        self.assertGreater(IT.table_relevance("DT_ItemParam"), IT.table_relevance("DT_ItemShopParam"))
+
+    def test_only_the_item_table_is_relevant_and_chosen(self):
+        rated = IT.rate_tables(IT.table_candidates(self.prof), self.live)
+        self.assertEqual(len(rated), len(GAME_C_TABLES))                        # alle bewertet, nichts verloren
+        self.assertEqual([r["name"] for r in rated if r["relevant"]], ["DT_ItemParam"])
+        self.assertEqual(rated[0]["name"], "DT_ItemParam")
+        self.assertEqual(IT.choose_table(IT.table_candidates(self.prof), self.live)[0][1][1], "DT_ItemParam")
+        self.assertEqual([n for _a, n in IT.order_tables(self.live)][0], "DT_ItemParam")
+
+    def test_reachable_function_wins_and_odd_ones_are_not_relevant(self):
+        rated = IT.rate_functions(self.prof, self.sdk)
+        by = {f"{r['sug'].data['owner']}.{r['sug'].data['name']}": r for r in rated}
+        self.assertEqual(rated[0]["sug"].title, "UItemBagComponent.AddItem")          # Objekt ueber den PlayerController erreichbar
+        self.assertEqual(rated[0]["reach"], "member")
+        self.assertTrue(rated[0]["relevant"])
+        self.assertEqual([r["sug"].title for r in rated if r["relevant"]], ["UItemBagComponent.AddItem"])
+        sub = by["UMyInventorySubsystem.AddImportantItem"]
+        self.assertEqual(sub["reach"], "zero")
+        self.assertFalse(sub["relevant"])
+        self.assertIn("Spezial-Items", sub["reasons"])
+        self.assertIn("Objekt nicht erreichbar", sub["reasons"])
+        self.assertIn("gehoert zur Anzeige", by["AItemModelViewActor.SpawnItem"]["reasons"])
+        self.assertIn("kein normales Item-Geben", by["UMyCheatManager.AddSelectItem"]["reasons"])
+        self.assertIn("kein normales Item-Geben", by["UMyCheatManager.AddPresetItem"]["reasons"])
+        self.assertEqual(IT.function_label(rated[0]), "UItemBagComponent.AddItem  [Name + Menge]")
+
+    def test_without_reachable_function_best_guess_is_still_offered_but_not_relevant(self):
+        sdk = TP.sdk_from(TP.GAME_A)                                                  # GAME_A: nichts ueber den PlayerController
+        rated = IT.rate_functions(P.build(sdk), sdk)
+        self.assertTrue(rated)
+        self.assertFalse(any(r["relevant"] for r in rated))
 
 
 class FakeLiveFn:

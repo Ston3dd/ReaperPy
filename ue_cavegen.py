@@ -70,9 +70,10 @@ def classify_params(params, sdk=None):
                                  "Zeiger werden unterstuetzt")
         kind, size, signed = k
         role = "other"
-        if kind == "fname" or (kind == "int" and P.ID_NAME.search(n) and not P.COUNT_NAME.search(n)):
+        simple = str(n).split(".")[0]                           # SDK schreibt oft 'Item.param' statt 'Item'
+        if kind == "fname" or (kind == "int" and P.ID_NAME.search(simple) and not P.COUNT_NAME.search(simple)):
             role = "id"
-        elif kind in ("int", "float", "double") and P.COUNT_NAME.search(n) and not P.COUNT_BAD.search(n):
+        elif kind in ("int", "float", "double") and P.COUNT_NAME.search(simple) and not P.COUNT_BAD.search(simple):
             role = "count"
         out.append({"name": n, "type": raw, "kind": kind, "size": size, "signed": signed, "role": role,
                     "ref": "const" in raw and "&" in raw})
@@ -93,16 +94,68 @@ def check_return(ret):
         raise T.TrainerError(f"Rueckgabetyp '{r}' (Struct/String?) wird nicht unterstuetzt - der Aufruf waere falsch")
 
 
+WALK_PTR = re.compile(
+    r"(?i)cheatmanager|acknowledgedpawn|^pawn$|character$|playerstate|inventory|backpack|^bag$|itemcomp|"
+    r"itemmanager|equipment|storage"
+)
+MAX_THIS_DEPTH = 4
+
+
+def _ptr_class(m):
+    """SDK-Member -> Klassenname, wenn es ein Objekt-Zeiger ist, sonst None."""
+    raw = str(m.type)
+    if "*" not in raw and "TObjectPtr" not in raw:
+        return None
+    t = P.clean_type(raw)
+    return t.split()[-1] if t else None
+
+
+def _is_owner(sdk, got, owner):
+    """Passt der Zeiger-Typ zur Geben-Klasse (auch Unter-/Oberklasse: UCheatManager* -> PalCheatManager)."""
+    return got == owner or P.derives_from(sdk, owner, got) or P.derives_from(sdk, got, owner)
+
+
+def _this_path(sdk, start, owner, depth=0, path=(), seen=None):
+    """Kette von Zeiger-Offsets start -> owner.  Nur uebliche Player-Felder, kein Blindflug durch alle UObject*."""
+    if P.derives_from(sdk, start, owner) or start == owner:
+        return list(path)
+    if depth >= MAX_THIS_DEPTH or start in (seen or ()):
+        return None
+    seen = (seen or set()) | {start}
+    members = list(sdk.all_members(start)) if start in sdk.classes else []
+    ranked = []
+    for m in members:
+        tgt = _ptr_class(m)
+        if not tgt:
+            continue
+        if _is_owner(sdk, tgt, owner):
+            ranked.append((0, m.offset, tgt, m.name))
+        elif WALK_PTR.search(m.name) or WALK_PTR.search(tgt):
+            ranked.append((1, m.offset, tgt, m.name))
+    ranked.sort()
+    for _pri, off, tgt, name in ranked:
+        step = path + ((off, f"{start}.{name}"),)
+        if _pri == 0:
+            return list(step)
+        found = _this_path(sdk, tgt, owner, depth + 1, step, seen)
+        if found is not None:
+            return found
+    return None
+
+
 def choose_this(sdk, owner, hooked="APlayerController", static=False):
-    """Woher kommt `this`?  -> (modus, offset, hinweis)."""
+    """Woher kommt `this`?  -> (modus, offset_oder_kette, hinweis).
+    offset_oder_kette: 0 (hooked/zero), eine Zahl (ein Zeiger) oder ein Tupel von Offsets (Pawn -> Inventar)."""
     if static:
         return "zero", 0, "statische Funktion: this wird nicht gebraucht"
-    if P.derives_from(sdk, hooked, owner):
+    if P.derives_from(sdk, hooked, owner) or hooked == owner:
         return "hooked", 0, f"{owner} ist Elternklasse von {hooked}: this = das gehookte Objekt"
-    for m in sdk.all_members(hooked) if hooked in sdk.classes else []:
-        t = P.clean_type(m.type)
-        if "*" in str(m.type) and t and (t.split()[-1] == owner or P.derives_from(sdk, t.split()[-1], owner)):
-            return "member", m.offset, f"this = {hooked}.{m.name} (Zeiger @+{m.offset:#x}); ist er 0, wird der Aufruf uebersprungen"
+    found = _this_path(sdk, hooked, owner)
+    if found:
+        offs = tuple(p[0] for p in found)
+        note = "this = " + " -> ".join(f"{n} @+{o:#x}" for o, n in found)
+        note += "; ist ein Zeiger 0, wird der Aufruf uebersprungen"
+        return "member", (offs[0] if len(offs) == 1 else offs), note
     return "zero", 0, (f"Keine Instanz von {owner} ueber {hooked} erreichbar - this = 0.  Funktioniert nur, wenn die Funktion "
                        "this nicht benutzt; sonst Absturz moeglich!")
 
@@ -111,13 +164,18 @@ def choose_this(sdk, owner, hooked="APlayerController", static=False):
 # Aufruf-Beschreibung + Maschinencode
 # --------------------------------------------------------------------------------------------------
 class CallSpec:
-    """impl_rva = native Implementierung (RVA); this_mode zero|hooked|member (+this_off); args = Liste von Dicts
+    """impl_rva = native Implementierung (RVA); this_mode zero|hooked|member (+this_off / this_path); args = Liste von Dicts
     {name, kind, size, signed, value, mode} mit mode 'val' | 'ref'; value: int/float oder 8 Byte (FName)."""
 
-    def __init__(self, impl_rva, args, this_mode="zero", this_off=0, function=""):
+    def __init__(self, impl_rva, args, this_mode="zero", this_off=0, function="", this_path=None):
         if this_mode not in THIS_MODES:
             raise T.TrainerError(f"this-Modus '{this_mode}' unbekannt")
-        self.impl_rva, self.this_mode, self.this_off, self.function = int(impl_rva), this_mode, int(this_off), function
+        path = [int(x) for x in this_path] if this_path else []
+        off = int(this_off or 0)
+        if this_mode == "member" and not path:
+            path = [off]
+        self.impl_rva, self.this_mode, self.this_off = int(impl_rva), this_mode, (path[0] if path else off)
+        self.this_path, self.function = path, function
         self.args = [dict(a) for a in args]
         for a in self.args:
             a.setdefault("mode", "val")
@@ -128,13 +186,18 @@ class CallSpec:
                 raise T.TrainerError(f"FName-Parameter '{a['name']}' braucht 8 Byte")
 
     def to_json(self):
-        return {"function": self.function, "impl_rva": hex(self.impl_rva), "this": self.this_mode, "this_off": hex(self.this_off),
-                "args": [dict(a, value=a["value"].hex() if isinstance(a["value"], (bytes, bytearray)) else a["value"])
-                         for a in self.args]}
+        d = {"function": self.function, "impl_rva": hex(self.impl_rva), "this": self.this_mode, "this_off": hex(self.this_off),
+             "args": [dict(a, value=a["value"].hex() if isinstance(a["value"], (bytes, bytearray)) else a["value"])
+                      for a in self.args]}
+        if len(self.this_path) > 1:
+            d["this_path"] = [hex(x) for x in self.this_path]
+        return d
 
     @classmethod
     def from_json(cls, d):
-        return cls(int(d["impl_rva"], 16), d["args"], d.get("this", "zero"), int(d.get("this_off", "0"), 16), d.get("function", ""))
+        path = [int(x, 16) if isinstance(x, str) else int(x) for x in d["this_path"]] if d.get("this_path") else None
+        return cls(int(d["impl_rva"], 16), d["args"], d.get("this", "zero"), int(d.get("this_off", "0"), 16),
+                   d.get("function", ""), path)
 
 
 def _raw_value(a):
@@ -160,10 +223,12 @@ def emit_call(e, spec, base):
         e.raw("31FF")                                           # xor edi,edi
     else:
         e.raw("488B7C2410")                                     # mov rdi,[rsp+0x10]   (gehooktes Objekt)
-        if spec.this_mode == "member":
-            e.raw("488BBF" + struct.pack("<i", spec.this_off).hex())    # mov rdi,[rdi+off]
+        hops = spec.this_path if spec.this_mode == "member" else []
+        for off in hops:
+            e.raw("488BBF" + struct.pack("<i", int(off)).hex())  # mov rdi,[rdi+off]
             e.raw("4885FF")                                     # test rdi,rdi
-            skip = e.uniq("skip")
+            if skip is None:
+                skip = e.uniq("skip")
             e.raw("0F84")                                       # jz skip
             e.rel32(skip)
     ireg = freg = 0
@@ -217,22 +282,47 @@ class CallRow(T.Row):
         return cls(d["alias"], CallSpec.from_json(d["call"]), bytes.fromhex(f) if f else None, d.get("amount", 1))
 
 
+def extra_value(extra, name):
+    """Wert aus extra fuer den SDK-Parameter `name`.  Akzeptiert 'Item', 'Item.param', Gross/Klein - oder None."""
+    if not extra:
+        return None
+    if name in extra:
+        return extra[name]
+    want = {name.lower(), name.lower().split(".")[0]}
+    for k, v in extra.items():
+        kn = str(k).lower().replace(" ", "")
+        if kn in want or kn.split(".")[0] in want:
+            return v
+    return None
+
+
+def _this_spec(this):
+    """(modus, offset_oder_kette) -> (modus, this_off, this_path)."""
+    mode, off = this[0], this[1]
+    if isinstance(off, (list, tuple)):
+        path = [int(x) for x in off]
+        return mode, (path[0] if path else 0), path
+    return mode, int(off or 0), None
+
+
 def build_row(alias, impl_rva, params, ret, sdk, this, id_value=None, count_value=1, extra=None, byref=(), function=""):
     """Eine Zeile aus den SDK-Parametern der Funktion.
       id_value   FName-Bytes (8) oder ID-Zahl fuer den Parameter der Rolle 'id'
       count_value Menge fuer die Rolle 'count'
-      extra      {Parametername: Wert} fuer alle uebrigen (Standard 0)
+      extra      {Parametername: Wert} fuer alle uebrigen (Standard 0); 'Item.param' zaehlt als 'Item'
       byref      Namen der Parameter, die per Zeiger uebergeben werden (const T&)
-      this       (modus, offset)"""
+      this       (modus, offset) oder (modus, (off1, off2, ...))"""
     check_return(ret)
     cls = classify_params(params, sdk)
     extra = dict(extra or {})
     args, fname, amount = [], None, count_value
     used_id = used_cnt = False
+    byref_set = {str(x).lower() for x in byref} | {str(x).split(".")[0].lower() for x in byref}
     for a in cls:
         n, k = a["name"], a["kind"]
-        if n in extra:
-            val = extra[n]
+        got = extra_value(extra, n)
+        if got is not None:
+            val = got
         elif a["role"] == "id" and not used_id and id_value is not None:
             val, used_id = id_value, True
         elif a["role"] == "count" and not used_cnt:
@@ -246,9 +336,10 @@ def build_row(alias, impl_rva, params, ret, sdk, this, id_value=None, count_valu
                 raise T.TrainerError(f"Fuer den FName-Parameter '{n}' fehlt der 8-Byte-FName (Tabellenzeile waehlen)")
             if any(val) and fname is None:
                 fname = bytes(val)
-        mode = "ref" if n in byref else "val"
+        mode = "ref" if n.lower() in byref_set or n.split(".")[0].lower() in byref_set else "val"
         args.append({"name": n, "kind": k, "size": a["size"], "signed": a["signed"], "value": val, "mode": mode})
-    spec = CallSpec(impl_rva, args, this[0], this[1], function)
+    mode, off, path = _this_spec(this)
+    spec = CallSpec(impl_rva, args, mode, off, function, path)
     for a in spec.args:                 # Wert-Pruefung jetzt, nicht erst beim Bauen
         _raw_value(a)
     return CallRow(alias, spec, fname, int(amount) if isinstance(amount, (int, float)) and amount >= 1 else 1)

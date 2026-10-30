@@ -67,6 +67,21 @@ class T(unittest.TestCase):
         self.assertIn("3 von 3", self.t.lbl_count._text)
         self.assertIn("3 Items in 1 Eintr", self.t.lbl_plan._text)
 
+    def test_choice_lists_are_short_and_unreachable_function_is_warned_about(self):
+        self.t.find_items()
+        self.assertEqual([n for n, _r in self.t._table_choices()], ["DT_Items"])
+        labels = [n for n, _r in self.t._func_choices()]
+        self.assertTrue(labels and all("." in n for n in labels))
+        self.assertFalse(self.t.func_rating["relevant"])                      # Testspiel: kein Objekt ueber den PlayerController
+        self.assertIn("⚠", self.t.lbl_found._text)
+        self.assertIn("erreicht", self.t.lbl_found._text)
+        self.t.v_expert.set(True); self.t._toggle_expert()                    # Auswahl-Zeile ein ...
+        self.t.v_expert.set(False); self.t._toggle_expert()                   # ... und wieder aus: kein Fehler
+        self.t.v_all.set(True); self.t._fill_choices()
+        self.assertEqual(self.t.v_table.get(), "DT_Items")
+        self.t.v_func.set(labels[-1]); self.t.pick_func()
+        self.assertIs(self.t.func, next(r["sug"] for n, r in self.t._func_choices() if n == labels[-1]))
+
     def test_checks_search_and_category_buttons(self):
         self.t.find_items()
         self.t.set_visible(False)

@@ -967,7 +967,7 @@ class ToolsWindow(tk.Toplevel):
     GROUPS = {
         "★ UNREAL": (("★ ITEMS", "ITEMS"), ("★ WERTE", "WERTE"), ("★ UE-LIVE", "LIVE"), ("★ CHEAT-MENÜ", "CHEAT-MENÜ"),
                      ("★ UE-ENTDECKER", "ENTDECKER"), ("UE-AUTO", "EXPERTE")),
-        "★ UNITY": (("★ WERTE UNITY", "SCHNELL"), ("★ UNITY MANUELL", "MANUELL")),
+        "★ UNITY": (("★ UNITY ITEMS", "ITEMS"), ("★ WERTE UNITY", "SCHNELL"), ("★ UNITY MANUELL", "MANUELL")),
     }
     GROUPED = {inner for subs in GROUPS.values() for inner, _t in subs}
 
@@ -1053,6 +1053,7 @@ class ToolsWindow(tk.Toplevel):
         self.items_tab = None
         self.values_tab = None
         self.values_tab_unity = None
+        self.unity_items_tab = None
         self.unity_tab = None
         # jeder Zusatz-Tab einzeln: ein defekter Tab darf die anderen nicht mitreissen
         extra = (("tools_extra_gui", "CallerTab", "FUNKTION AUFRUFEN"),
@@ -1061,6 +1062,7 @@ class ToolsWindow(tk.Toplevel):
                  ("tools_uelive_gui", "UeLiveTab", "★ UE-LIVE"),
                  ("tools_items_gui", "ItemsTab", "★ ITEMS"),
                  ("tools_values_gui", "ValuesTab", "★ WERTE", {"engine": "ue"}),
+                 ("tools_unity_items_gui", "UnityItemsTab", "★ UNITY ITEMS"),
                  ("tools_values_gui", "ValuesTab", "★ WERTE UNITY", {"engine": "unity"}),
                  ("tools_discover_gui", "DiscoverTab", "★ UE-ENTDECKER"),
                  ("tools_cheatmenu_gui", "CheatMenuTab", "★ CHEAT-MENÜ"),
@@ -1085,6 +1087,8 @@ class ToolsWindow(tk.Toplevel):
                     self.values_tab_unity = t
                 if clsname == "UnityTab":
                     self.unity_tab = t
+                if clsname == "UnityItemsTab":
+                    self.unity_items_tab = t
             except Exception as e:
                 msg = f"Tab {name} nicht geladen: {e}"
                 self.after(200, lambda msg=msg: self.log(msg, "err"))

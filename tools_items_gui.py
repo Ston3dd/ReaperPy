@@ -23,7 +23,7 @@ import ue_profile as P
 import ue_quick as Q
 from tools_common import (BG, BG_CARD, ACCENT, ERROR, FONT_HEAD, FONT_LABEL, TEXT, TEXT_DIM, WARN, BaseTab, entry,
                           tree, with_scroll)
-from tools_scan_gui import card, clabel, pbtn
+from tools_scan_gui import _check, card, clabel, pbtn
 
 MAX_SHOWN = 5000
 ALL_CATS = "alle Kategorien"
@@ -38,6 +38,9 @@ class ItemsTab(BaseTab):
         self.funcs = []                   # baubare Geben-Funktionen
         self.func_bad = []                # [(Suggestion, Grund)]
         self.live_tables = []             # [(addr, name)] aus dem laufenden Spiel
+        self.rated_tables = []            # alle Tabellen bewertet (ue_items.rate_tables), beste zuerst
+        self.rated_funcs = []             # alle baubaren Geben-Funktionen bewertet (ue_items.rate_functions)
+        self.func_rating = None           # Bewertung der gewaehlten Funktion
         self.cands = []                   # Tabellen-Vorschlaege aus dem SDK
         self.table = None                 # (addr, name) der gelesenen Tabelle
         self.items, self.on, self.view = [], [], []
@@ -50,6 +53,8 @@ class ItemsTab(BaseTab):
         self.v_amount = tk.StringVar(value="999")
         self.v_table = tk.StringVar()
         self.v_func = tk.StringVar()
+        self.v_expert = tk.BooleanVar(value=False)        # Auswahl-Zeile (Tabelle/Funktion) einblenden
+        self.v_all = tk.BooleanVar(value=False)           # auch unpassende Tabellen/Funktionen zeigen
 
         tk.Label(self, text="▸  ITEMS  →  TRAINER", bg=BG, fg=ACCENT, font=FONT_HEAD).pack(anchor="w", padx=14,
                                                                                          pady=(10, 0))
@@ -88,17 +93,25 @@ class ItemsTab(BaseTab):
         self.lbl_found.pack(side="left", padx=12, fill="x", expand=True)
         self.b_base = pbtn(top, "BASIS ÜBERNEHMEN", self.adopt_base)          # nur sichtbar, wenn die Basis nicht stimmt
 
-        sel = tk.Frame(body, bg=BG_CARD)
-        sel.pack(fill="x", pady=(6, 0))
-        clabel(sel, "Item-Tabelle").pack(side="left")
-        self.cb_table = ttk.Combobox(sel, textvariable=self.v_table, values=[], width=34, state="readonly")
+        opt = tk.Frame(body, bg=BG_CARD)
+        opt.pack(fill="x", pady=(4, 0))
+        self.chk_expert = _check(opt, "Auswahl selbst ändern (nur für Fortgeschrittene)", self.v_expert)
+        self.chk_expert.configure(command=self._toggle_expert)
+        self.chk_expert.pack(side="left")
+        self.sel = tk.Frame(body, bg=BG_CARD)
+        sel = self.sel
+        clabel(sel, "Item-Liste").pack(side="left")
+        self.cb_table = ttk.Combobox(sel, textvariable=self.v_table, values=[], width=30, state="readonly")
         self.cb_table.pack(side="left", padx=(6, 12))
         self.cb_table.bind("<<ComboboxSelected>>", lambda _e: self.pick_table())
         clabel(sel, "Geben-Funktion").pack(side="left")
-        self.cb_func = ttk.Combobox(sel, textvariable=self.v_func, values=[], width=34, state="readonly")
+        self.cb_func = ttk.Combobox(sel, textvariable=self.v_func, values=[], width=52, state="readonly")
         self.cb_func.pack(side="left", padx=6)
         self.cb_func.bind("<<ComboboxSelected>>", lambda _e: self.pick_func())
-        clabel(sel, "(automatisch gewählt - nur ändern, falls die Liste falsch aussieht)").pack(side="left", padx=8)
+        self.chk_all = _check(sel, "auch unpassende zeigen", self.v_all)
+        self.chk_all.configure(command=self._fill_choices)
+        self.chk_all.pack(side="left", padx=8)
+        self.opt_row = opt                                                  # die Auswahl-Zeile 'sel' erscheint darunter
 
         flt = tk.Frame(body, bg=BG_CARD)
         flt.pack(fill="x", pady=(8, 4))
@@ -228,13 +241,15 @@ class ItemsTab(BaseTab):
                 live.build_index()
             tables = P.find_table_objects(live)
             cands = IT.table_candidates(prof)
-            ranked = IT.choose_table(cands, tables)
+            rated_t = IT.rate_tables(cands, tables)                        # ALLE Tabellen des Spiels bewerten
+            ranked = IT.choose_table(cands, tables)                        # nur die, die nach Items aussehen
             table = rows = cols = None
             for s, pick in ranked[:6]:                                   # erste Tabelle, die wirklich Zeilen liefert
                 r, c = P.read_table(live.rd, live.fname_str, pick[0], s.data.get("columns", []))
                 if r:
                     table, rows, cols = pick, r, c
                     break
+            rated_f = IT.rate_functions(prof, sdk)                         # nur Funktionen, die der Trainer bauen kann
             funcs, bad = IT.give_candidates(prof, sdk)
             try:                                                      # stimmt die Image-Basis mit der Konsole ueberein?
                 bc = IB.check_image_base(client.get_maps_named(), self.base)
@@ -246,7 +261,8 @@ class ItemsTab(BaseTab):
                 self._ilog(f"Platz fuer die Cave nicht ermittelt: {e}")
                 cap = None
             return {"prof": prof, "sig": sig, "fresh": fresh, "live": live, "tables": tables, "cands": cands,
-                    "table": table, "rows": rows or [], "cols": cols or [], "funcs": funcs, "bad": bad, "cap": cap, "basecheck": bc}
+                    "table": table, "rows": rows or [], "cols": cols or [], "funcs": funcs, "bad": bad, "cap": cap, "basecheck": bc,
+                    "rated_t": rated_t, "rated_f": rated_f}
 
         def ok(res):
             self._busy = False
@@ -257,14 +273,16 @@ class ItemsTab(BaseTab):
                 ue.live = res["live"]
             self.prof, self.live_tables, self.cands = res["prof"], res["tables"], res["cands"]
             self.funcs, self.func_bad = res["funcs"], res["bad"]
+            self.rated_tables, self.rated_funcs = res["rated_t"], res["rated_f"]
             self.cap = res.get("cap")
             self._set_basecheck(res.get("basecheck"))
-            self.func = self.funcs[0] if self.funcs else None
+            self.func_rating = self.rated_funcs[0] if self.rated_funcs else None      # beste Funktion (erreichbare zuerst)
+            good = [r for r in self.rated_funcs if r["relevant"]]
+            if good:
+                self.func_rating = good[0]
+            self.func = self.func_rating["sug"] if self.func_rating else (self.funcs[0] if self.funcs else None)
             self.table = res["table"]
-            self.cb_table.configure(values=[n for _a, n in IT.order_tables(self.live_tables)])
-            self.cb_func.configure(values=[self._func_title(s) for s in self.funcs])
-            self.v_func.set(self._func_title(self.func) if self.func else "")
-            self.v_table.set(self.table[1] if self.table else "")
+            self._fill_choices()
             self.set_items(res["rows"], res["cols"])
             self._report()
 
@@ -294,6 +312,42 @@ class ItemsTab(BaseTab):
         self.lbl_done.configure(text=f"Image-Basis auf {bc.live_base:#x} gestellt (laut Speicherkarte). "
                                      "Jetzt ITEMS FINDEN erneut klicken.", fg=ACCENT)
 
+    def _toggle_expert(self):
+        """Tabelle/Funktion nur auf Wunsch zeigen: fuer Anfaenger genuegt die Statuszeile."""
+        if self.v_expert.get():
+            self.sel.pack(fill="x", pady=(4, 0), after=self.opt_row)
+        else:
+            self.sel.pack_forget()
+
+    def _table_choices(self):
+        """[(Anzeigename, Bewertung)] - standardmaessig nur Tabellen, die nach Items aussehen."""
+        rated = self.rated_tables
+        shown = rated if self.v_all.get() else [r for r in rated if r["relevant"]]
+        if not shown:
+            shown = rated                           # nichts Passendes erkannt -> lieber alles zeigen als eine leere Liste
+        return [(r["name"], r) for r in shown]
+
+    def _func_choices(self):
+        rated = self.rated_funcs
+        shown = rated if self.v_all.get() else [r for r in rated if r["relevant"]]
+        if not shown:
+            shown = rated
+        out = []
+        for r in shown:
+            label = IT.function_label(r)
+            if not r["relevant"] and r["reasons"]:
+                label += "   ⚠ " + ", ".join(r["reasons"])
+            out.append((label, r))
+        return out
+
+    def _fill_choices(self):
+        tabs, funcs = self._table_choices(), self._func_choices()
+        self.cb_table.configure(values=[n for n, _r in tabs])
+        self.cb_func.configure(values=[n for n, _r in funcs])
+        self.v_table.set(self.table[1] if self.table else "")
+        cur = next((n for n, r in funcs if self.func_rating is not None and r["sug"] is self.func_rating["sug"]), "")
+        self.v_func.set(cur)
+
     @staticmethod
     def _func_title(s):
         return f"{s.data.get('owner', '')}.{s.data.get('name', s.title)}" if s is not None else ""
@@ -303,21 +357,32 @@ class ItemsTab(BaseTab):
         if self.table and self.items:
             parts.append(f"✔ {len(self.items)} Items aus der Tabelle {self.table[1]}")
         elif self.live_tables:
-            parts.append("✗ Keine Item-Tabelle automatisch erkannt - oben bei 'Item-Tabelle' eine auswählen "
-                         "(Namen mit Item / Inventory / Loot zuerst)")
+            parts.append("✗ Keine Item-Liste automatisch erkannt - oben 'Auswahl selbst ändern' ankreuzen und eine Liste "
+                         "wählen (Namen mit Item / Weapon / Loot stehen oben)")
         else:
             parts.append("✗ Im Spiel wurden keine Tabellen gefunden - Spielstand geladen (nicht im Hauptmenü)?")
-        if self.func:
+        weak = self.func_rating is not None and not self.func_rating["relevant"]
+        if self.func and not weak:
             parts.append(f"✔ Geben-Funktion: {self._func_title(self.func)}")
+        elif self.func:
+            parts.append(f"⚠ Geben-Funktion: {self._func_title(self.func)} - {self._weak_reason()}")
         else:
             why = self.func_bad[0][1] if self.func_bad else "keine Funktion zum Geben von Items im SDK"
             parts.append("✗ Keine Funktion gefunden, die der Trainer bauen kann (" + why + ") - dafür den Weg über "
                          "UE-ENTDECKER → INVENTAR-EINTRÄGE SUCHEN nutzen")
         if self.basecheck is not None and self.basecheck.status == "shifted":
             parts.insert(0, "✗ " + self.basecheck.message + " → BASIS ÜBERNEHMEN klicken")
-        good = bool(self.items and self.func) and not (self.basecheck and self.basecheck.status == "shifted")
+        good = bool(self.items and self.func) and not weak and not (self.basecheck and self.basecheck.status == "shifted")
         self._found("   |   ".join(parts), ACCENT if good else WARN)
         self.update_summary()
+
+    def _weak_reason(self):
+        """Warum die gewaehlte Funktion nur eine Notloesung ist (leicht verstaendlich)."""
+        r = self.func_rating or {}
+        if r.get("reach") == "zero":
+            return ("Der Trainer erreicht das Spiel-Objekt dieser Funktion nicht - sie bewirkt vermutlich nichts "
+                    "(oder stürzt ab). Besser eine andere Funktion wählen, falls es eine gibt.")
+        return "passt nur mit Einschränkung (" + ", ".join(r.get("reasons", [])) + ")"
 
     def pick_table(self):
         name = self.v_table.get()
@@ -327,10 +392,14 @@ class ItemsTab(BaseTab):
         if pick is None or live is None or self._busy:
             return
         cols = []
-        for s in self.cands:
-            if P.best_table_for(s, [pick]) == pick:
-                cols = s.data.get("columns", [])
-                break
+        rt = next((r for r in self.rated_tables if (r["addr"], r["name"]) == pick), None)
+        if rt is not None and rt["sug"] is not None:
+            cols = rt["sug"].data.get("columns", [])
+        else:
+            for s in self.cands:
+                if P.best_table_for(s, [pick]) == pick:
+                    cols = s.data.get("columns", [])
+                    break
         self._busy = True
 
         def job():
@@ -349,7 +418,9 @@ class ItemsTab(BaseTab):
 
     def pick_func(self):
         name = self.v_func.get()
-        self.func = next((s for s in self.funcs if self._func_title(s) == name), self.func)
+        r = next((r for n, r in self._func_choices() if n == name), None)
+        if r is not None:
+            self.func_rating, self.func = r, r["sug"]
         self._report()
 
     # --- Liste ----------------------------------------------------------------------------------
@@ -602,8 +673,11 @@ class ItemsTab(BaseTab):
 
     def _ask_preview(self, text):
         """Dry-Run: zeigt, wo Cave und Schalter landen wuerden, bevor Dateien geschrieben werden."""
+        warn = ""
+        if self.func_rating is not None and not self.func_rating["relevant"]:
+            warn = "\n\n⚠ " + self._weak_reason()
         return messagebox.askyesno("Trainer speichern?", "So würde der Trainer aussehen (bisher wurde nichts geschrieben):\n\n"
-                                   + text + "\n\nJetzt speichern?", parent=self.win)
+                                   + text + warn + "\n\nJetzt speichern?", parent=self.win)
 
     def _ask_adapt(self, text):
         return messagebox.askyesno("Trainer anpassen", text, parent=self.win)

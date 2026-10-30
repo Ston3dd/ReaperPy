@@ -147,7 +147,7 @@ def _id_kind(mtype):
     return ""
 
 
-ID_NAME = re.compile(r"(?i)^(id|uid|guid|key|alias|rowname|name|tag|index)$|item.?(id|key|alias|name|index|row|tag|def|type|data)"
+ID_NAME = re.compile(r"(?i)^(id|uid|guid|key|alias|rowname|name|tag|index|item)$|item.?(id|key|alias|name|index|row|tag|def|type|data)"
                      r"|(id|key|alias|rowname|handle)$")
 COUNT_NAME = re.compile(r"(?i)^(count|quantity|qty|amount|num|number|stack|stacks|stackcount|itemcount|itemnum|"
                         r"itemquantity|itemamount|cnt)$|(count|quantity|amount|stack)$")
