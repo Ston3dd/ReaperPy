@@ -615,7 +615,7 @@ class Project(unittest.TestCase):
 
     @unittest.skipUnless(NATIVE, "braucht Linux x86-64 und binutils")
     def test_refuses_already_hooked_and_unhookable(self):
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory():
             call = make_call(["E", "int"], impl=0x300)
             opts = [U.Option("A", [U.UnityRow("x", call, 1, 1)])]
             dis = ue_instr.get_disasm(prefer="objdump")

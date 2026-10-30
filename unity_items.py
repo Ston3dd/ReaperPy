@@ -24,7 +24,6 @@ import json
 import os
 import re
 import struct
-from collections import OrderedDict
 
 import cave_trainer as TR
 import il2cpp_dump as D
@@ -559,7 +558,7 @@ def relocate(code, old_addr, new_addr, dis, min_len=HOOK_LEN_MIN, max_len=HOOK_L
         raise RelocError(f"Die ersten Befehle sind zusammen {total} Byte lang (mehr als {max_len}) - ungewoehnlich")
     stolen_end = old_addr + total
     for k, i in enumerate(used):
-        raw, here = bytes(i.raw), new_addr + len(out)
+        raw = bytes(i.raw)
         op0 = raw[0]
         off = 0
         while off < len(raw) and raw[off] in (0x66, 0x67, 0xF2, 0xF3, 0x2E, 0x3E, 0x26, 0x36, 0x64, 0x65):
