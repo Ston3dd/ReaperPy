@@ -4,8 +4,7 @@ import tkinter as tk
 from tkinter import filedialog
 
 from script_api import Ps5Api, run_script
-from tools_common import (ACCENT, BG, BG_CARD, BG_CARD_HVR, FONT_LABEL, FONT_MONO, TEXT, TEXT_DIM,
-                          BaseTab, button, label, textbox)
+from tools_common import (ACCENT, BG, BG_CARD, BG_CARD_HVR, FONT_MONO, TEXT, BaseTab, button, label, textbox)
 
 SAMPLE = '''# ps5 = laufendes Spiel.  F5 = ausfuehren.
 base = ps5.module()                       # eboot.bin

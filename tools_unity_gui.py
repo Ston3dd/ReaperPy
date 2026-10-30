@@ -18,7 +18,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 import il2cpp_dump as D
 import ue_quick as Q
 import tools_i18n
-from tools_common import (ACCENT, BG, BG_CARD, BORDER_HVR, ERROR, FONT_LABEL, FONT_MONO, TEXT, TEXT_DIM, WARN, BaseTab,
+from tools_common import (ACCENT, BG, BG_CARD, BORDER_HVR, ERROR, FONT_LABEL, TEXT_DIM, WARN, BaseTab,
                           button, entry, label, tree, with_scroll)
 
 CFG = os.path.join(os.path.expanduser("~"), ".reaperpy_unity.json")

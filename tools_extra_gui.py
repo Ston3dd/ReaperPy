@@ -11,8 +11,8 @@ from tkinter import filedialog, messagebox, ttk
 import asm_tools as AT
 import caller as CL
 import logger as LG
-from tools_common import (BG, BG_CARD, ACCENT, TEXT_DIM, WARN, ERROR, FONT_LABEL, BaseTab,
-                          button, entry, label, textbox, tree, with_scroll, hexs)
+from tools_common import (BG, BG_CARD, ACCENT, TEXT_DIM, WARN, FONT_LABEL, BaseTab,
+                          button, entry, label, textbox, tree, with_scroll)
 
 
 def _chk(parent, text, var, cmd=None):

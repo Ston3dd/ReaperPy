@@ -2,7 +2,7 @@
 import os, threading, tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from universal_analyzer import analyze_dump, export_report, export_csv, default_checkpoint_path
-from tools_common import BG, BG_BAR, BG_CARD, ACCENT, TEXT, TEXT_DIM, WARN, FONT_MONO, FONT_HEAD, FONT_LABEL, button, label, tree, with_scroll
+from tools_common import BG, BG_CARD, TEXT, TEXT_DIM, WARN, FONT_LABEL, button, label
 
 class UniversalAnalyzerTab(tk.Frame):
     def __init__(self,parent,win):

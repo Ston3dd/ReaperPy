@@ -3,8 +3,10 @@ line-length = 120
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["F", "I", "UP", "C4", "SIM", "PIE", "RET505", "E711", "E712", "E721", "E731"]
-ignore = ["SIM108", "SIM105", "SIM102", "SIM117", "SIM115"]
+# Bewusst klein: F = echte Fehler (ungenutzte Importe/Variablen, ueberdeckte Namen), E7xx = typische Fallen.
+# Stilfamilien (I, UP, C4, SIM, PIE, RET) sind aus, bis der Bestand einmal bereinigt ist:
+#   ruff check . --select I,UP,C4,SIM,PIE,RET505 --statistics
+select = ["F", "E711", "E712", "E721", "E731"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["I001"]
+"tests/*" = ["F401", "F403", "F811", "E731"]   # Tests importieren absichtlich Module nur wegen ihrer Nebenwirkung (ghost_tk)

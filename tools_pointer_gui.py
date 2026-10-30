@@ -6,8 +6,7 @@ from tkinter import ttk, messagebox, filedialog
 import pointerscan as PS
 import scanner as SC
 import ps5_ext as X
-from tools_common import (BG, BG_CARD, ACCENT, TEXT, TEXT_DIM, WARN, ERROR, FONT_LABEL,
-                          BaseTab, button, label, entry, tree, with_scroll, hexs)
+from tools_common import (BG, ACCENT, TEXT, WARN, ERROR, BaseTab, button, label, entry, tree, with_scroll, hexs)
 
 
 class PointerTab(BaseTab):

@@ -13,8 +13,7 @@ import socket
 import struct
 import threading
 
-from ps5_client import (STATUS_SUCCESS, STATUS_ERROR, STATUS_DATA_NULL,
-                        STATUS_ALREADY_DEBUG, STATUS_INVALID_INDEX)
+from ps5_client import (STATUS_SUCCESS, STATUS_ERROR)
 
 SENTINEL64 = 0xFFFFFFFFFFFFFFFF
 

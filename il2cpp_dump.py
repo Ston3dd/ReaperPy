@@ -718,7 +718,7 @@ def find_module_base(read, maps, game, log=print, cancel=None):
     named_first = None
     mods = named_modules(maps)
     if mods:
-        log(f"Module im Spiel: " + ", ".join(f"{n} @ {b:#x}" for n, b, _e in mods[:8]) + (" ..." if len(mods) > 8 else ""))
+        log("Module im Spiel: " + ", ".join(f"{n} @ {b:#x}" for n, b, _e in mods[:8]) + (" ..." if len(mods) > 8 else ""))
     for n, b, _e in mods:
         if cancel and cancel():
             break

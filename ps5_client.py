@@ -2,7 +2,6 @@
 import functools
 import socket
 import struct
-import sys
 import select
 import threading
 import time

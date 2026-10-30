@@ -5,7 +5,6 @@ Erwartete Struktur (Beispiel Palworld/PS5-Dumper):
     <Spiel>/SDK/SDK_HEADERS/*_classes.hpp, *_structs.hpp (*_parameters.hpp werden uebersprungen)
 dump.bin ist optional - ohne sie gibt es Kandidaten und Funktionsliste, aber keine Instruktionssuche.
 """
-import os
 
 import dumpmem
 import uecheat

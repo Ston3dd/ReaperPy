@@ -19,8 +19,8 @@ from ps5_client import PS5DebugClient
 from reapatch import ReapPatch
 from patch_engine import apply_patch, deactivate_patch, is_cave_patch, asm_to_bytes
 from tools_groups import GroupTab
-from tools_common import (BG, BG_BAR, BG_CARD, ACCENT, ACCENT_DIM, TEXT, TEXT_DIM, WARN,
-                          ERROR, FONT_MONO, FONT_LABEL, FONT_HEAD, BaseTab, style_ttk,
+from tools_common import (BG, BG_BAR, BG_CARD, ACCENT, TEXT, TEXT_DIM, WARN,
+                          ERROR, FONT_LABEL, FONT_HEAD, BaseTab, style_ttk,
                           button, label, entry, textbox, tree, with_scroll, hexs)
 
 

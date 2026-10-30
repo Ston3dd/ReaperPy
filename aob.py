@@ -9,7 +9,6 @@ Signatur-Format in der Patch-Datei (am OriginSource-Eintrag):
     "aobOffset": 0          # Hook = Treffer + aobOffset
 """
 import json
-import os
 import re
 
 import ps5_ext as X

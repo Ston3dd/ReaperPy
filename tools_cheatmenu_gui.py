@@ -14,7 +14,7 @@ from tkinter import messagebox, simpledialog, ttk
 
 import cheatmenu as M
 import cheatmenu_cave as CV
-from tools_common import ACCENT, BG, TEXT_DIM, BaseTab, button, entry, label, tree, with_scroll
+from tools_common import BG, TEXT_DIM, BaseTab, button, entry, label, tree, with_scroll
 
 try:
     from tools_i18n import translate as _tr
