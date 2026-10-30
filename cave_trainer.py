@@ -48,6 +48,13 @@ LIMIT = 0x7F000000                  # rel32-Reichweite mit Sicherheitsabstand
 NAME_MAX = 60
 ANCHOR_LEN = 16                     # so viele Byte je Funktionsanfang fuer die Versionspruefung
 PACK_SIZE = 14                      # so viele Items hoechstens in einem Paket-Eintrag
+PAD_WINDOW = 0x10000                # so viel vom Region-Ende wird nach freien Null-/CC-Stuecken durchsucht (nicht nur ganz am Ende)
+PAD_MIN_RUN = 0x40
+_PAD_RUN = re.compile(b"\\x00{%d,}|\\xcc{%d,}" % (PAD_MIN_RUN, PAD_MIN_RUN))
+REMNANT_SCAN = 0x20000              # so viel vom Region-Ende wird nach Resten einer frueheren ReaperPy-Cave durchsucht
+_FILL_RUN = re.compile(b"[\x00\xcc]{32,}")
+# Anfang einer ReaperPy-Cave (build_cave): xor eax,eax / (or rax,[rip+d32])+ / jnz +5 / jmp orig_pe
+_CAVE_HEAD = re.compile(rb"\x31\xc0(?:\x48\x0b\x05....)+\x0f\x85\x05\x00\x00\x00\xe9....", re.DOTALL)
 
 
 class TrainerError(Exception):
@@ -278,12 +285,70 @@ def _tail_run(read, end, start, cap=0x8000):
     return cnt, last
 
 
+def tail_map(read, end, n=0x4000, step=0x100):
+    """Grobe Karte des Region-Endes fuer das Log: je `step` Byte ein Zeichen - '.' nur 00, 'c' nur CC, '#' sonst, '?' nicht lesbar."""
+    try:
+        buf = bytes(read(end - n, n))
+    except Exception:  # noqa: BLE001
+        return "?"
+    if len(buf) != n:
+        return "?"
+    out = []
+    for i in range(0, n, step):
+        blk = buf[i:i + step]
+        out.append("." if not any(blk) else "c" if blk.count(0xCC) == len(blk) else "#")
+    return "".join(out)
+
+
+def find_remnant(read, span, s, e):
+    """Reste einer frueheren ReaperPy-Cave am Ende der Code-Region [s,e)?
+
+    Die Cave bleibt nach dem Abschalten absichtlich stehen (Nullen koennte einen Thread im Code abstuerzen lassen)
+    und liegt genau dort, wo sonst der freie Platz waere.  Ohne diese Erkennung sieht ein zweiter Export (oder eine
+    Konsole, auf der der Trainer schon einmal aktiv war / ueber GoldHEN geladen wurde) 'keinen Platz' (0 Byte).
+    Erkannt wird der Cave-Anfang (genau die Bytefolge von build_cave, Spruenge zeigen ins Image), mehrere
+    Caves hintereinander (mehrere Projekte) werden zu einer Kette zusammengefasst.
+    -> (Start, Fuellbyte) des wiederverwendbaren Stuecks [Start, e) oder None."""
+    n = min(REMNANT_SCAN, e - s)
+    if n < 32:
+        return None
+    try:
+        buf = bytes(read(e - n, n))
+    except Exception:  # noqa: BLE001
+        return None
+    if len(buf) != n:
+        return None
+    base = e - n
+    cands = []
+    for off in range((-base) % 16, n, 16):
+        m = _CAVE_HEAD.match(buf, off)
+        if not m:
+            continue
+        d1 = struct.unpack_from("<i", buf, off + 5)[0]                   # or rax,[rip+d1] -> Schalter
+        d2 = struct.unpack_from("<i", buf, m.end() - 4)[0]                # jmp orig_pe
+        if in_span(span, base + off + 9 + d1) and in_span(span, base + m.end() + d2):
+            cands.append(off)
+    start, limit = None, n
+    for off in sorted(cands, reverse=True):                               # vom Ende her: lueckenlose Kette
+        if _FILL_RUN.search(buf, off, limit):
+            break
+        start, limit = off, off
+    if start is None:
+        return None
+    cnt, fill = _tail_run(read, base + start, s)                          # freier Platz direkt davor gehoert dazu
+    if not cnt:
+        fill = buf[-1] if buf[-1] in FILL else 0xCC
+    return base + start - cnt, fill
+
+
 class Slots:
     """Freie Stuecke: Code-Padding (r-x) und Daten-Padding (rw-), jeweils am Region-Ende, von hinten nach vorn."""
 
     def __init__(self, read, span, log=print):
         self.read, self.span, self.log = read, span, log
         self._code, self._data = None, None
+        self.reclaimed = []             # [(start, ende, fuellbyte)]: Reste einer frueheren ReaperPy-Cave, die ueberschrieben werden duerfen
+        self.last_reclaim = None        # Fuellbyte, wenn die zuletzt vergebene Cave in so einem Rest liegt, sonst None
 
     def _scan_code(self):
         runs = []
@@ -293,6 +358,15 @@ class Slots:
             cnt, _b = _tail_run(self.read, e, s)
             if cnt >= 0x20:
                 runs.append([e - cnt, e])
+                continue
+            rem = find_remnant(self.read, self.span, s, e)
+            if rem:
+                runs.append([rem[0], e])
+                self.reclaimed.append((rem[0], e, rem[1]))
+                self.log(f"[trainer] Reste einer frueheren ReaperPy-Cave am Ende der Region {s:#x}-{e:#x} "
+                         f"({e - rem[0]} Byte) - der Platz wird wiederverwendet")
+        for r in self._scan_pad_window(runs):                       # freie Stuecke NICHT ganz am Ende (fremde Cave dahinter)
+            runs.append(r)
         runs.sort(key=lambda r: -(r[1] - r[0]))
         self.log(f"[trainer] {len(runs)} Code-Padding-Luecke(n) am Region-Ende")
         if max(((r[1] - r[0]) & ~0xF for r in runs), default=0) < INNER_TRIGGER:
@@ -301,6 +375,29 @@ class Slots:
                 self.log(f"[trainer] {len(inner)} Code-Luecke(n) mitten im Code (kein Padding am Region-Ende)")
                 runs = sorted(runs + inner, key=lambda r: -(r[1] - r[0]))
         return runs
+
+    def _scan_pad_window(self, known):
+        """Ein anderer Cheat/Plugin kann seine Cave ans Region-Ende gelegt haben (dort liegt das Seiten-Padding hinter dem
+        Code).  Der freie Rest davor ist dann kein 'Tail-Stueck' mehr.  Darum werden die letzten PAD_WINDOW Byte jeder
+        ausfuehrbaren Region nach reinen Null- oder CC-Stuecken durchsucht.  Nur Lesen."""
+        out = []
+        busy = [(r[0], r[1]) for r in known]
+        for s, e, p in self.span:
+            if not p & 4:
+                continue
+            n = min(PAD_WINDOW, e - s)
+            try:
+                buf = bytes(self.read(e - n, n))
+            except Exception:  # noqa: BLE001
+                continue
+            if len(buf) != n:
+                continue
+            for m in _PAD_RUN.finditer(buf):
+                a, b = e - n + m.start(), e - n + m.end()
+                if any(a < y and x < b for x, y in busy):
+                    continue
+                out.append([a, b])
+        return out
 
     def _scan_inner(self, tail_runs):
         """Ausweichplatz: lange 0xCC-Stuecke (Padding zwischen Funktionen) mitten in ausfuehrbaren Regionen.
@@ -341,9 +438,25 @@ class Slots:
             cnt, b = _tail_run(self.read, e, s)
             if b == 0 and cnt >= FLAG_MIN_RUN:
                 runs.append([e - cnt, e])
+            elif self.reclaimed:                                  # alte Schalter (Bytes 0/1) der frueheren Cave: ueberspringen
+                skip = self._old_flags(e, s)
+                if skip:
+                    runs.append([e - skip[0], e - skip[1]])
         runs.sort(key=lambda r: -(r[1] - r[0]))
         self.log(f"[trainer] {len(runs)} Daten-Leerstelle(n) am Ende beschreibbarer Regionen")
         return runs
+
+    def _old_flags(self, end, start, cap=0x8000):
+        """Die Schalter einer frueheren ReaperPy-Cave (hoechstens 64 Byte, nur 0/1) liegen am Region-Ende; ein Eintrag, der
+        geklickt wurde ohne dass der Haken aktiv war, bleibt dort auf 1.  Sie bleiben unberuehrt (die neue Cave bekommt
+        frische Schalter DAVOR, damit nichts Altes ausgeloest wird).  -> (Laenge mit Schaltern, Laenge der Schalter) oder None."""
+        n = min(cap, end - start)
+        data = bytes(self.read(end - n, n))
+        if len(data) != n or n <= 64 or not set(data[-64:]) <= {0, 1}:
+            return None
+        rest = data[:-64]
+        free = len(rest) - len(rest.rstrip(b"\x00"))
+        return (64 + free, 64) if free + 64 >= FLAG_MIN_RUN else None
 
     def code_capacity(self):
         """Groesse (Byte) der laengsten freien Code-Luecke - so gross darf eine Cave hoechstens sein."""
@@ -368,9 +481,15 @@ class Slots:
                         busy.append(f"{e:#x}: endet mit {bytes(self.read(e - 8, 8)).hex(' ')}")
                     except Exception:  # noqa: BLE001
                         pass
+        if self.reclaimed:
+            lines.append(f"{len(self.reclaimed)} Rest(e) einer frueheren ReaperPy-Cave erkannt (werden wiederverwendet).")
         if busy:
             lines.append("Das Ende dieser Regionen ist NICHT leer (ein anderer Cheat/ein Plugin oder eine noch aktive "
                          "ReaperPy-Cave belegt es - erst BASIS deaktivieren oder das Spiel neu starten): " + "; ".join(busy[:4]) + ".")
+        for s, e, p in self.span:
+            if p & 4:
+                lines.append(f"Ende {e:#x} (letzte {0x4000:#x} Byte, je 256 Byte ein Zeichen, '.'=00 'c'=CC '#'=Daten): "
+                             f"{tail_map(self.read, e, min(0x4000, e - s))}")
         lines.append("Wenn der Trainer sehr gross ist: weniger Items je Projekt waehlen (der Tab ITEMS teilt automatisch "
                      "nach dem freien Platz auf).")
         return " ".join(lines)
@@ -384,6 +503,7 @@ class Slots:
             if cave < r[0] or abs(cave - near) > LIMIT:
                 continue
             r[1] = cave
+            self.last_reclaim = next((f for rs, re_, f in self.reclaimed if rs <= cave < re_), None)
             return cave, need
         raise TrainerError("Kein freier Code-Platz (Padding am Ende einer ausfuehrbaren Image-Region) fuer die Cave "
                            f"gefunden. {self.explain(need)}")
@@ -408,9 +528,12 @@ def capacity(read, maps, base, log=lambda _m: None):
     if not span:
         raise TrainerError(f"Die Image-Basis {base:#x} liegt in keiner Speicherregion")
     sl = Slots(read, span, log)
+    code = sl.code_capacity()                          # zuerst: erkennt Reste einer frueheren Cave (wichtig fuer die Daten-Suche)
     if sl._data is None:
         sl._data = sl._scan_data()
-    return {"code": sl.code_capacity(), "data": max(((r[1] - r[0]) & ~7 for r in sl._data), default=0)}
+    if code == 0:                                      # Ursache ins Log, damit "0 Byte" nicht ratselhaft bleibt
+        log("[trainer] KEIN freier Code-Platz gefunden. " + sl.explain(0))
+    return {"code": code, "data": max(((r[1] - r[0]) & ~7 for r in sl._data), default=0)}
 
 
 def fit_options(options, code_capacity, max_options=None, max_rows=None):
@@ -419,6 +542,11 @@ def fit_options(options, code_capacity, max_options=None, max_rows=None):
     max_options = max_options or MAX_OPTIONS
     max_rows = max_rows or MAX_ROWS
     out, cur, rows = [], [], 0
+    if code_capacity <= 0:
+        raise TrainerError("Im laufenden Spiel ist KEIN freier Code-Platz fuer die Cave da (0 Byte). Meist liegt am Ende der "
+                           "Code-Region noch etwas: ein Cheat/Plugin (z. B. GoldHEN/etaHEN) oder eine Cave von ReaperPy, die "
+                           "noch aktiv ist. Erst die BASIS bzw. den Cheat ausschalten oder das Spiel neu starten; Details "
+                           "stehen im Log (Zeilen mit [trainer]).")
     for o in options:
         if cave_size([o]) > code_capacity:
             raise TrainerError(f"Schon der Eintrag '{o.name}' ({len(o.rows)} Zeilen, {cave_size([o])} Byte) passt nicht in "
@@ -450,6 +578,7 @@ class Plan:
         self.options = []
         self.warnings = []
         self.anchors = []               # [(rva, hex)] Funktionsanfaenge zur Versionspruefung (check_project)
+        self.verify_also = []           # weitere erlaubte Ist-Inhalte der Cave-Stelle (Reste einer alten Cave, anderes Padding)
 
     def rva(self, addr):
         return addr - self.base
@@ -530,6 +659,7 @@ def plan(read, maps, base, options, impl, orig_pe, slots, log=print, settle=0.4,
             except Exception:  # noqa: BLE001
                 pass
     slots_alloc = Slots(read, span, log)
+    slots_alloc.code_capacity()                                      # Code-Platz zuerst suchen (erkennt Reste einer frueheren Cave)
 
     need_flags = flag_bytes_needed(len(options))
     p.flag_addr, p.flag_size = slots_alloc.alloc_data(need_flags, impl)
@@ -549,9 +679,17 @@ def plan(read, maps, base, options, impl, orig_pe, slots, log=print, settle=0.4,
     if len(code) > reserved:
         raise TrainerError(f"Cave-Groesse stimmt nicht ({len(code)} > {reserved}) - Programmfehler")
     p.cave, p.cave_bytes = cave, code
-    p.cave_orig = bytes(read(cave, len(code)))
-    if len(set(p.cave_orig)) != 1 or p.cave_orig[0] not in FILL:
-        raise TrainerError(f"Cave-Platz {cave:#x} ist nicht leer (das Spiel hat dort Daten)")
+    live = bytes(read(cave, len(code)))
+    if slots_alloc.last_reclaim is not None:                         # Rest einer frueheren ReaperPy-Cave: gilt als frei
+        n = len(code)
+        p.cave_orig = bytes([slots_alloc.last_reclaim]) * n          # "Original" = Padding, so bleibt der Trainer auf einer frischen Konsole gueltig
+        p.verify_also = [x for x in dict.fromkeys((live, bytes([0xCC]) * n, bytes(n))) if x not in (p.cave_orig, code)]
+        p.warnings.append("Die Cave liegt auf den Resten einer frueheren ReaperPy-Cave (Trainer war auf dieser Konsole schon "
+                          "einmal aktiv / ueber GoldHEN geladen). Zuerst die alte BASIS bzw. den GoldHEN-Cheat AUSschalten.")
+    else:
+        p.cave_orig = live
+        if len(set(p.cave_orig)) != 1 or p.cave_orig[0] not in FILL:
+            raise TrainerError(f"Cave-Platz {cave:#x} ist nicht leer (das Spiel hat dort Daten)")
     for what, a in (("Cave", cave), ("Schalter", p.flag_addr)):
         if a < base:
             raise TrainerError(f"{what}-Adresse {a:#x} liegt unter der Basis {base:#x}")
@@ -577,8 +715,11 @@ def base_patch(p, author=""):
     variables = [_var("OriginSource", p.rva(p.cave), _spaced(p.cave_orig), _spaced(p.cave_bytes))]
     for k, s in enumerate(p.slots):
         variables.append(_var(f"Haken {k + 1} (vtable)", p.rva(s), _spaced(orig), _spaced(entry)))
-    return {"name": "00 BASIS - Item-Cave (zuerst aktivieren)", "author": author,
-            "ImageBase": hex(p.base), "Verify": True, "Variables": variables}
+    doc = {"name": "00 BASIS - Item-Cave (zuerst aktivieren)", "author": author,
+           "ImageBase": hex(p.base), "Verify": True, "Variables": variables}
+    if p.verify_also:                                    # patch_engine akzeptiert diese Inhalte zusaetzlich zum Original
+        doc["VerifyAlso"] = [_spaced(x) for x in p.verify_also]
+    return doc
 
 
 def option_patch(p, i, author=""):

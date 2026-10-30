@@ -4,6 +4,9 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 
 ## Unreleased
 
+### Fixed
+- **Trainer on another console: "does not fit into the largest free code gap of the game (0 bytes)".** The cave of an earlier trainer stays at the end of the code region after BASIS is switched off (or when it was loaded through GoldHEN/etaHEN). The free-space scan saw that region end as occupied and reported 0 bytes, so SAVE TRAINER and CHECK / ADAPT TRAINER failed on that console although game and version were identical. Leftover ReaperPy caves (also several stacked ones) are now recognised by their code signature and the space is reused; the base patch gets a `VerifyAlso` list so it activates both on that console and on a clean one; old switch bytes are left alone (new switches are placed in front of them). If there is really no space (foreign data at the region end), the message now says so and the log lists why. The free-space scan also looks through the last 64 KB of each executable region for zero/0xCC runs, not only at the very end, so a foreign cave (GoldHEN/etaHEN cheat, plugin) sitting at the end of the page padding no longer hides the free part in front of it. With 0 bytes the log now shows a map of the region end (`.` = 00, `c` = CC, `#` = data). Tests: `tests/test_cave_trainer.py` (`LeftoverCaveTests`).
+
 ## 5.9.1 - 2026-10-30
 
 **Hotfix - please update if you are on 5.9.0.** In 5.9.0 the connect step failed with

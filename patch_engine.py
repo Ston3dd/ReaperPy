@@ -170,6 +170,20 @@ def _plan_sites(backend, reapatch, hook_addr):
     return plan
 
 
+def _verify_also(reapatch, size):
+    """Zusaetzlich erlaubte Ist-Inhalte (Patch-Feld "VerifyAlso": Liste von Hex-Strings) mit genau `size` Byte.
+    Fuer Item-Trainer, deren Cave auf den Resten einer frueheren Cave liegt."""
+    out = []
+    for x in (getattr(reapatch, "raw", None) or {}).get("VerifyAlso") or []:
+        try:
+            b = bytes.fromhex(str(x).replace(" ", ""))
+        except ValueError:
+            continue
+        if len(b) == size:
+            out.append(b)
+    return out
+
+
 def _is_in_exec_region(backend, addr):
     """Prüft ob die Adresse in einem r-x oder rwx Bereich liegt."""
     try:
@@ -422,8 +436,9 @@ def _apply_simple(backend, reapatch, hook_addr):
             mem = bytes(mem)
             # Wächter fuer Patches mit "Verify": true (Item-Trainer von ReaperPy): steht dort weder das erwartete
             # Original noch der Patch, ist es eine ANDERE Spielversion/Basis - nicht blind drueberschreiben.
+            also = _verify_also(reapatch, size)
             if (getattr(reapatch, "raw", None) or {}).get("Verify") and default_bytes \
-                    and len(default_bytes) == size and mem not in (default_bytes, new_bytes):
+                    and len(default_bytes) == size and mem not in (default_bytes, new_bytes, *also):
                 raise RuntimeError(
                     f"Passt nicht zu diesem Spiel: an {addr:#x} stehen {mem[:16].hex(' ')} statt der erwarteten "
                     f"{default_bytes[:16].hex(' ')}. Der Patch wurde fuer eine andere Spielversion (oder Image-Basis) "

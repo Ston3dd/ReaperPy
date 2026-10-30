@@ -113,7 +113,7 @@ class CheckProject(Project):
 class Capacity(unittest.TestCase):
     def test_capacity_follows_the_padding_and_fit_splits(self):
         img = TS.FakeImage()
-        img.write(img.BASE + 0x10000 - 0x600, b"\x55")          # Code-Region endet nach 0x5FF Byte Luecke
+        img.write(img.BASE, b"\x55" * (0x10000 - 0x600 + 1))   # Code bis kurz vor dem Ende: nur 0x5FF Byte Luecke
         cap = T.capacity(img.read, img.maps, img.BASE)
         self.assertTrue(0x500 <= cap["code"] <= 0x600, cap)
         rows = [T.Row(f"I{k}", bytes([k + 1] * 8), 1) for k in range(60)]
@@ -132,7 +132,7 @@ class Capacity(unittest.TestCase):
 
     def test_no_space_message_explains_why(self):
         img = TS.FakeImage()
-        img.write(img.BASE + 0x10000 - 8, b"\x55" * 8)          # Region-Ende belegt (z. B. andere Cave)
+        img.write(img.BASE, b"\x55" * 0x10000)   # Region voll belegt (z. B. andere Cave / Code)
         with self.assertRaises(T.TrainerError) as c:
             T.plan(img.read, img.maps, img.BASE, TS.make_options(), img.impl, img.pe, [img.slot],
                    log=lambda _m: None, settle=0)

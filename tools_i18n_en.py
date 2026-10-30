@@ -1792,3 +1792,15 @@ EN.update({
 EN.update({
     ' Code-Luecke(n) mitten im Code (kein Padding am Region-Ende)': ' code gap(s) inside the code (no padding at the end of the region)',
 })
+
+
+EN.update({
+    # Reste einer frueheren Cave (cave_trainer.py)
+    "Im laufenden Spiel ist KEIN freier Code-Platz fuer die Cave da (0 Byte). Meist liegt am Ende der Code-Region noch etwas: ein Cheat/Plugin (z. B. GoldHEN/etaHEN) oder eine Cave von ReaperPy, die noch aktiv ist. Erst die BASIS bzw. den Cheat ausschalten oder das Spiel neu starten; Details stehen im Log (Zeilen mit [trainer]).": "There is NO free code space for the cave in the running game (0 bytes). Usually something still sits at the end of the code region: a cheat/plugin (e.g. GoldHEN/etaHEN) or a ReaperPy cave that is still active. Switch BASIS / the cheat off first or restart the game; details are in the log (lines with [trainer]).",
+    "Die Cave liegt auf den Resten einer frueheren ReaperPy-Cave (Trainer war auf dieser Konsole schon einmal aktiv / ueber GoldHEN geladen). Zuerst die alte BASIS bzw. den GoldHEN-Cheat AUSschalten.": "The cave sits on the remains of an earlier ReaperPy cave (the trainer was already active on this console / loaded via GoldHEN). Switch the old BASIS or the GoldHEN cheat OFF first.",
+    "[trainer] Reste einer frueheren ReaperPy-Cave am Ende der Region ": "[trainer] Remains of an earlier ReaperPy cave at the end of region ",
+    " Byte) - der Platz wird wiederverwendet": " bytes) - the space is reused",
+    "[trainer] KEIN freier Code-Platz gefunden. ": "[trainer] NO free code space found. ",
+    " Byte, je 256 Byte ein Zeichen, '.'=00 'c'=CC '#'=Daten): ": " bytes, one character per 256 bytes, '.'=00 'c'=CC '#'=data): ",
+    "Rest(e) einer frueheren ReaperPy-Cave erkannt (werden wiederverwendet).": "remnant(s) of an earlier ReaperPy cave detected (reused).",
+})

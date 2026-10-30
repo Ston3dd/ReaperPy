@@ -654,5 +654,140 @@ class InnerGapTests(unittest.TestCase):
         self.assertTrue(0x10500 <= cave and cave + need <= 0x10900)
 
 
+class LeftoverCaveTests(unittest.TestCase):
+    """Eine fruehere Cave (BASIS aus, GoldHEN-Cheat, anderer Export) blockiert das Region-Ende: das war 'Platz: 0 Byte'."""
+
+    def _plan(self, img, opts):
+        return T.plan(img.read, img.maps, img.BASE, opts, img.impl, img.pe, [img.slot], log=lambda _m: None, settle=0)
+
+    def _opts(self, name, n=3):
+        return [T.Option(name, [T.Row(f"{name}{i}", struct.pack("<Q", 0x1000 + i), 5) for i in range(n)])]
+
+    def _leave_cave(self, img, name="Alt"):
+        p1 = self._plan(img, self._opts(name))
+        img.write(p1.cave, p1.cave_bytes)                       # Cave steht, Haken ist aus (Slot zeigt noch auf ProcessEvent)
+        return p1
+
+    def test_capacity_is_not_zero_after_a_cave_was_left_behind(self):
+        img = FakeImage()
+        free = T.capacity(img.read, img.maps, img.BASE)["code"]
+        self._leave_cave(img)
+        after = T.capacity(img.read, img.maps, img.BASE)["code"]
+        self.assertGreaterEqual(after, free)                    # vorher 0 Byte: Rest der Cave zaehlte als belegt
+
+    def test_second_export_reuses_the_old_cave_space(self):
+        img = FakeImage()
+        p1 = self._leave_cave(img)
+        p2 = self._plan(img, self._opts("Neu", 5))
+        self.assertGreater(p2.cave + len(p2.cave_bytes), p1.cave)       # liegt wieder am Region-Ende
+        self.assertEqual(p2.cave_orig, bytes(len(p2.cave_bytes)))       # Original = Padding, nicht die alte Cave
+        self.assertIn(img.read(p2.cave, len(p2.cave_bytes)), p2.verify_also)
+        self.assertTrue(any("frueheren" in w for w in p2.warnings))
+
+    def test_stacked_caves_are_one_chain(self):
+        img = FakeImage()
+        p1 = self._leave_cave(img, "A")
+        free_after_one = T.capacity(img.read, img.maps, img.BASE)["code"]
+        p2 = self._plan(img, self._opts("B", 4))
+        img.write(p2.cave, p2.cave_bytes)
+        self.assertGreaterEqual(T.capacity(img.read, img.maps, img.BASE)["code"], free_after_one)
+        p3 = self._plan(img, self._opts("C", 6))
+        self.assertGreaterEqual(p3.cave, p2.cave - 0x1000)
+        self.assertEqual(p3.cave_orig, bytes(len(p3.cave_bytes)))
+        self.assertLess(p1.cave, img.BASE + 0x10000)
+
+    def test_leftover_flag_bytes_of_the_old_trainer_do_not_block(self):
+        img = FakeImage()
+        p1 = self._leave_cave(img)
+        img.write(p1.flag_addr, b"\x01\x00\x01")                  # Eintrag geklickt, aber Haken war aus -> Schalter blieb 1
+        p2 = self._plan(img, self._opts("Neu"))                      # darf nicht an 'Schalter-Bereich nicht leer' scheitern
+        self.assertLessEqual(p2.flag_addr + p2.flag_size, p1.flag_addr)   # frische Schalter VOR den alten (nichts Altes loest aus)
+        self.assertEqual(img.read(p2.flag_addr, p2.flag_size), bytes(p2.flag_size))
+
+    def test_foreign_data_at_region_end_is_still_not_overwritten(self):
+        img = FakeImage()
+        img.write(img.BASE, b"\x55\x48\x89\xe5" * 0x4000)           # Code bis zum Regionsende, nirgends Padding
+        self.assertEqual(T.capacity(img.read, img.maps, img.BASE)["code"], 0)
+        with self.assertRaises(T.TrainerError) as c:
+            T.fit_options(self._opts("X"), 0)
+        self.assertIn("KEIN freier Code-Platz", str(c.exception))
+
+    def test_zero_capacity_is_explained_in_the_log(self):
+        img = FakeImage()
+        img.write(img.BASE, b"\x55\x48\x89\xe5" * 0x4000)
+        logs = []
+        T.capacity(img.read, img.maps, img.BASE, log=logs.append)
+        self.assertTrue(any("KEIN freier Code-Platz" in x for x in logs))
+        self.assertTrue(any("'#'=Daten" in x for x in logs))            # Karte des Region-Endes im Log
+
+    def test_base_patch_accepts_leftover_and_clean_console_with_patch_engine(self):
+        """Gleicher Trainer auf der Konsole mit altem Cave-Rest UND auf einer frischen Konsole (nur Padding) aktivierbar."""
+        import patch_engine as PE
+        import reapatch
+        img = FakeImage()
+        self._leave_cave(img)
+        p2 = self._plan(img, self._opts("Neu", 5))
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        T.write_project(d, p2, "X")
+        with open(os.path.join(d, T.BASE_FILE), encoding="utf-8") as fh:
+            doc = json.load(fh)
+        self.assertTrue(doc.get("VerifyAlso"))
+        for image in (img, FakeImage()):                              # alter Rest / frisch
+            class Backend:
+                def read(self, a, n, _i=image):
+                    return _i.read(a, n)
+
+                def write(self, a, data, _i=image):
+                    _i.write(a, bytes(data))
+
+                def get_maps(self, force=False, _i=image):
+                    return _i.maps
+
+                def assemble(self, *_a, **_k):
+                    raise AssertionError("kein Assembler noetig")
+            base = reapatch.ReapPatch.load(os.path.join(d, T.BASE_FILE))
+            PE.apply_patch(Backend(), base, image.BASE + base.origin_source[0])
+            self.assertEqual(image.read(p2.cave, len(p2.cave_bytes)), p2.cave_bytes)
+
+    def test_other_fill_byte_cc_is_also_accepted(self):
+        img = FakeImage()
+        img.write(img.BASE + 0x2100, b"\xcc" * (0x10000 - 0x2100))   # Konsole, deren Padding 0xCC statt 0x00 ist
+        p = self._plan(img, self._opts("X"))
+        self.assertEqual(p.cave_orig[0], 0xCC)
+        img.write(p.cave, p.cave_bytes)                              # alter Rest
+        p2 = self._plan(img, self._opts("Y", 4))
+        self.assertEqual(p2.cave_orig[0], 0xCC)
+        self.assertTrue(any(x == bytes(len(p2.cave_bytes)) for x in p2.verify_also))   # frisch mit 00-Padding ginge auch
+
+    def test_foreign_cave_at_the_very_end_leaves_the_free_part_before_it_usable(self):
+        """Wie auf der anderen Konsole vermutet: ein fremder Cheat legt seine Cave ans Seitenende des Codes - davor
+        ist das Padding noch frei.  Das darf nicht '0 Byte' ergeben."""
+        img = FakeImage()
+        end = img.BASE + 0x10000
+        img.write(end - 0x200, b"\x48\x8b\x05\x11\x22\x33\x44\x90" * 0x40)       # fremder Code (512 Byte) ganz am Ende
+        cap = T.capacity(img.read, img.maps, img.BASE)["code"]
+        self.assertGreater(cap, 0x1000)
+        p = self._plan(img, self._opts("Neu", 4))
+        self.assertLess(p.cave + len(p.cave_bytes), end - 0x200 + 1)       # liegt VOR dem fremden Code
+        self.assertEqual(p.cave_orig, bytes(len(p.cave_bytes)))
+        self.assertEqual(img.read(end - 0x200, 8), b"\x48\x8b\x05\x11\x22\x33\x44\x90")
+
+    def test_foreign_cave_in_the_middle_of_the_padding(self):
+        img = FakeImage()
+        end = img.BASE + 0x10000
+        img.write(end - 0x1800, b"\xe9\x01\x02\x03\x04" * 0x80)
+        p = self._plan(img, self._opts("Neu", 4))
+        forbidden = range(end - 0x1800, end - 0x1800 + 0x280)
+        self.assertFalse(any(a in forbidden for a in range(p.cave, p.cave + len(p.cave_bytes))))
+
+    def test_unrelated_bytes_with_similar_start_are_not_taken_for_a_cave(self):
+        img = FakeImage()
+        end = img.BASE + 0x10000
+        img.write(img.BASE, b"\x55\x48\x89\xe5" * 0x4000)
+        img.write(end - 0x40, b"\x31\xc0\x48\x0b\x05\x00\x00\x00\x00\x0f\x85\x05\x00\x00\x00\xe9\xff\xff\xff\x7f" + b"\x55" * 0x2c)
+        self.assertEqual(T.capacity(img.read, img.maps, img.BASE)["code"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
