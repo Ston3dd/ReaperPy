@@ -13,7 +13,8 @@ import socket
 import struct
 import threading
 
-from ps5_client import (STATUS_SUCCESS, STATUS_ERROR)
+# Re-Exports: debugger.py liest X.STATUS_ALREADY_DEBUG und X.STATUS_INVALID_INDEX ueber dieses Modul
+from ps5_client import STATUS_ALREADY_DEBUG, STATUS_ERROR, STATUS_INVALID_INDEX, STATUS_SUCCESS  # noqa: F401
 
 SENTINEL64 = 0xFFFFFFFFFFFFFFFF
 
