@@ -362,7 +362,7 @@ def _apply_cave(backend, reapatch, hook_addr, size_hint=0x4000):
     backend.write(cave_addr, cave_bytes)
     if not _verify_write(backend, cave_addr, cave_bytes, "Cave"):
         raise RuntimeError("Cave-Write fehlgeschlagen!")
-    print(f"[cave]   Cave-Verifikation OK")
+    print("[cave]   Cave-Verifikation OK")
 
     # --- 6. Hook schreiben (KEIN set_rwx!) ---
     hook_bytes = build_hook(backend, hook_addr, cave_addr, length=8)
@@ -371,7 +371,7 @@ def _apply_cave(backend, reapatch, hook_addr, size_hint=0x4000):
 
     if not _verify_write(backend, hook_addr, hook_bytes, "Hook"):
         raise RuntimeError("Hook-Write fehlgeschlagen!")
-    print(f"[cave]   Hook-Verifikation OK")
+    print("[cave]   Hook-Verifikation OK")
 
     # --- 7. Cache relax ---
     time.sleep(0.15)
@@ -548,10 +548,6 @@ def detect_patched(backend, reapatch, hook_addr):
     if not new_asm:
         return False, None, "?"
 
-    try:
-        new_bytes = _asm_or_empty(backend, new_asm, hook_addr)
-    except Exception:
-        new_bytes = b""
     try:
         default_bytes = _asm_or_empty(backend, default_asm, hook_addr)
     except Exception:

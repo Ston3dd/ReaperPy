@@ -87,7 +87,7 @@ class T(unittest.TestCase):
         self.assertEqual(self.t.view[0].title, "FInvEntry")
         self.t.v_kind.set("alle"); self.t.v_q.set("godmode"); self.t.fill()
         self.assertEqual([s.title for s in self.t.view], ["UMyCheatManager"])
-        s = self.pick("alle", "UMyCheatManager")
+        self.pick("alle", "UMyCheatManager")
         self.assertIn("Cheat-Manager", self.t.txt.t); self.assertIn("So benutzt du es", self.t.txt.t)
 
     def test_row_search_filters_by_name_and_keeps_indexes(self):
@@ -128,7 +128,7 @@ class T(unittest.TestCase):
 
     def test_read_table_for_suggestion_export_and_errors(self):
         self.t.analyze()
-        s = self.pick("Tabelle", "FItemRow")
+        self.pick("Tabelle", "FItemRow")
         self.t.read_table()
         self.assertEqual(self.errs(), [])
         name, rows, cols = self.t.cur

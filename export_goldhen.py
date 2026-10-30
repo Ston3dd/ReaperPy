@@ -473,8 +473,7 @@ def _gui_dialog():
     import threading
     import tkinter as tk
     from tkinter import filedialog, messagebox, ttk
-    from tools_common import (ACCENT, BG, BG_BAR, BG_CARD, BG_CARD_HVR, ERROR, FONT_HEAD,
-                              FONT_LABEL, FONT_MONO, TEXT, TEXT_DIM, WARN)
+    from tools_common import (ACCENT, BG, BG_BAR, BG_CARD, BG_CARD_HVR, ERROR, FONT_LABEL, FONT_MONO, TEXT, TEXT_DIM, WARN)
     import library
 
     class ExportDialog(tk.Toplevel):
@@ -689,7 +688,8 @@ def _gui_dialog():
             threading.Thread(target=self._work, args=args, daemon=True).start()
 
         def _work(self, backend, sel, image_base, path, game, tid, ver, proc, creds, tb, fmt="json"):
-            log = lambda m: self.q.put(("log", (str(m), None)))
+            def log(m):
+                return self.q.put(("log", (str(m), None)))
             try:
                 doc, report, issues = export(backend, sel, image_base, path, game, tid, ver, proc,
                                              creds, tb, log=log, fmt=fmt)

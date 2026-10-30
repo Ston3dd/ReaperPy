@@ -4,9 +4,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
 import ps5_ext as X
-from debugger import DebugSession, DebugError
-from tools_common import (BG, BG_CARD, ACCENT, TEXT, TEXT_DIM, WARN, ERROR, FONT_LABEL,
-                          BaseTab, button, label, entry, tree, with_scroll, hexs)
+from debugger import DebugSession
+from tools_common import (BG, ACCENT, TEXT_DIM, BaseTab, button, label, entry, tree, with_scroll)
 
 WP_TYPES = {"schreiben": X.WP_WRITE, "lesen/schreiben": X.WP_RDWR, "ausführen": X.WP_EXEC}
 
@@ -337,7 +336,8 @@ class DebugTab(BaseTab):
             rsp = self.sess.regs(lw)["rsp"]
             cl = self.win.client
             ex = AOB.exec_regions(cl.get_maps(), 0x1000)
-            in_code = lambda a: any(s <= a < e for s, e in ex)
+            def in_code(a):
+                return any(s <= a < e for s, e in ex)
             return rsp, unwind.unwind(cl.read_memory, rsp, in_code, depth=0x1000, max_frames=48)
 
         def ok(res):

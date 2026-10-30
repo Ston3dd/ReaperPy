@@ -22,7 +22,6 @@ public:
 
 
 def tgt(sdk, member):
-    c = next(c for c in uecheat.find_candidates(sdk, 0) if c.member == member) if False else None
     m = sdk.find_member("UHealthComponent", member)
     return Q.Target("UHealthComponent", member, m.type, m.offset, m.bit)
 

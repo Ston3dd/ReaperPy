@@ -126,7 +126,8 @@ def call_ufunction(client, obj, ufunc, fp, assign, pe_addr, caller=None):
     """-> [(name, wert)] der Ausgaben.  caller(client, rip, rdi, rsi, rdx) -> rax  (Standard ps5_more.call)."""
     if caller is None:
         import ps5_more
-        caller = lambda c, rip, a, b, d: ps5_more.call(c, rip, a, b, d)
+        def caller(c, rip, a, b, d):
+            return ps5_more.call(c, rip, a, b, d)
     buf = encode_params(fp, assign)
     addr = client.allocate_memory((len(buf) + 0xF) & ~0xF or 0x10)
     try:

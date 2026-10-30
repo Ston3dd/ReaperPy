@@ -41,7 +41,8 @@ def foreground_app(client):
         _ok(client, "foreground app")
         blob = client._recv_exact(140)
     pid, tid, _cid, name, ver = struct.unpack("<I16s64s40s16s", blob)
-    dec = lambda b: b.split(b"\x00", 1)[0].decode("utf-8", "replace").strip()
+    def dec(b):
+        return b.split(b"\x00", 1)[0].decode("utf-8", "replace").strip()
     return pid, dec(tid).upper(), dec(name), dec(ver)
 
 

@@ -298,7 +298,6 @@ class ValuesTab(BaseTab):
         order = VA.group_by_category(range(len(self.rows)), lambda i: self.rows[i]["cat"])
         self.view = [i for lst in order.values() for i in lst]
         for i in self.view:
-            r = self.rows[i]
             self.tv.insert("", "end", iid=str(i), values=self._cells(i))
         self.update_summary()
 
@@ -458,7 +457,7 @@ class ValuesTab(BaseTab):
         self.bg(job, ok, fail)
 
     def _save_ue(self, chosen, client):
-        ue, proj, menu = self._ue(), self._ue_proj(), self.menu
+        _ue, proj, menu = self._ue(), self._ue_proj(), self.menu
         if menu is None or proj is None:
             self.lbl_done.configure(text="Erst WICHTIGES FINDEN (Spiel laden, verbinden).", fg=ERROR)
             return

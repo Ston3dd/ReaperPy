@@ -70,7 +70,7 @@ class NativeCalls(unittest.TestCase):
         self.mm = mmap.mmap(-1, SIZE, prot=mmap.PROT_READ | mmap.PROT_WRITE | mmap.PROT_EXEC)
         self.base = ctypes.addressof(ctypes.c_char.from_buffer(self.mm))
         self.tmp = tempfile.mkdtemp()
-        help_bin = TS.build_helpers(self.tmp, CAVE_OFF)
+        TS.build_helpers(self.tmp, CAVE_OFF)
         # eigene Hilfsdatei mit 80-Byte-Log
         src = os.path.join(self.tmp, "h2.s")
         with open(src, "w", encoding="utf-8") as f:

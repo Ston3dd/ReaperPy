@@ -372,7 +372,7 @@ class StartTabAndNavigation(unittest.TestCase):
     def test_show_tab_reaches_tabs_inside_advanced_notebook(self):
         from tools_gui import ToolsWindow
         sel = []
-        adv_nb, nb = object(), types.SimpleNamespace(select=lambda t: sel.append(("main", t)))
+        nb = types.SimpleNamespace(select=lambda t: sel.append(("main", t)))
         adv = types.SimpleNamespace(select=lambda t: sel.append(("adv", t)))
         fake = types.SimpleNamespace(adv_nb=adv, nb=nb, adv_frame="FRAME")
         inner = types.SimpleNamespace(master=adv)

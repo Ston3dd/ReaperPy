@@ -1,6 +1,6 @@
 """Universal Unreal Engine SDK/dump analyzer. Read-only, evidence-backed static discovery."""
 from __future__ import annotations
-import csv, json, re, zipfile, hashlib, os, time
+import csv, json, re, zipfile, hashlib, time
 from unreal_profiles import build_capability_profiles, build_item_catalog
 from pathlib import Path
 
@@ -168,7 +168,6 @@ def analyze_dump(path, progress_callback=None, cancel_event=None, checkpoint_pat
    hits.append(hit)
    for c in cats: capability_counts[c]=capability_counts.get(c,0)+1
   last_file=rel
-  files_done_before=files
   if progress_callback:
    try: progress_callback(files, total, rel)
    except Exception: pass

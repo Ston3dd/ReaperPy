@@ -97,7 +97,8 @@ class CapstoneDisasm:
         mem, reads, writes = None, False, False
         for op in i.operands:
             if op.type == cs.x86.X86_OP_MEM:
-                reg = lambda r: i.reg_name(r) if r else None
+                def reg(r):
+                    return i.reg_name(r) if r else None
                 mem = Mem(reg(op.mem.base), reg(op.mem.index), op.mem.scale, op.mem.disp)
                 if op.access & cs.CS_AC_READ:
                     reads = True
@@ -318,7 +319,7 @@ def scan(dump, targets, dis, class_offsets=None, base_va=0, dump_rva=0, include_
     want = {o for o in class_offsets if o >= min_disp}
     lo, hi = code_range if code_range else (0, len(dump))
     hits_by_off = byte_hits(dump, want, min_disp, lo, hi)
-    funcs, total = {}, sum(len(v) for v in hits_by_off.values())
+    total = sum(len(v) for v in hits_by_off.values())
     if total > max_positions:
         raise RuntimeError(f"{total} Byte-Treffer - Offsets zu unspezifisch (Dump zu gross oder Liste zu lang)")
     done = 0

@@ -328,8 +328,10 @@ class Scanner:
         """Kurztext fuers Log: welche Beschleuniger das Payload anbietet / benutzt wurden."""
         c = self.caps or {}
         f = getattr(self, "last_flags", None)
-        used = lambda bit: "ja" if f is not None and f & bit else "nein"
-        can = lambda b: "ja" if self.has(b) else "nein"
+        def used(bit):
+            return "ja" if f is not None and f & bit else "nein"
+        def can(b):
+            return "ja" if self.has(b) else "nein"
         return (f"Payload kann: Parallel {can(TSE_PARALLEL)} (Threads={c.get('threads', '?')}), SIMD {can(TSE_SIMD)}, "
                 f"Aliasing {can(TSE_ALIASING)}  |  ANGEFORDERT: Parallel {used(TS_PARALLEL)}, "
                 f"Aliasing {used(TS_USE_ALIASING)}")

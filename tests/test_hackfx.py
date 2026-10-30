@@ -179,7 +179,7 @@ class BannerTests(unittest.TestCase):
         self.assertIsNone(b.win)
 
     def test_fade_sets_alpha_near_the_end(self):
-        b = F.Banner(Root(), True, ["x"], tk=FAKE_TK)
+        F.Banner(Root(), True, ["x"], tk=FAKE_TK)
         top = FakeTop.instances[-1]
         self.clock.now += F.GRANTED_S - 0.1
         top.afters[-1][1]()

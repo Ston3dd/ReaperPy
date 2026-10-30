@@ -21,7 +21,8 @@ class Entry:
 
     def line(self):
         n = len(self.new)
-        h = lambda b: b[:8].hex(" ").upper() + (" .." if len(b) > 8 else "")
+        def h(b):
+            return b[:8].hex(" ").upper() + (" .." if len(b) > 8 else "")
         return (time.strftime("%H:%M:%S", time.localtime(self.t)), f"{self.addr:#x}", n,
                 h(self.old), h(self.new), self.source)
 
