@@ -4,6 +4,14 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 
 ## Unreleased
 
+## 5.9.1 - 2026-10-30
+
+**Hotfix - please update if you are on 5.9.0.** In 5.9.0 the connect step failed with
+`[net] ERROR module 'imagebase' has no attribute 'check_base'`, so ReaperPy could not be used at all. 5.9.1 fixes this and
+also brings the self-updater, version anchors for trainers and the trainer preview (all listed below). 5.9.0 builds have **no**
+self-update: download 5.9.1 once by hand (see the release page); from then on ReaperPy offers updates itself.
+Release notes for GitHub: [`docs/history/RELEASE_NOTES_v5.9.1.md`](docs/history/RELEASE_NOTES_v5.9.1.md).
+
 ### Added
 - **Self-update from GitHub Releases.** On start (4 s after the window opens) ReaperPy asks GitHub for the latest release. If it is newer, a dialog shows the release notes and offers **Install now / Later / Skip this version**. *Install now* downloads the release zip, checks its SHA-256, unpacks it into a staging folder, replaces the program files with a backup + automatic rollback, and then says that ReaperPy has to be restarted (with a **Restart now** button). Config, profiles, logs, library and `applied.json` are never overwritten. A git checkout is never touched (it only tells you to `git pull`). START tab -> *Check for updates* runs the same flow manually. Turn it off with `"auto_update_check": false`; use another repository with `"update_repo": "owner/name"`. The old `update_url` (own JSON file) still works and only shows a hint. Tests: `tests/test_updater.py`.
 - **Version anchors as signatures.** Trainers now store the start of each function as an AOB signature with wildcards instead of fixed bytes, so they survive small game updates. If a function only moved (exactly one hit elsewhere), the ITEMS tab offers to adapt the trainer to the new addresses; if it is gone or ambiguous it still says "other game version".
@@ -13,12 +21,22 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 - Guard tests: no test files in the repo root, explicit encoding for all text files.
 
 ### Fixed
+- **Connecting failed with `module 'imagebase' has no attribute 'check_base'`.** The image base check that runs on connect
+  (`gui._check_image_base`) called a function that had been renamed to `imagebase.check_image_base` (with a new result type).
+  The check now works again: matching base -> info line, shifted base -> warning and the image base is set to the one found in
+  the console's memory map, no module names in the map -> warning with the module list. Test: `tests/test_gui_imagebase_check.py`.
 - `cave_trainer.check_anchors()` / `anchor_problem()` were used by the GUI and the tests but did not exist; `spec_document()` crashed with signature-style anchors.
 - Export: the code cave now prefers non-writable code regions (`r-x`); writable (`rwx`) regions are only a fallback and log a warning. The report names the region. On disable only the hook is restored and the cave stays (zeroing it could crash a thread still running inside).
 - Missing English texts for the UE-LIVE connection fallback messages.
 - Test files had landed in the repo root (`module incorrectly imported` in CI); `F402` loop variable shadowing an import in `tools_gui.py`.
 - File handles left open in `ue_auto.load_dump` / `main_game`; the test suite no longer produces `ResourceWarning`s.
 - Long byte dumps in the patch log are cut to 32 bytes plus `... (+N bytes)`.
+
+### Changed
+- Lint: `ruff check .` is clean (rules `F`, `E711`, `E712`, `E721`, `E731`; style families stay off until the code base is
+  cleaned up). Unused imports and variables removed, lambda assignments turned into functions, dead code in `tests/ue_world.py`
+  removed. `ps5_ext` keeps `STATUS_ALREADY_DEBUG` / `STATUS_INVALID_INDEX` as explicit re-exports used by `debugger.py`.
+- Test suite: 737 tests (CI: Linux Python 3.10 / 3.12, Windows Python 3.12).
 
 ## 5.9.0 - 2026-10-29
 

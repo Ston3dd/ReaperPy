@@ -1,15 +1,15 @@
 # UTF-8
 VSVersionInfo(
-  ffi=FixedFileInfo(filevers=(5, 9, 0, 0), prodvers=(5, 9, 0, 0), mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
+  ffi=FixedFileInfo(filevers=(5, 9, 1, 0), prodvers=(5, 9, 1, 0), mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
   kids=[
     StringFileInfo([StringTable('040904B0', [
       StringStruct('CompanyName', ''),
       StringStruct('FileDescription', 'ReaperPy - PS5 Memory Tools'),
-      StringStruct('FileVersion', '5.9.0.0'),
+      StringStruct('FileVersion', '5.9.1.0'),
       StringStruct('InternalName', 'ReaperPy'),
       StringStruct('OriginalFilename', 'ReaperPy.exe'),
       StringStruct('ProductName', 'ReaperPy'),
-      StringStruct('ProductVersion', '5.9.0.0')])]),
+      StringStruct('ProductVersion', '5.9.1.0')])]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]
 )

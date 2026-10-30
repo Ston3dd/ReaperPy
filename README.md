@@ -88,6 +88,10 @@ python gui.py                       # Windows: double-click start.bat (checks Py
 A Windows folder build (no Python needed) is created with `build_exe.bat` (PyInstaller, no `--onefile`: configuration,
 profiles and logs stay next to the EXE).
 
+**Ready-made Windows build.** Download `ReaperPy_v<version>_win64.zip` from the GitHub **Releases** page, check it against the
+`.sha256` file next to it, unpack it and start `ReaperPy.exe`. Releases from 5.9.1 on update themselves (see **Auto-update**
+below); 5.9.0 and older have to be replaced by hand once.
+
 ## Quick start
 
 **1. Connect.** Start the game on the console, load the payload, enter the console IP in the main window and press
@@ -375,7 +379,28 @@ world and a Tk stand-in for the GUI. Tests that need Keystone or a native toolch
 hardware depends on your console, payload and game - try new features with a single-player game and a backup first.
 Please include the log (`logs/reaperpy.log`) in bug reports.
 
-Code style: `ruff` (configured in `pyproject.toml`, line length 120).
+Code style: `ruff` (configured in `pyproject.toml`, line length 120). The enabled rules are deliberately small - `F`
+(real errors: unused imports/variables, undefined names) and `E711` / `E712` / `E721` / `E731`:
+
+```bash
+ruff check .          # must report "All checks passed!"
+```
+
+Careful with `ruff check --fix`: it removes imports that are only used as a re-export (`ps5_ext.STATUS_*` is read by
+`debugger.py`). Such lines carry `# noqa: F401` and a comment; run the tests after every auto-fix.
+
+**Continuous integration** (`.github/workflows/ci.yml`): the tests run on every push and pull request (Linux with Python 3.10
+and 3.12, Windows with 3.12, with Keystone and Capstone installed); `ruff` runs as an informational job.
+
+**Making a release**
+
+1. Raise `version.py` (and `version_info.txt`), add a `## <version> - <date>` section to `CHANGELOG.md`
+   (`python scripts/changelog_from_git.py <last tag> <version>` drafts it from the commit messages), write
+   `docs/history/RELEASE_NOTES_v<version>.md`.
+2. `python scripts/release_notes.py <version>` prints the text that goes into the GitHub release.
+3. Tag and push: `git tag v<version> && git push origin v<version>`. The release workflow checks that the tag equals
+   `version.py`, runs the tests, builds the Windows zip with its `.sha256` and publishes the release. Building by hand
+   instead: name the file `ReaperPy_v<version>_win64.zip` and upload the `.sha256` file as well - the self-updater needs both.
 
 ## Project layout
 
@@ -390,6 +415,9 @@ Code style: `ruff` (configured in `pyproject.toml`, line length 120).
 | `patch_engine.py`, `reapatch.py`, `cave_trainer.py`, `export_goldhen.py`, `cheatfmt.py` | Patches, caves, trainers and export |
 | `ue_*.py`, `uesdk.py`, `uecheat.py`, `cheatmenu.py` | Unreal Engine support and the cheat menu logic |
 | `il2cpp_dump.py`, `tools_unity_gui.py` | Unity (IL2CPP) support: Il2CppDumper output, live instances, method patches |
+| `updater.py`, `update_ui.py`, `version.py` | Self-update from GitHub Releases (download, SHA-256 check, backup + rollback), update dialog, program version |
+| `imagebase.py` | Checks the image base against the console's memory map (never guesses) |
+| `scripts/`, `.github/workflows/` | Changelog / release-note helpers; CI (tests, lint) and the release build |
 | `docs/` | `de/` German notes, `history/` old release notes, `screenshots/` |
 | `tests/` | Unit tests |
 
