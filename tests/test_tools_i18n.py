@@ -56,11 +56,13 @@ class Dictionary(unittest.TestCase):
 
     def test_all_tab_names_and_start_texts_have_english(self):
         from tools_gui import ToolsWindow
-        for name in ToolsWindow.SIMPLE + ToolsWindow.ADVANCED + ("START", "FORTGESCHRITTEN"):
+        subs = tuple(label for g in ToolsWindow.GROUPS.values() for _inner, label in g)           # Unterreiter in UNREAL/UNITY
+        for name in ToolsWindow.SIMPLE + ToolsWindow.ADVANCED + subs + ("START", "FORTGESCHRITTEN"):
             self.assertTrue(name in EN or name in SAME, name)
         with Lang("en"):
             self.assertEqual(T.translate("FORTGESCHRITTEN"), "ADVANCED")
             self.assertEqual(T.translate("★ UE-ENTDECKER"), "★ UE DISCOVERER")
+            self.assertEqual(T.translate("ENTDECKER"), "DISCOVERER")
 
     def test_every_ui_string_in_the_tabs_is_translated(self):
         """Neue deutsche Texte in den Tabs ohne Eintrag in tools_i18n_en.py lassen diesen Test scheitern."""
@@ -385,8 +387,28 @@ class StartTabAndNavigation(unittest.TestCase):
         self.assertFalse(set(ToolsWindow.SIMPLE) & set(ToolsWindow.ADVANCED))
         for needed in ("SPEICHER", "DEBUGGER", "DISASSEMBLER", "POINTER"):
             self.assertIn(needed, ToolsWindow.ADVANCED)
-        for needed in ("WERT SUCHEN", "CHEATS BEARBEITEN", "★ UE-ENTDECKER"):
+        for needed in ("WERT SUCHEN", "CHEATS BEARBEITEN", "★ UNREAL", "★ UNITY"):
             self.assertIn(needed, ToolsWindow.SIMPLE)
+        # jeder Unterreiter gehoert genau einem Sammel-Tab und steht nicht noch einmal oben oder bei FORTGESCHRITTEN
+        inner = [i for g in ToolsWindow.GROUPS.values() for i, _l in g]
+        self.assertEqual(len(inner), len(set(inner)))
+        self.assertFalse(set(inner) & (set(ToolsWindow.SIMPLE) | set(ToolsWindow.ADVANCED)))
+        names = {i for i, _l in ToolsWindow.GROUPS["★ UNREAL"]}
+        self.assertIn("★ UE-ENTDECKER", names)
+        self.assertIn("UE-AUTO", names)
+        self.assertTrue(all("UNITY" in i for i, _l in ToolsWindow.GROUPS["★ UNITY"]))
+        self.assertEqual(ToolsWindow.GROUPED, set(inner))
+
+    def test_show_tab_reaches_tabs_inside_unreal_and_unity_groups(self):
+        from tools_gui import ToolsWindow
+        sel = []
+        nb = types.SimpleNamespace(select=lambda t: sel.append(("main", t)))
+        gnb = types.SimpleNamespace(select=lambda t: sel.append(("group", t)))
+        gnb.group = "UNREAL-FRAME"
+        fake = types.SimpleNamespace(adv_nb=object(), nb=nb, adv_frame="FRAME")
+        tab = types.SimpleNamespace(master=gnb)
+        ToolsWindow.show_tab(fake, tab)
+        self.assertEqual(sel, [("main", "UNREAL-FRAME"), ("group", tab)])
 
 
 if __name__ == "__main__":

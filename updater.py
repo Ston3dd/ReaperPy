@@ -151,6 +151,20 @@ def check(repo, current, fetch=None):
     return res
 
 
+def sidecar_digest(rel, asset_name, opener=None):
+    """Pruefsumme aus der Release-Datei `<asset>.sha256` ("sha256:<hex>") oder "" (nicht vorhanden / nicht lesbar)."""
+    side = next((a for a in rel.assets if a["name"] == asset_name + ".sha256"), None)
+    if not side:
+        return ""
+    try:
+        with (opener or _opener()).open(_request(side["url"], "application/octet-stream"), timeout=TIMEOUT) as r:
+            raw = r.read(4097)
+        m = re.search(r"\b([0-9a-fA-F]{64})\b", raw[:4096].decode("utf-8", "replace"))
+        return f"sha256:{m.group(1).lower()}" if m else ""
+    except Exception:  # noqa: BLE001 - Pruefsumme ist eine Zusatzsicherung, kein Grund den Dialog zu sprengen
+        return ""
+
+
 def pick_asset(rel, frozen):
     """-> (url, name, size, digest).  EXE build: the *win64*.zip asset.  Source run: a non-win64 .zip asset
     (e.g. a source package) or GitHub's automatic source archive of the tag."""
@@ -335,6 +349,10 @@ def run_update(rel, target, frozen, progress=None, cancel=None, stage=None, log=
     -> list of installed files.  Raises UpdateError (nothing changed unless install() already ran - then rolled back)."""
     stage = stage or (lambda s: None)
     url, name, size, digest = pick_asset(rel, frozen)
+    if not digest:                                                # kein GitHub-Digest -> <asset>.sha256 des Releases
+        digest = sidecar_digest(rel, name, opener)
+        if not digest and log:
+            log(f"no checksum available for {name} - integrity is only protected by HTTPS")
     staging = os.path.join(target, STAGING)
     shutil.rmtree(staging, ignore_errors=True)
     os.makedirs(staging, exist_ok=True)

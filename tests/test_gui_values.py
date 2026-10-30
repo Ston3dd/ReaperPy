@@ -172,5 +172,18 @@ class UnrealFlow(TC.Real):
         self.assertIn("Zahl", self.t.lbl_done._text)
 
 
+class FixedEngine(unittest.TestCase):
+    """Zwei WERTE-Tabs: im Sammel-Tab UNREAL nur Unreal, im Sammel-Tab UNITY nur Unity."""
+    def test_fixed_engine_is_used_even_if_the_other_game_is_loaded(self):
+        import tools_values_gui as G
+        w = FakeWin(); w.client = None
+        w.extra_tabs = [FakeUnityTab(object()), FakeUeTab(object())]       # beide Spiele geladen
+        self.assertEqual(G.ValuesTab(None, w, engine="unity")._engine(), "unity")
+        self.assertEqual(G.ValuesTab(None, w, engine="ue")._engine(), "ue")
+        auto = G.ValuesTab(None, w)
+        self.assertEqual(auto.v_engine.get(), "Automatisch")               # ohne Parameter wie bisher
+        self.assertEqual(G.ValuesTab(None, w, engine="unity").v_engine.get(), "Unity")
+        self.assertEqual(G.ValuesTab(None, w, engine="ue").v_engine.get(), "Unreal Engine")
+
 if __name__ == "__main__":
     unittest.main()

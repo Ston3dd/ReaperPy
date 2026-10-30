@@ -455,8 +455,37 @@ class Plan:
         return addr - self.base
 
 
-def plan(read, maps, base, options, impl, orig_pe, slots, log=print, settle=0.4):
+def anchor_names(base, impl, orig_pe, row_impls):
+    """{Adresse: Name} der Funktionen, deren Anfang als Versions-Fingerabdruck gespeichert wird."""
+    names = {impl: "item_function", orig_pe: "process_event"}
+    for a in sorted(row_impls):
+        names.setdefault(a, f"row_function_{a - base:x}")
+    return names
+
+
+def signature_anchors(client, maps, base, names, read, log=print):
+    """-> {name: (rva, aob)}.  Eindeutige Signatur ab Funktionsanfang (Adress-/Offset-Bytes als ??); gelingt das nicht
+    (Capstone fehlt, kein eindeutiges Muster), faellt dieser eine Anker auf feste Bytes zurueck."""
+    import aob
+    out = {}
+    for addr, name in names.items():
+        try:
+            sig, _hits = aob.make_signature(client, maps, addr, hook_len=0, wildcard_hook=False,
+                                            min_len=ANCHOR_LEN, max_len=64, log=log)
+        except Exception as e:  # noqa: BLE001 - ein Anker darf den Export nicht verhindern
+            log(f"Signatur fuer {name} nicht moeglich ({e}) - feste Bytes")
+            try:
+                sig = " ".join(f"{b:02X}" for b in bytes(read(addr, ANCHOR_LEN)))
+            except Exception:  # noqa: BLE001
+                continue
+        out[name] = (addr - base, sig)
+    return out
+
+
+def plan(read, maps, base, options, impl, orig_pe, slots, log=print, settle=0.4, client=None):
     """Alles was gebraucht wird, nur LESEND: read(addr,n)->bytes, maps=[(start,end,prot)], base = Image-Basis.
+    Mit `client` (hat read_memory, optional Server-Scan) bekommen die Versions-Anker AOB-Signaturen mit Wildcards
+    (ueberleben kleine Spiel-Updates und verschobene Funktionen); ohne client feste Bytes wie frueher.
     -> Plan.  Wirft TrainerError mit klarer Meldung."""
     options = list(options)
     if not options:
@@ -492,11 +521,14 @@ def plan(read, maps, base, options, impl, orig_pe, slots, log=print, settle=0.4)
 
     p = Plan()
     p.base, p.impl, p.orig_pe, p.slots, p.options = base, impl, orig_pe, sorted(set(slots)), options
-    for a in sorted({impl, orig_pe, *row_impls}):                    # Fingerabdruck dieser Spielversion
-        try:
-            p.anchors.append((a - base, bytes(read(a, ANCHOR_LEN)).hex()))
-        except Exception:  # noqa: BLE001
-            pass
+    if client is not None:                                           # Fingerabdruck als Signaturen mit Wildcards
+        p.anchors = signature_anchors(client, maps, base, anchor_names(base, impl, orig_pe, row_impls), read, log)
+    else:
+        for a in sorted({impl, orig_pe, *row_impls}):                # Fingerabdruck dieser Spielversion (feste Bytes)
+            try:
+                p.anchors.append((a - base, bytes(read(a, ANCHOR_LEN)).hex()))
+            except Exception:  # noqa: BLE001
+                pass
     slots_alloc = Slots(read, span, log)
 
     need_flags = flag_bytes_needed(len(options))
@@ -705,7 +737,22 @@ def check_project(out_dir, read, base):
     spec_base = int(d.get("image_base", "0x0"), 16)
     if spec_base != base:
         problems.append(f"Image-Basis: Trainer {spec_base:#x}, Spiel {base:#x}")
-    for a in d.get("anchors", []):
+    anchors = d.get("anchors", [])
+    if isinstance(anchors, dict):                      # Signaturen: nur Lesen an der gespeicherten Stelle
+        import aob
+        for name, a in anchors.items():
+            rva = int(a["rva"], 16) if isinstance(a["rva"], str) else int(a["rva"])
+            pat, mask = aob.parse_pattern(a["aob"])
+            try:
+                got = bytes(read(base + rva, len(pat)))
+            except Exception as e:  # noqa: BLE001
+                problems.append(f"{name}: +{rva:#x} nicht lesbar ({e})")
+                continue
+            checked += 1
+            if len(got) != len(pat) or any(m and g != b for g, b, m in zip(got, pat, mask)):
+                problems.append(f"{name}: Signatur passt bei +{rva:#x} nicht (Funktion verschoben oder geaendert)")
+        anchors = []
+    for a in anchors:
         rva, want = int(a["rva"], 16), a["bytes"]
         try:
             got = bytes(read(base + rva, len(want) // 2)).hex()
@@ -846,3 +893,81 @@ def compare_fnames(out_dir, live_alias_map):
             else:
                 changed.append((a, r["fname"], bytes(live).hex()))
     return ok, changed, missing
+
+
+def moved_rvas(spec, res, base):
+    """check_anchors-Ergebnis -> (verschoben {alte_rva: neue_rva}, Rest [(name, status)]).
+    Nur Anker mit genau einem Treffer an anderer Stelle ("moved") lassen sich automatisch korrigieren; alles andere
+    (missing / ambiguous / changed / unreadable) steht in `Rest` und bedeutet: Trainer neu bauen."""
+    anchors = (spec or {}).get("anchors") or {}
+    moved, rest = {}, []
+    for name, status, addr in res:
+        if status == "ok":
+            continue
+        a = anchors.get(name) if isinstance(anchors, dict) else None
+        if status == "moved" and a is not None:
+            old = int(a["rva"], 16) if isinstance(a["rva"], str) else int(a["rva"])
+            moved[old] = addr - base
+        else:
+            rest.append((name, status))
+    return moved, rest
+
+
+def remap_options(options, rva_map):
+    """Funktions-RVAs der Zeilen nach `rva_map` {alt: neu} ersetzen.  -> (neue Optionen, Anzahl geaenderter Zeilen)."""
+    import ue_cavegen
+    out, n = [], 0
+    for o in options:
+        rows = []
+        for r in o.rows:
+            old = getattr(r, "call_impl_rva", None)
+            if old in rva_map and isinstance(r, ue_cavegen.CallRow):
+                d = r.to_json()
+                d["call"]["impl_rva"] = hex(rva_map[old])
+                rows.append(ue_cavegen.CallRow.from_json(d))
+                n += 1
+            else:
+                rows.append(r)
+        out.append(Option(o.name, rows))
+    return out, n
+# ======================================================================
+# Vorschau (Dry-Run): wo wuerde was landen?  Nur Anzeige, nichts wird geschrieben
+# ======================================================================
+def prot_text(prot):
+    """Schutzbits (1=r, 2=w, 4=x) -> 'r-x' / 'rw-' / 'rwx'."""
+    return ("r" if prot & 1 else "-") + ("w" if prot & 2 else "-") + ("x" if prot & 4 else "-")
+
+
+def region_info(maps, addr):
+    """-> (start, ende, 'r-x') der Region, in der addr liegt; None wenn keine."""
+    for start, end, prot in maps:
+        if start <= addr < end:
+            return start, end, prot_text(prot)
+    return None
+
+
+def preview(p, maps):
+    """Alles Wesentliche eines Plans fuer eine Rueckfrage vor dem Schreiben.  -> dict"""
+    cave_r, flag_r = region_info(maps, p.cave), region_info(maps, p.flag_addr)
+    sig = sum(1 for v in (p.anchors.values() if isinstance(p.anchors, dict) else ()) if "?" in v[1])
+    return {
+        "cave": p.cave, "cave_rva": p.rva(p.cave), "cave_size": len(p.cave_bytes), "cave_region": cave_r,
+        "cave_writable": bool(cave_r and "w" in cave_r[2]),
+        "flag": p.flag_addr, "flag_rva": p.rva(p.flag_addr), "flag_size": p.flag_size, "flag_region": flag_r,
+        "hooks": len(p.slots), "options": len(p.options), "rows": sum(len(o.rows) for o in p.options),
+        "anchors": len(p.anchors), "anchors_with_wildcards": sig, "warnings": list(p.warnings),
+    }
+
+
+def preview_lines(pv):
+    """preview() -> Textzeilen fuer den Rueckfrage-Dialog."""
+    def where(r):
+        return f"Region {r[0]:#x}-{r[1]:#x} ({r[2]})" if r else "ausserhalb bekannter Regionen"
+    lines = [f"{pv['options']} Einträge, {pv['rows']} Items, {pv['hooks']} Haken (vtable-Slots)",
+             f"Cave: base+{pv['cave_rva']:#x} ({pv['cave']:#x}), {pv['cave_size']} Byte - {where(pv['cave_region'])}",
+             f"Schalter: base+{pv['flag_rva']:#x} ({pv['flag']:#x}), {pv['flag_size']} Byte - {where(pv['flag_region'])}"]
+    if pv["cave_writable"]:
+        lines.append("WARNUNG: Die Cave liegt in einer beschreibbaren Region (rwx) - nur Ausweichplatz, bitte testen.")
+    if pv["anchors"]:
+        lines.append(f"Versions-Prüfung: {pv['anchors']} Funktions-Anker, davon {pv['anchors_with_wildcards']} als Signatur mit Wildcards")
+    return lines

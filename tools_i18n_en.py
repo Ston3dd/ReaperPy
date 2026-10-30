@@ -1722,6 +1722,51 @@ EN.update({
 })
 
 
+# --- ReaperPy: zusaetzliche englische Texte (Signatur-Anker, Vorschau, Tabs)
+_ADD = {
+    '★ UNREAL': '★ UNREAL',
+    '★ UNITY': '★ UNITY',
+    'ITEMS': 'ITEMS',
+    'WERTE': 'VALUES',
+    'LIVE': 'LIVE',
+    'CHEAT-MENÜ': 'CHEAT MENU',
+    'ENTDECKER': 'DISCOVERER',
+    'EXPERTE': 'EXPERT',
+    'SCHNELL': 'QUICK',
+    'MANUELL': 'MANUAL',
+    'Unreal-Engine-Spiel: Leben, Gold, Erfahrung, Munition': 'Unreal Engine game: health, gold, experience, ammo',
+    'Wichtige Werte als fertige Patches - in drei Klicks (Reiter UNREAL, Unterreiter WERTE).': 'Important values as ready-made patches - in three clicks (tab UNREAL, sub-tab VALUES).',
+    'Unity-Spiel: Leben, Gold, Erfahrung, Munition': 'Unity game: health, gold, experience, ammo',
+    'Wichtige Werte als fertige Patches - in drei Klicks (Reiter UNITY, Unterreiter SCHNELL).': 'Important values as ready-made patches - in three clicks (tab UNITY, sub-tab QUICK).',
+    'ZU UNITY ▸ SCHNELL': 'GO TO UNITY ▸ QUICK',
+    'Unity-Spiel: Spezialfälle': 'Unity game: special cases',
+    'Felder, Methoden und Namen von Hand ansehen und ändern.': 'Look at and change fields, methods and names by hand.',
+    'ZU UNITY ▸ MANUELL': 'GO TO UNITY ▸ MANUAL',
+    'Signatur fuer ': 'Signature for ',
+    ' nicht moeglich (': ' not possible (',
+    ' - feste Bytes': ' - using fixed bytes',
+    ' nicht (Funktion verschoben oder geaendert)': ' does not match (function moved or changed)',
+    ' Funktion(en) liegen in deinem Spiel an anderer Stelle (Update / anderer Build):': ' function(s) are at a different place in your game (update / other build):',
+    '   → Der Trainer kann automatisch auf die neuen Adressen angepasst werden.': '   → The trainer can be adapted to the new addresses automatically.',
+    ' Zeile(n) rufen jetzt die verschobene Funktion auf.': ' row(s) now call the moved function.',
+    'Funktionen dieses Trainers liegen in deinem Spiel an anderer Stelle': 'Functions of this trainer are at a different place in your game',
+    'Trainer speichern?': 'Save trainer?',
+    'So würde der Trainer aussehen (bisher wurde nichts geschrieben):': 'This is what the trainer would look like (nothing has been written yet):',
+    'Jetzt speichern?': 'Save now?',
+    'Abgebrochen - es wurde nichts geschrieben.': 'Cancelled - nothing was written.',
+    'ausserhalb bekannter Regionen': 'outside known regions',
+    ' Einträge, ': ' entries, ',
+    ' Items, ': ' items, ',
+    ' Haken (vtable-Slots)': ' hooks (vtable slots)',
+    'WARNUNG: Die Cave liegt in einer beschreibbaren Region (rwx) - nur Ausweichplatz, bitte testen.': 'WARNING: The cave is in a writable region (rwx) - fallback location only, please test.',
+    'Versions-Prüfung: ': 'Version check: ',
+    ' Funktions-Anker, davon ': ' function anchors, of which ',
+    ' als Signatur mit Wildcards': ' as signature with wildcards',
+    ' Code-Luecke(n) mitten im Code (kein Padding am Region-Ende)': ' code gap(s) in the middle of the code (no padding at the region end)',
+}
+for _k, _v in _ADD.items():
+    EN.setdefault(_k, _v)
+
 from tools_i18n_unity import EN_UNITY  # noqa: E402
 EN.update(EN_UNITY)
 

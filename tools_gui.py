@@ -1098,9 +1098,9 @@ class ToolsWindow(tk.Toplevel):
             msg = f"Start-Tab nicht geladen: {e}"
             self.after(200, lambda msg=msg: self.log(msg, "err"))
         for name, subs in self.GROUPS.items():                     # Sammel-Tabs fuellen (nur Tabs, die geladen werden konnten)
-            for inner, label in subs:
+            for inner, sub_title in subs:
                 if inner in by_name:
-                    self.groups[name].add(by_name[inner], label)
+                    self.groups[name].add(by_name[inner], sub_title)
             by_name[name] = self.groups[name]
         for name in self.SIMPLE:
             if name in by_name:

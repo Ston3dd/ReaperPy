@@ -528,15 +528,26 @@ class ItemsTab(BaseTab):
             dirs = IT.project_dirs(self._base_dir(), len(groups))
             self._ilog(f"Platz fuer die Cave: {cap['code']} Byte -> {len(groups)} Projekt(e)")
             made = []
-            for d, opts in zip(dirs, groups):
-                p = TR.plan(read, maps, base, opts, None, pe, slots, log=self._ilog)
-                TR.write_project(d, p, game=str(game))
+            for d, opts in zip(dirs, groups):                               # nur planen (lesend) - noch nichts schreiben
+                p = TR.plan(read, maps, base, opts, None, pe, slots, log=self._ilog, client=client)
                 made.append((d, len(opts), sum(len(o.rows) for o in opts), p))
-            return made, skipped
+            return made, skipped, maps
 
         def ok(res):
+            made, skipped, maps = res
+            lines = []
+            for m in made:
+                lines += ([f"{m[0]}:"] if len(made) > 1 else []) + ["  " + x for x in TR.preview_lines(TR.preview(m[3], maps))]
+            if not self._ask_preview("\n".join(lines)):
+                self._busy = False
+                self.lbl_done.configure(text="Abgebrochen - es wurde nichts geschrieben.", fg=WARN)
+                return
+            try:
+                for d, _n, _r, p in made:
+                    TR.write_project(d, p, game=str(game))
+            except Exception as e:  # noqa: BLE001
+                return fail(e)
             self._busy = False
-            made, skipped = res
             self.out_dirs = [m[0] for m in made]
             total = sum(m[2] for m in made)
             msg = [f"✔ Fertig: {total} Items in {sum(m[1] for m in made)} Einträgen, gespeichert in:"]
@@ -589,6 +600,11 @@ class ItemsTab(BaseTab):
     def _live_names(self):
         return {TR.clean_name(it["name"]): it["fname"] for it in self.items}
 
+    def _ask_preview(self, text):
+        """Dry-Run: zeigt, wo Cave und Schalter landen wuerden, bevor Dateien geschrieben werden."""
+        return messagebox.askyesno("Trainer speichern?", "So würde der Trainer aussehen (bisher wurde nichts geschrieben):\n\n"
+                                   + text + "\n\nJetzt speichern?", parent=self.win)
+
     def _ask_adapt(self, text):
         return messagebox.askyesno("Trainer anpassen", text, parent=self.win)
 
@@ -606,14 +622,26 @@ class ItemsTab(BaseTab):
         def job():
             res = TR.check_project(d, client.read_memory, self.base)
             cmp = TR.compare_fnames(d, names) if names else None
-            return res, cmp
+            moved = {}
+            spec = TR._load_spec_raw(d)
+            if spec and isinstance(spec.get("anchors"), dict) and not res["ok_version"]:
+                # Signaturen: liegt die Funktion nur woanders (genau ein Treffer)?  Dann laesst sich das korrigieren.
+                maps = [(m[0], m[1], m[2]) for m in client.get_maps()]
+                found, rest = TR.moved_rvas(spec, TR.check_anchors(client, maps, self.base, spec), self.base)
+                if found and not rest and int(spec.get("image_base", "0x0"), 16) == self.base:
+                    moved = found
+            return res, cmp, moved
 
         def ok(r):
             self._busy = False
-            res, cmp = r
+            res, cmp, moved = r
             lines = [f"Trainer: {d}"]
             if res["ok_version"]:
                 lines.append("✔ Passt zur Spielversion (Funktionen und Image-Basis stimmen überein).")
+            elif moved:
+                lines.append(f"↻ {len(moved)} Funktion(en) liegen in deinem Spiel an anderer Stelle (Update / anderer Build):")
+                lines += [f"      +{o:#x} → +{n:#x}" for o, n in list(moved.items())[:3]]
+                lines.append("   → Der Trainer kann automatisch auf die neuen Adressen angepasst werden.")
             else:
                 lines.append("✗ Dieser Trainer wurde für eine ANDERE Spielversion / Image-Basis gebaut - NICHT aktivieren:")
                 lines += ["      " + x for x in res["problems"][:3]]
@@ -630,12 +658,15 @@ class ItemsTab(BaseTab):
                 else:
                     lines.append(f"✗ {len(changed)} Item-Nummern sind in deinem Spiel anders (und {len(missing)} Items fehlen) - "
                                  "deshalb passiert im Spiel nichts, wenn du einen Eintrag aktivierst.")
-                    adapt = res["ok_version"] and bool(changed)
+                    adapt = (res["ok_version"] or bool(moved)) and bool(changed)
+            fix = bool(moved)
             self.lbl_done.configure(text="\n".join(lines), fg=ACCENT if res["ok_version"] and not adapt else WARN)
-            if adapt and self._ask_adapt("Die Item-Nummern dieses Trainers passen nicht zu deinem Spiel.\n\n"
-                                         "Jetzt an dein Spiel anpassen? (Die Dateien in diesem Ordner werden neu geschrieben; "
-                                         "die BASIS des Trainers muss ausgeschaltet sein.)"):
-                self._adapt_dir(d, names)
+            if (adapt or fix) and self._ask_adapt(
+                    ("Funktionen dieses Trainers liegen in deinem Spiel an anderer Stelle" if fix else
+                     "Die Item-Nummern dieses Trainers passen nicht zu deinem Spiel") + ".\n\n"
+                    "Jetzt an dein Spiel anpassen? (Die Dateien in diesem Ordner werden neu geschrieben; "
+                    "die BASIS des Trainers muss ausgeschaltet sein.)"):
+                self._adapt_dir(d, names, moved)
 
         def fail(e):
             self._busy = False
@@ -643,10 +674,12 @@ class ItemsTab(BaseTab):
             self.log(str(e), "err")
         self.bg(job, ok, fail)
 
-    def _adapt_dir(self, d, names):
+    def _adapt_dir(self, d, names, moved=None):
+        """Trainer an das laufende Spiel anpassen: Item-Nummern (names) und/oder verschobene Funktionen (moved {alt: neu})."""
+        moved = moved or {}
         ue, proj, client = self._ue(), self._proj(), getattr(self.win, "client", None)
         live = getattr(ue, "live", None)
-        if proj is None or client is None or live is None or not names:
+        if proj is None or client is None or live is None or not (names or moved):
             self.lbl_done.configure(text="Erst Schritt ① und ITEMS FINDEN (Spiel laden, verbinden).", fg=ERROR)
             return
         sdk, base, game = proj.sdk, self.base, getattr(proj, "title", "") or getattr(proj, "name", "")
@@ -655,21 +688,26 @@ class ItemsTab(BaseTab):
 
         def job():
             read = client.read_memory
-            new, changed, missing = TR.refresh_fnames(TR.load_options(d), names)
+            new, changed, missing = TR.refresh_fnames(TR.load_options(d), names) if names else (TR.load_options(d), [], [])
+            n_moved = 0
+            if moved:
+                new, n_moved = TR.remap_options(new, moved)
             pe, slots, _notes = IT.hook_targets(sdk, live, read, base)
             maps = [(m[0], m[1], m[2]) for m in client.get_maps()]
             cap = TR.capacity(read, maps, base, log=self._ilog)
             if len(TR.fit_options(new, cap["code"])) != 1:
                 raise TR.TrainerError("Der Trainer passt in diesem Spiel nicht mehr in eine Cave - bitte mit ITEMS neu bauen "
                                       "(teilt automatisch auf mehrere Projekte auf)")
-            p = TR.plan(read, maps, base, new, None, pe, slots, log=self._ilog)
+            p = TR.plan(read, maps, base, new, None, pe, slots, log=self._ilog, client=client)
             TR.write_project(d, p, game=str(game))
-            return changed, missing
+            return changed, missing, n_moved
 
         def ok(r):
             self._busy = False
-            changed, missing = r
+            changed, missing, n_moved = r
             msg = f"✔ Angepasst: {len(changed)} Item-Nummern ersetzt."
+            if n_moved:
+                msg += f" {n_moved} Zeile(n) rufen jetzt die verschobene Funktion auf."
             if missing:
                 msg += f" {len(missing)} Items gibt es in deinem Spiel nicht - sie behalten die alte Nummer (wirkungslos)."
             msg += "\nIn ReaperPy den Ordner neu laden (ORDNER), BASIS aktivieren und die Einträge testen."

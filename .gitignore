@@ -25,3 +25,11 @@ Thumbs.db
 # Game dumps and exports you made while testing
 dumps/
 *.reapproj.bak
+
+# Archive gehoeren nicht ins Repo (Releases laufen ueber GitHub Actions)
+*.zip
+*.rar
+
+# Archive gehoeren nicht ins Repo (Releases laufen ueber GitHub Actions)
+*.zip
+*.rar

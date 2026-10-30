@@ -566,20 +566,6 @@ class ProjectTests(unittest.TestCase):
         self.assertLessEqual(len(T.clean_name("x" * 200)), T.NAME_MAX)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
-def test_alloc_code_falls_back_to_inner_gap():
-    import cave_trainer as CT
-    size = 0x3000
-    mem = bytearray(b"\x90" * size)
-    mem[0x1000:0x1400] = b"\xCC" * 0x400          # Luecke mitten im Code, am Region-Ende kein Padding
-    read = lambda a, n: bytes(mem[a - 0x10000:a - 0x10000 + n])
-    sl = CT.Slots(read, [(0x10000, 0x10000 + size, 5)], log=lambda *_: None)
-    cave, need = sl.alloc_code(0x100, 0x10000)
-    assert 0x11000 <= cave and cave + need <= 0x11400
-
 
 class AnchorTests(unittest.TestCase):
     class _Client:
@@ -616,3 +602,57 @@ class AnchorTests(unittest.TestCase):
         p.anchors = {"impl": (0x10, "48 8B ??")}
         doc = T.spec_document(p)
         self.assertEqual(doc["anchors"]["impl"], {"rva": "0x10", "aob": "48 8B ??"})
+
+
+class InnerGapTests(unittest.TestCase):
+    """Kein Padding am Region-Ende -> Ausweichplatz in einer CC-Luecke mitten im Code."""
+
+    def test_alloc_code_falls_back_to_inner_gap(self):
+        import cave_trainer as CT
+        size = 0x3000
+        mem = bytearray(b"\x90" * size)
+        mem[0x1000:0x1400] = b"\xCC" * 0x400          # Luecke mitten im Code, am Region-Ende kein Padding
+
+        def read(a, n):
+            return bytes(mem[a - 0x10000:a - 0x10000 + n])
+        sl = CT.Slots(read, [(0x10000, 0x10000 + size, 5)], log=lambda *_: None)
+        cave, need = sl.alloc_code(0x100, 0x10000)
+        self.assertTrue(0x11000 <= cave and cave + need <= 0x11400)
+        self.assertGreaterEqual(sl.code_capacity(), 0x300)
+
+    def test_tail_padding_is_preferred_and_inner_scan_is_skipped(self):
+        import cave_trainer as CT
+        reads = []
+        size = 0x4000
+        mem = bytearray(b"\x90" * size)
+        mem[-0x2000:] = b"\xCC" * 0x2000               # grosses Padding am Ende
+        mem[0x100:0x200] = b"\xCC" * 0x100
+
+        def read(a, n):
+            reads.append(n)
+            return bytes(mem[a - 0x10000:a - 0x10000 + n])
+        sl = CT.Slots(read, [(0x10000, 0x10000 + size, 5)], log=lambda *_: None)
+        cave, _need = sl.alloc_code(0x100, 0x10000)
+        self.assertGreaterEqual(cave, 0x10000 + size - 0x2000)
+        self.assertLess(max(reads), 0x10000)                  # nur der Rand, nicht der ganze Code gelesen
+
+    def test_no_gap_anywhere_still_raises_and_gap_split_over_blocks_is_merged(self):
+        import cave_trainer as CT
+        old = CT.INNER_BLOCK
+        CT.INNER_BLOCK = 0x100                                 # Stueck muss ueber mehrere Bloecke zusammengesetzt werden
+        self.addCleanup(setattr, CT, "INNER_BLOCK", old)
+        size = 0x2000
+        mem = bytearray(b"\x90" * size)
+
+        def read(a, n):
+            return bytes(mem[a - 0x10000:a - 0x10000 + n])
+        with self.assertRaises(CT.TrainerError):
+            CT.Slots(read, [(0x10000, 0x10000 + size, 5)], log=lambda *_: None).alloc_code(0x100, 0x10000)
+        mem[0x500:0x900] = b"\xCC" * 0x400
+        sl = CT.Slots(read, [(0x10000, 0x10000 + size, 5)], log=lambda *_: None)
+        cave, need = sl.alloc_code(0x300, 0x10000)
+        self.assertTrue(0x10500 <= cave and cave + need <= 0x10900)
+
+
+if __name__ == "__main__":
+    unittest.main()

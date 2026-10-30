@@ -6,11 +6,19 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 
 ### Added
 - **Self-update from GitHub Releases.** On start (4 s after the window opens) ReaperPy asks GitHub for the latest release. If it is newer, a dialog shows the release notes and offers **Install now / Later / Skip this version**. *Install now* downloads the release zip, checks its SHA-256, unpacks it into a staging folder, replaces the program files with a backup + automatic rollback, and then says that ReaperPy has to be restarted (with a **Restart now** button). Config, profiles, logs, library and `applied.json` are never overwritten. A git checkout is never touched (it only tells you to `git pull`). START tab -> *Check for updates* runs the same flow manually. Turn it off with `"auto_update_check": false`; use another repository with `"update_repo": "owner/name"`. The old `update_url` (own JSON file) still works and only shows a hint. Tests: `tests/test_updater.py`.
+- **Version anchors as signatures.** Trainers now store the start of each function as an AOB signature with wildcards instead of fixed bytes, so they survive small game updates. If a function only moved (exactly one hit elsewhere), the ITEMS tab offers to adapt the trainer to the new addresses; if it is gone or ambiguous it still says "other game version".
+- **Preview before saving a trainer.** The ITEMS tab shows where the cave and the switch would land (region and `r-x`/`rwx`, warning for writable caves) and writes nothing until you confirm.
+- GitHub Actions: tests on every push/PR (Linux + Windows, with keystone and capstone) and a release build on `v*` tags (Windows zip + `.sha256`, notes from this file). The updater uses the `.sha256` of the release when GitHub gives no digest.
+- `scripts/changelog_from_git.py` drafts a changelog section from the commit messages (`Added` / `Changed` / `Fixed` blocks).
+- Guard tests: no test files in the repo root, explicit encoding for all text files.
 
 ### Fixed
 - `cave_trainer.check_anchors()` / `anchor_problem()` were used by the GUI and the tests but did not exist; `spec_document()` crashed with signature-style anchors.
 - Export: the code cave now prefers non-writable code regions (`r-x`); writable (`rwx`) regions are only a fallback and log a warning. The report names the region. On disable only the hook is restored and the cave stays (zeroing it could crash a thread still running inside).
 - Missing English texts for the UE-LIVE connection fallback messages.
+- Test files had landed in the repo root (`module incorrectly imported` in CI); `F402` loop variable shadowing an import in `tools_gui.py`.
+- File handles left open in `ue_auto.load_dump` / `main_game`; the test suite no longer produces `ResourceWarning`s.
+- Long byte dumps in the patch log are cut to 32 bytes plus `... (+N bytes)`.
 
 ## 5.9.0 - 2026-10-29
 

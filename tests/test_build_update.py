@@ -152,11 +152,12 @@ class StartButtonAndHandler(unittest.TestCase):
         t.bg = lambda job, ok=None, err=None: ok(job())
         return t, logs
 
-    def test_no_url_gives_a_hint(self):
+    def test_no_url_starts_the_github_check(self):
         t, logs = self.make_start("")
+        calls = []
+        t.win.app.check_for_updates = lambda manual=True: calls.append(manual)
         t.check_updates()
-        self.assertEqual(logs[-1][0], "info")
-        self.assertIn("update_url", logs[-1][1])
+        self.assertEqual(calls, [True])                       # ohne "update_url" -> GitHub-Releases + Installieren-Dialog
 
     def test_results_are_reported_and_download_needs_confirmation(self):
         import tools_start_gui as S
@@ -204,7 +205,7 @@ class StartButtonAndHandler(unittest.TestCase):
         app._on_update(U.Result("newer", "5.7.0", "5.8.0", "https://x/dl"))
         self.assertEqual(out, [("accent", "[update] New version 5.8.0 available (installed: 5.7.0) - download: https://x/dl")])
 
-    def test_async_check_runs_by_default_and_only_off_when_disabled(self):
+    def test_async_check_modes(self):
         import gui
         app = object.__new__(gui.App)
         started = []
@@ -215,12 +216,14 @@ class StartButtonAndHandler(unittest.TestCase):
             app._update_check_async()
             app.cfg = {"update_url": "https://x/v.json", "auto_update_check": False}
             app._update_check_async()
-            self.assertEqual(started, [])
-            app.cfg = {}                                              # Standard: GitHub-Releases pruefen
-            app._update_check_async()
-            app.cfg = {"update_url": "https://x/v.json"}              # alte JSON-Variante bleibt moeglich
-            app._update_check_async()
+            self.assertEqual(started, [])                                  # abgeschaltet
+            app.cfg = {"update_url": "https://x/v.json"}
+            app._update_check_async()                                      # eigene JSON-Datei (alter Weg)
+            self.assertEqual(len(started), 1)
+            app.cfg = {}
+            app._update_check_async()                                      # Standard: GitHub
             self.assertEqual(len(started), 2)
+            self.assertIn("check_for_updates", started[1]["target"].__qualname__)
         finally:
             gui.threading.Thread = orig
 

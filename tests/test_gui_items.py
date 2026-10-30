@@ -1,5 +1,6 @@
 """Tab ITEMS (Fake-Tk, kein Display): ITEMS FINDEN -> Haken -> TRAINER SPEICHERN."""
 import os, shutil, struct, sys, tempfile, unittest
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
@@ -132,6 +133,23 @@ class BaseCheck(T):
         self.assertEqual(self.t.basecheck.status, "ok")
 
 
+    def test_save_shows_preview_and_writes_only_after_yes(self):
+        self.t.find_items()
+        seen = []
+        self.t._ask_preview = lambda text: seen.append(text) or False
+        self.t.save()
+        self.assertEqual(len(seen), 1)
+        self.assertIn("Region 0x400000-0x410000 (r-x)", seen[0])
+        self.assertIn("Cave:", seen[0])
+        self.assertIn("nichts geschrieben", self.t.lbl_done._text)
+        self.assertFalse(os.path.isdir(os.path.join(self.tmp, "Spiel", "Items")))
+        self.assertFalse(self.t._busy)
+        self.t._ask_preview = lambda text: True
+        self.t.save()
+        self.assertTrue(os.path.isfile(os.path.join(self.tmp, "Spiel", "Items", "_trainer_spec.json")))
+        self.assertIn("Fertig", self.t.lbl_done._text)
+
+
 class Portability(T):
     """Fremder / alter Trainer: pruefen und an die Item-Nummern des eigenen Spiels anpassen."""
 
@@ -178,6 +196,48 @@ class Portability(T):
         self.t._ask_adapt = lambda text: True
         self.t._check_dir(d)
         self.assertIn("BASIS dieses Trainers ist noch aktiv", self.t.lbl_done._text)
+
+    def test_moved_function_is_found_and_trainer_is_adapted_automatically(self):
+        import random
+        rnd = random.Random(3)
+        for a in (self.img.impl, self.img.pe):                       # eindeutiger Code -> echte Signaturen
+            self.img.write(a, bytes(rnd.randrange(1, 255) for _ in range(160)))
+        d = self.build()
+        spec = TR._load_spec_raw(d)
+        self.assertEqual(sorted(spec["anchors"]), ["item_function", "process_event"])
+        old_rva = self.img.impl - self.img.BASE
+        new_addr = self.img.impl + 0x100                              # Spiel-Update: Funktion liegt weiter hinten
+        self.img.write(new_addr, self.img.read(self.img.impl, 160))
+        self.img.write(self.img.impl, bytes(160))
+        asked = []
+        self.t._ask_adapt = lambda text: asked.append(text) or True
+        self.t._check_dir(d)
+        self.assertEqual(len(asked), 1)
+        self.assertIn("anderer Stelle", asked[0])
+        txt = self.t.lbl_done._text
+        self.assertIn("Angepasst", txt)
+        self.assertIn("verschobene Funktion", txt)
+        opts = TR.load_options(d)
+        self.assertEqual({r.call_impl_rva for o in opts for r in o.rows}, {new_addr - self.img.BASE})
+        spec = TR._load_spec_raw(d)
+        self.assertEqual(spec["anchors"]["item_function"]["rva"], hex(new_addr - self.img.BASE))
+        self.assertNotEqual(old_rva, new_addr - self.img.BASE)
+        res = TR.check_anchors(self.w.client, self.img.maps, self.img.BASE, spec)
+        self.assertEqual({r[1] for r in res}, {"ok"})
+
+    def test_moved_function_is_not_adapted_when_user_says_no(self):
+        import random
+        rnd = random.Random(4)
+        for a in (self.img.impl, self.img.pe):
+            self.img.write(a, bytes(rnd.randrange(1, 255) for _ in range(160)))
+        d = self.build()
+        before = Path(os.path.join(d, "_trainer_spec.json")).read_bytes()
+        self.img.write(self.img.impl + 0x100, self.img.read(self.img.impl, 160))
+        self.img.write(self.img.impl, bytes(160))
+        self.t._ask_adapt = lambda text: False
+        self.t._check_dir(d)
+        self.assertIn("anderer Stelle", self.t.lbl_done._text)
+        self.assertEqual(Path(os.path.join(d, "_trainer_spec.json")).read_bytes(), before)
 
 
 

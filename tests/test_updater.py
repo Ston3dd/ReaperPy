@@ -9,6 +9,7 @@ import threading
 import types
 import unittest
 import zipfile
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
@@ -123,11 +124,11 @@ class Install(unittest.TestCase):
             for n, c in files.items():
                 p = os.path.join(base, *n.split("/"))
                 os.makedirs(os.path.dirname(p), exist_ok=True)
-                with open(p, "w") as f:
+                with open(p, "w", encoding="utf-8") as f:
                     f.write(c)
 
     def rd(self, *p):
-        with open(os.path.join(self.t, *p)) as f:
+        with open(os.path.join(self.t, *p), encoding="utf-8") as f:
             return f.read()
 
     def test_user_data_is_protected_and_code_replaced(self):
@@ -193,6 +194,41 @@ class Install(unittest.TestCase):
         with self.assertRaises(U.UpdateError):
             U.run_update(bad, self.t, False, opener=FakeOpener())
         self.assertEqual(self.rd("gui.py"), "V2")                           # wrong checksum: nothing touched
+
+    def test_sha256_sidecar_file_is_used_when_github_gives_no_digest(self):
+        pkg = os.path.join(self.tmp.name, "pkg2.zip")
+        make_zip(pkg, {"gui.py": "V3", "version.py": "V3"})
+        with open(pkg, "rb") as f:
+            data = f.read()
+        side_ok = (hashlib.sha256(data).hexdigest() + "  src.zip\n").encode()
+        side_bad = ("0" * 64 + "  src.zip\n").encode()
+
+        class Resp:
+            def __init__(self, b): self.b, self.headers = io.BytesIO(b), {"Content-Length": str(len(b))}
+            def read(self, n=-1): return self.b.read(n)
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+
+        def opener(sidecar):
+            class O:
+                def open(self, req, timeout=0):
+                    return Resp(sidecar if req.full_url.endswith(".sha256") else data)
+            return O()
+
+        assets = [asset("src.zip", len(data)), asset("src.zip.sha256", 90)]
+        rel = U.parse_release(release_json(assets=assets))
+        logs = []
+        U.run_update(rel, self.t, False, opener=opener(side_ok), log=logs.append)
+        self.assertEqual(self.rd("gui.py"), "V3")
+        self.assertEqual(logs, [])                                   # Pruefsumme vorhanden -> keine Warnung
+        Path(os.path.join(self.t, "gui.py")).write_text("OLD", encoding="utf-8")
+        with self.assertRaises(U.UpdateError):                       # falsche Pruefsumme -> nichts angefasst
+            U.run_update(rel, self.t, False, opener=opener(side_bad))
+        self.assertEqual(self.rd("gui.py"), "OLD")
+        rel2 = U.parse_release(release_json(assets=[asset("src.zip", len(data))]))
+        logs.clear()
+        U.run_update(rel2, self.t, False, opener=opener(side_ok), log=logs.append)       # gar keine Pruefsumme
+        self.assertTrue(any("no checksum" in m for m in logs))
 
 
 class Environment(unittest.TestCase):
