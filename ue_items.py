@@ -185,6 +185,7 @@ FUNC_NOT_GIVE = {"remove", "delete", "sub", "subtract", "consume", "use", "disca
 FUNC_SPECIAL = {"important", "key", "quest", "mission", "story", "event", "tutorial", "mail", "present"}
 OWNER_NOT_GAME = {"view", "model", "widget", "ui", "hud", "preview", "display", "viewer", "menu", "window", "slate",
                   "actor"}
+BAG_WORDS = {"inventory", "backpack", "bag", "storage", "warehouse", "stash", "pouch"}
 SHAPE_TEXT = {"name+menge": "Name + Menge", "id+menge": "Nummer + Menge", "klasse+menge": "Klasse + Menge",
               "name": "nur Name", "id": "nur Nummer", "name+zahl": "Name + Zahl"}
 
@@ -217,11 +218,13 @@ def rate_functions(prof, sdk, verified=None):
         bad_name = bool(fw & FUNC_NOT_GIVE)
         bad_owner = bool(ow & OWNER_NOT_GAME)
         special = bool(fw & FUNC_SPECIAL)
+        if (fw | ow) & BAG_WORDS:
+            score += 1.5                                # BackPack/Inventory/Bag im Namen: das ist das Inventar
         if bad_name:
-            score -= 6
+            score -= 10
             reasons.append("kein normales Item-Geben")
         if bad_owner:
-            score -= 4
+            score -= 8
             reasons.append("gehoert zur Anzeige")
         if special:
             score -= 3
@@ -256,11 +259,14 @@ def test_assignments(func, fp, item, amount, sdk):
     """Parameter fuer ue_call.encode_params: ID-Parameter = das Item, Mengen-Parameter = amount, alles andere 0."""
     cls = CG.classify_params(func.data["params"], sdk)
     names = {p.name for p in fp.params}
-    out = {}
+    out, used_id = {}, False
     for a in cls:
         if a["name"] not in names:
             continue
         if a["role"] == "id":
+            if used_id:
+                continue                                       # weitere ID-Parameter (z. B. WorkId) bleiben leer = None / 0
+            used_id = True
             if a["kind"] == "fname":
                 out[a["name"]] = "hex:" + bytes(item["fname"]).hex()
             elif item.get("id") is None:
@@ -269,9 +275,26 @@ def test_assignments(func, fp, item, amount, sdk):
                 out[a["name"]] = str(int(item["id"]))
         elif a["role"] == "count":
             out[a["name"]] = str(amount)
-    if not any(a["role"] == "id" for a in cls):
+    if not used_id:
         raise ValueError("Die Funktion hat keinen Parameter fuer die Item-ID")
     return out
+
+
+def call_report(fp, assign, outs, instance, found):
+    """Textzeilen fuers Protokoll: was wurde WOHIN gerufen, mit welchen Bytes, was kam zurueck."""
+    import ue_call
+    buf = ue_call.encode_params(fp, assign)
+    lines = [f"   Objekt: {instance.get('name', '?')} @ {instance.get('addr', 0):#x} ({instance.get('class', '?')}), "
+             f"{len(found)} Objekt(e) dieser Klasse im Spiel"]
+    if len(found) > 1:
+        lines.append("   weitere: " + ", ".join(f"{i.get('name', '?')}" for i in found[1:5]))
+    for p in fp.params:
+        kind = "Rueckgabe" if p.pflags & 0x400 else ("Ausgabe" if p.pflags & 0x100 else "Eingabe")
+        raw = bytes(buf[p.offset:p.offset + p.size]).hex(" ")
+        lines.append(f"   {kind}: {p.name} ({p.type}) @+{p.offset:#x} = {raw}")
+    for k, v in outs:
+        lines.append(f"   Ergebnis {k} = {v}")
+    return lines
 
 
 def returned_false(fp, outs):
@@ -282,9 +305,8 @@ def returned_false(fp, outs):
     return any(k == "ReturnValue" and str(v).strip() == "0" for k, v in outs)
 
 
-def try_give(live, client, sdk, func, item, base, amount=1, caller=None):
-    """EIN Item ueber die Funktion in einer ECHTEN Instanz des laufenden Spiels geben (nicht ueber die Cave).
-    -> {'instance', 'instances', 'outs', 'returned_false', 'reach'}.  Wirft ValueError mit verstaendlichem Text."""
+def _prepare_call(live, client, sdk, func, base):
+    """Alles, was fuer den Live-Aufruf noetig ist -> (fp, ufunction, [Instanzen], ProcessEvent-Adresse)."""
     import ue_call
     d = func.data
     sdk.load_params()
@@ -298,21 +320,30 @@ def try_give(live, client, sdk, func, item, base, amount=1, caller=None):
         raise ValueError("Die Funktion wurde im laufenden Spiel nicht gefunden (Klasse nicht geladen?)")
     if d.get("flags", 0) & FUNC_STATIC:
         obj = live.default_object(d["owner"])
-        found = [obj] if obj else []
+        found = [{"addr": obj, "name": "Default__" + d["owner"], "class": d["owner"]}] if obj else []
     else:
-        found = [i["addr"] for i in live.instances(d["owner"]) if "Default__" not in i["name"]]
+        found = [i for i in live.instances(d["owner"]) if "Default__" not in i["name"]]
     if not found:
         raise ValueError(f"Im Spiel gibt es kein Objekt der Klasse {d['owner']} - Spielstand laden (nicht im Hauptmenue) "
                          "und es erneut versuchen")
-    obj = found[0]
-    assign = test_assignments(func, fp, item, amount, sdk)
     pidx = sdk.offset("process_event_index", "processeventindex", default=77)
     prva = sdk.offset("process_event")
-    pe = ue_call.process_event_addr(client.read_memory, obj, pidx, fallback=(base + prva) if prva else None)
+    pe = ue_call.process_event_addr(client.read_memory, found[0]["addr"], pidx, fallback=(base + prva) if prva else None)
+    return fp, function, found, pe
+
+
+def try_give(live, client, sdk, func, item, base, amount=1, caller=None):
+    """EIN Item ueber die Funktion in einer ECHTEN Instanz des laufenden Spiels geben (nicht ueber die Cave).
+    -> {'instance', 'instances', 'outs', 'returned_false', 'reach'}.  Wirft ValueError mit verstaendlichem Text."""
+    import ue_call
+    d = func.data
+    fp, function, found, pe = _prepare_call(live, client, sdk, func, base)
+    obj = found[0]["addr"]
+    assign = test_assignments(func, fp, item, amount, sdk)
     outs = ue_call.call_ufunction(client, obj, function, fp, assign, pe, caller)
     mode, _off, _note = CG.choose_this(sdk, d["owner"])
     return {"instance": obj, "instances": len(found), "outs": outs, "returned_false": returned_false(fp, outs),
-            "reach": mode}
+            "reach": mode, "detail": call_report(fp, assign, outs, found[0], found)}
 
 
 def row_number_id(row):
@@ -508,6 +539,12 @@ def make_options(pkgs, func, sdk, live, read, base, amount, log=lambda _m: None)
     extra = {a["name"]: (1 if a["kind"] == "int" and re.search(r"(?i)notify|show|message|bshow", a["name"]) else 0)
              for a in cls if a["role"] == "other" and a["kind"] != "ptr"}
     options, skipped = [], 0
+    first_id = True
+    for a in cls:                                   # weitere FName-IDs (z. B. WorkId): leer (None) lassen statt Fehler "FName fehlt"
+        if a["role"] == "id":
+            if not first_id and a["kind"] == "fname":
+                extra.setdefault(a["name"], bytes(8))
+            first_id = False
     for name, items in pkgs:
         ok, bad = usable(items, ida["kind"])
         skipped += len(bad)
@@ -526,3 +563,26 @@ def project_dirs(base_dir, n, name="Items"):
     if n <= 1:
         return [os.path.join(base_dir, name)]
     return [os.path.join(base_dir, f"{name} {k + 1}") for k in range(n)]
+
+
+def give_many(live, client, sdk, func, items, base, amount, progress=None, caller=None):
+    """Alle `items` hintereinander live geben (ein ProcessEvent-Aufruf je Item, wie try_give; ohne Trainer/Cave).
+    -> {'total', 'given', 'rejected': [Name], 'skipped': [Name], 'instance'}.  Bricht bei einem Fehler im Spiel ab (ValueError/OSError)."""
+    import ue_call
+    fp, function, found, pe = _prepare_call(live, client, sdk, func, base)
+    obj = found[0]["addr"]
+    given, rejected, skipped = 0, [], []
+    for n, item in enumerate(items):
+        try:
+            assign = test_assignments(func, fp, item, amount, sdk)
+        except ValueError:
+            skipped.append(item["name"])                           # Item ohne Zahlen-ID
+            continue
+        outs = ue_call.call_ufunction(client, obj, function, fp, assign, pe, caller)
+        if returned_false(fp, outs):
+            rejected.append(item["name"])
+        else:
+            given += 1
+        if progress:
+            progress(n + 1, len(items))
+    return {"total": len(items), "given": given, "rejected": rejected, "skipped": skipped, "instance": obj}

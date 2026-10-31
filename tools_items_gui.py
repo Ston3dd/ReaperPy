@@ -91,6 +91,8 @@ class ItemsTab(BaseTab):
         self.b_find.pack(side="left")
         self.b_test = pbtn(top, "🧪  1 ITEM TESTEN", self.test_item)
         self.b_test.pack(side="left", padx=(6, 0))
+        self.b_live = pbtn(top, "⚡  JETZT GEBEN", self.give_live)
+        self.b_live.pack(side="left", padx=(6, 0))
         self.lbl_found = tk.Label(top, text="Klicke ITEMS FINDEN - alles Weitere passiert automatisch.", bg=BG_CARD,
                                   fg=TEXT_DIM, font=FONT_LABEL, anchor="w", justify="left", wraplength=820)
         self.lbl_found.pack(side="left", padx=12, fill="x", expand=True)
@@ -425,8 +427,59 @@ class ItemsTab(BaseTab):
             self.log(str(e), "err")
         self.bg(job, ok, fail)
 
+    def give_live(self):
+        """Alle angehakten Items SOFORT geben (ProcessEvent auf dem echten Objekt) - ohne Trainer, wirkt bis zum Spielende."""
+        if self._busy:
+            return self.log("Es läuft noch ein Auftrag - kurz warten", "warn")
+        ue, proj, client = self._ue(), self._proj(), getattr(self.win, "client", None)
+        live = getattr(ue, "live", None)
+        chosen = self._chosen()
+        if self.func is None or live is None or proj is None or client is None:
+            return self._found("Erst Schritt ① und ITEMS FINDEN (Spiel laden, verbinden).", ERROR)
+        if not chosen:
+            return self._found("Erst Items anhaken (Schritt ②).", ERROR)
+        try:
+            amount = self._amount()
+        except ValueError as e:
+            return self._found(str(e), ERROR)
+        key = IT.func_key(self.func)
+        hint = "" if self.verified.get(key) == "ok" else "\n\nDiese Funktion ist noch nicht getestet - erst '1 ITEM TESTEN'."
+        if not messagebox.askyesno("Jetzt geben", f"{len(chosen)} Items x {amount} werden SOFORT über {key} ins Spiel gegeben "
+                                   "(ohne Trainer). Das läuft auf einem Hilfs-Thread des Spiels - vorher speichern, im Spiel "
+                                   "bleiben (nicht im Hauptmenü), nicht zu viele Items auf einmal." + hint
+                                   + "\n\nJetzt geben?", parent=self.win):
+            return
+        func, sdk, base = self.func, proj.sdk, self.base
+        self._busy = True
+        self._found("Gebe Items … (nicht anfassen)", WARN)
+
+        def job():
+            return IT.give_many(live, client, sdk, func, chosen, base, amount)
+
+        def ok(res):
+            self._busy = False
+            self._give_done(res, amount)
+
+        def fail(e):
+            self._busy = False
+            self._found("✗ Geben abgebrochen: " + (str(e) or e.__class__.__name__), ERROR)
+            self.log(str(e), "err")
+        self.bg(job, ok, fail)
+
+    def _give_done(self, res, amount):
+        msg = f"✔ {res['given']}/{res['total']} Items x {amount} gegeben - Inventar im Spiel schließen und neu öffnen."
+        if res["rejected"]:
+            msg += f"  ({len(res['rejected'])} vom Spiel abgelehnt, z. B. {res['rejected'][0]})"
+        if res["skipped"]:
+            msg += f"  ({len(res['skipped'])} ohne Zahlen-ID übersprungen)"
+        self._found(msg, ACCENT if res["given"] else WARN)
+        self.log(msg, "ok" if res["given"] else "warn")
+
     def _test_done(self, func, item, res):
         key = IT.func_key(func)
+        self.log(f"Test 1 Item: {key} mit {item['name']}", "info")
+        for line in res.get("detail", []):
+            self.log(line, "info")
         if res["returned_false"]:
             self._set_verified(key, "fail")
             self._found(f"✗ Das Spiel hat das Item abgelehnt (Rückgabe: false) - diese Funktion passt nicht: {key}", ERROR)
@@ -440,7 +493,7 @@ class ItemsTab(BaseTab):
         elif said:
             self._found(f"✔ Die Funktion wirkt im Spiel und der Trainer erreicht ihr Objekt: {key}", ACCENT)
         else:
-            self._found(f"✗ Nichts angekommen - diese Funktion passt nicht (oder braucht ein anderes Item): {key}", ERROR)
+            self._found(f"✗ Nichts angekommen (Einzelheiten im Protokoll) - diese Funktion passt nicht (oder braucht ein anderes Item): {key}", ERROR)
 
     def _set_verified(self, key, state):
         """Testergebnis merken (im Spielprofil), Funktionsliste neu bewerten und die beste neu wählen."""

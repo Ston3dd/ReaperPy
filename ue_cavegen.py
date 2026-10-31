@@ -71,12 +71,20 @@ def classify_params(params, sdk=None):
         kind, size, signed = k
         role = "other"
         simple = str(n).split(".")[0]                           # SDK schreibt oft 'Item.param' statt 'Item'
-        if kind == "fname" or (kind == "int" and P.ID_NAME.search(simple) and not P.COUNT_NAME.search(simple)):
+        if kind == "fname" or (kind == "int" and P.ID_NAME.search(simple) and not P.COUNT_NAME.search(simple)
+                               and not P.SLOT_NAME.search(simple)):           # SlotIndex ist ein Platz, keine Item-ID
             role = "id"
         elif kind in ("int", "float", "double") and P.COUNT_NAME.search(simple) and not P.COUNT_BAD.search(simple):
             role = "count"
         out.append({"name": n, "type": raw, "kind": kind, "size": size, "signed": signed, "role": role,
                     "ref": "const" in raw and "&" in raw})
+    if any(a["role"] == "id" for a in out) and not any(a["role"] == "count" for a in out):
+        # Menge unter ungewohntem Namen ('Add', 'Value', 'Cnt' ...): genau ein uebriger Zahlen-Parameter (kein Bool/Byte, kein
+        # Platz, kein Max/Index) ist die Menge - sonst bliebe sie 0 und der Aufruf gaebe null Items
+        rest = [a for a in out if a["role"] == "other" and a["kind"] in ("int", "float", "double") and a["size"] >= 2
+                and not P.COUNT_BAD.search(str(a["name"]).split(".")[0]) and not P.SLOT_NAME.search(str(a["name"]).split(".")[0])]
+        if len(rest) == 1:
+            rest[0]["role"] = "count"
     n_int = sum(1 for a in out if a["kind"] in ("int", "ptr", "fname", "enum"))
     n_flt = sum(1 for a in out if a["kind"] in ("float", "double"))
     if n_int > len(INT_REGS):

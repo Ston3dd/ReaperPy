@@ -238,6 +238,38 @@ class TryGive(unittest.TestCase):
         self.assertEqual((res["instance"], res["reach"]), (0x1000, "member"))
         self.assertEqual(len(mem.freed), 1)
 
+    def test_report_lists_object_parameters_and_bytes(self):
+        res = self.run_call()[0]
+        text = "\n".join(res["detail"])
+        self.assertIn("Objekt: Obj_0 @ 0x1000", text)
+        self.assertIn("Eingabe: ItemName (FName) @+0x0 = 0b 00 00 00 00 00 00 00", text)
+        self.assertIn("Eingabe: Count (int32) @+0x8 = 07 00 00 00", text)
+        self.assertIn("Rueckgabe: ReturnValue (bool)", text)
+
+    def test_unusual_amount_name_is_still_filled(self):
+        sdk = TP.sdk_from("".join([TP.cls("UBagComp", "UActorComponent", [], ["void AddItemToBag(class FName ItemName, int32 Value);"])]))
+        func = next(s for s in IT.give_candidates(P.build(sdk), sdk)[0])
+        fp = uesdk.FuncParams("/Script/Game.BagComp.AddItemToBag", 0xC,
+                              [uesdk.Member("ItemName", "FName", 0, 8, pflags=0x80), uesdk.Member("Value", "int32", 8, 4, pflags=0x80)])
+        got = IT.test_assignments(func, fp, {"fname": bytes(8), "id": None}, 5, sdk)
+        self.assertEqual(got["Value"], "5")
+
+    def test_give_many_calls_once_per_item_and_counts_rejections(self):
+        mem, seen = FakeMem(), []
+        items = [dict(self.item, name=f"Item_{i}", fname=bytes([i + 1]) + bytes(7)) for i in range(3)]
+
+        def caller(c, rip, obj, fn, params):
+            seen.append(c.read_memory(params, 0x18))
+            c.write_memory(params + 0x10, bytes([0 if len(seen) == 2 else 1]))      # das 2. Item lehnt das Spiel ab
+            return 0
+        done = []
+        res = IT.give_many(FakeGameLive(), mem, self.sdk, self.func, items, 0x400000, 9, lambda n, t: done.append((n, t)), caller)
+        self.assertEqual((res["total"], res["given"], res["rejected"], res["skipped"]), (3, 2, ["Item_1"], []))
+        self.assertEqual([struct.unpack_from("<i", b, 8)[0] for b in seen], [9, 9, 9])
+        self.assertEqual([b[0] for b in seen], [1, 2, 3])
+        self.assertEqual(done[-1], (3, 3))
+        self.assertEqual(len(mem.freed), 3)                                          # jeder Puffer freigegeben
+
     def test_false_return_is_reported(self):
         self.assertTrue(self.run_call(ret=0)[0]["returned_false"])
 
@@ -303,6 +335,40 @@ class BuildTrainer(unittest.TestCase):
         files = TR.write_project(os.path.join(self.tmp, "Items"), p, game="Testspiel")
         self.assertTrue(any("Fish 1" in f for f in files), files)
         self.assertTrue(any("Weapon" in f for f in files))
+
+    BAG = TP.cls("UDMXInventory", "UObject", [], [
+        "int32_t AddItemToBackPack(struct FName ItemId, int32_t Add, struct FName WorkId, bool bCallEvent);",
+        "int32_t AddItemInBackPackItemList(int32_t SlotIndex, struct FName ItemId, int32_t Add, struct FName WorkId);"])
+
+    def test_real_world_signature_add_item_to_backpack(self):
+        """AddItemToBackPack(FName ItemId, int32 Add, FName WorkId, bool bCallEvent): Add ist die Menge, WorkId bleibt leer."""
+        sdk = TP.sdk_from(self.BAG)
+        prof = P.build(sdk)
+        func = next(s for s in IT.give_candidates(prof, sdk)[0] if s.data["name"] == "AddItemToBackPack")
+        roles = {a["name"]: a["role"] for a in CG.classify_params(func.data["params"], sdk)}
+        self.assertEqual(roles, {"ItemId": "id", "Add": "count", "WorkId": "id", "bCallEvent": "other"})
+        fp = uesdk.FuncParams("/Script/Game.Inv.AddItemToBackPack", 0x1C, [
+            uesdk.Member("ItemId", "FName", 0, 8, pflags=0x80), uesdk.Member("Add", "int32", 8, 4, pflags=0x80),
+            uesdk.Member("WorkId", "FName", 0xC, 8, pflags=0x80), uesdk.Member("bCallEvent", "bool", 0x14, 1, pflags=0x80),
+            uesdk.Member("ReturnValue", "int32", 0x18, 4, pflags=0x400)])
+        got = IT.test_assignments(func, fp, {"fname": bytes.fromhex("54d0040000000000"), "id": None}, 3, sdk)
+        self.assertEqual(got, {"ItemId": "hex:54d0040000000000", "Add": "3"})          # WorkId / bCallEvent nicht angefasst
+
+    def test_trainer_row_for_two_fname_parameters_builds(self):
+        sdk = TP.sdk_from(self.BAG)
+        func = next(s for s in IT.give_candidates(P.build(sdk), sdk)[0] if s.data["name"] == "AddItemToBackPack")
+        pk = [("A", [{"name": "ItemX", "fname": bytes.fromhex("01" + "00" * 7), "id": None, "category": "A"}])]
+        opts, _ = IT.make_options(pk, func, sdk, FakeLiveFn(), self.img.read, self.img.BASE, 50)
+        args = {a["name"]: a["value"] for a in opts[0].rows[0].spec.args}
+        self.assertEqual(args["Add"], 50)                                                # Menge kommt in 'Add' an
+        self.assertEqual(args["WorkId"], bytes(8))                                       # zweiter FName: leer, kein Fehler
+        self.assertEqual(args["ItemId"], bytes.fromhex("01" + "00" * 7))
+
+    def test_slot_index_is_not_the_item_id(self):
+        sdk = TP.sdk_from(self.BAG)
+        func = next(s for s in IT.give_candidates(P.build(sdk), sdk)[0] if s.data["name"] == "AddItemInBackPackItemList")
+        roles = {a["name"]: a["role"] for a in CG.classify_params(func.data["params"], sdk)}
+        self.assertEqual(roles, {"SlotIndex": "other", "ItemId": "id", "Add": "count", "WorkId": "id"})
 
     def test_missing_function_and_impl_give_clear_errors(self):
         ok, _ = IT.give_candidates(self.prof, self.sdk)

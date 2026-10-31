@@ -155,6 +155,42 @@ class T(unittest.TestCase):
         self.assertIn("kein Objekt", self.t.lbl_found._text)
         self.assertFalse(self.t._busy)
 
+    def test_give_live_gives_all_checked_items_after_confirmation(self):
+        self.t.find_items()
+        got = []
+        self.patch(IT, "give_many", lambda live, client, sdk, func, items, base, amount, progress=None, caller=None:
+                   got.append((len(items), amount)) or {"total": len(items), "given": len(items), "rejected": [], "skipped": [],
+                                                       "instance": 1})
+        asked = self.answer(True)
+        self.t.v_amount.set("25")
+        self.t.give_live()
+        self.assertEqual(got, [(3, 25)])
+        self.assertIn("noch nicht getestet", asked[0])
+        self.assertIn("3/3 Items x 25", self.t.lbl_found._text)
+
+    def test_give_live_needs_checked_items_and_valid_amount_and_confirmation(self):
+        self.t.find_items(); got = self.fake_give()
+        self.t.set_visible(False); self.t.give_live()
+        self.assertIn("Items anhaken", self.t.lbl_found._text)
+        self.t.set_visible(True); self.t.v_amount.set("viel"); self.t.give_live()
+        self.assertIn("ganze Zahl", self.t.lbl_found._text)
+        self.t.v_amount.set("5"); self.answer(False); self.t.give_live()
+        self.assertEqual(got, [])                                                    # "Nein": nichts wird gegeben
+
+    def fake_give(self):
+        got = []
+        self.patch(IT, "give_many", lambda *a, **k: got.append(a) or {"total": 0, "given": 0, "rejected": [], "skipped": [], "instance": 1})
+        return got
+
+    def test_give_live_error_is_shown_plainly(self):
+        self.t.find_items(); self.answer(True)
+
+        def boom(*a, **k): raise ValueError("Im Spiel gibt es kein Objekt der Klasse X")
+        self.patch(IT, "give_many", boom)
+        self.t.give_live()
+        self.assertIn("Geben abgebrochen", self.t.lbl_found._text)
+        self.assertFalse(self.t._busy)
+
     def test_checks_search_and_category_buttons(self):
         self.t.find_items()
         self.t.set_visible(False)
