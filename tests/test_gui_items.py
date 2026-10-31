@@ -82,6 +82,79 @@ class T(unittest.TestCase):
         self.t.v_func.set(labels[-1]); self.t.pick_func()
         self.assertIs(self.t.func, next(r["sug"] for n, r in self.t._func_choices() if n == labels[-1]))
 
+    def fake_try(self, **res):
+        out = {"instance": 0x1000, "instances": 1, "outs": [], "returned_false": False, "reach": "member"}
+        out.update(res)
+        calls = []
+        self.patch(IT, "try_give", lambda live, client, sdk, func, item, base, amount=1, caller=None:
+                   calls.append((func, item, amount)) or out)
+        return calls
+
+    def answer(self, *replies):
+        """Antworten auf die Ja/Nein-Fragen der Reihe nach (die letzte gilt weiter); -> Liste der gestellten Fragen."""
+        import tkinter.messagebox as mb
+        asked, rest = [], list(replies)
+        self.patch(mb, "askyesno", lambda title, text, **k: asked.append(text) or (rest.pop(0) if len(rest) > 1 else rest[0]))
+        return asked
+
+    def test_test_button_needs_game_and_item(self):
+        self.t.test_item()
+        self.assertIn("Schritt", self.t.lbl_found._text)                      # noch nicht gefunden
+        self.t.find_items(); self.t.set_visible(False)
+        self.t.test_item()
+        self.assertIn("Item anklicken", self.t.lbl_found._text)
+
+    def test_test_button_gives_one_item_and_remembers_the_answer(self):
+        self.t.find_items()
+        calls = self.fake_try(reach="member")
+        asked = self.answer(True)
+        self.t.tv.sel = ("1",)                                                 # angeklickte Zeile: Item_Potion
+        self.t.test_item()
+        self.assertEqual([(c[1]["name"], c[2]) for c in calls], [("Item_Potion", 1)])
+        self.assertEqual(len(asked), 2)                                        # erst "Jetzt testen?", dann "im Inventar?"
+        key = IT.func_key(self.t.func)
+        self.assertEqual(self.t.verified, {key: "ok"})
+        self.assertIn("✔", self.t.lbl_found._text)
+        self.assertEqual(next(r["verified"] for r in self.t.rated_funcs if IT.func_key(r["sug"]) == key), "ok")
+
+    def test_unreachable_object_is_explained_even_when_the_call_works(self):
+        self.t.find_items(); self.fake_try(reach="zero"); self.answer(True)
+        self.t.test_item()
+        self.assertIn("ABER", self.t.lbl_found._text)
+
+    def test_nothing_arrived_marks_function_as_failed(self):
+        self.t.find_items(); self.fake_try(); self.answer(True, False)          # testen: ja - im Inventar: nein
+        key = IT.func_key(self.t.func)
+        self.t.test_item()
+        self.assertEqual(self.t.verified, {key: "fail"})
+        self.assertIn("Nichts angekommen", self.t.lbl_found._text)
+        self.assertFalse(next(r for r in self.t.rated_funcs if IT.func_key(r["sug"]) == key)["relevant"])
+
+    def test_game_says_false_skips_the_question(self):
+        self.t.find_items(); self.fake_try(returned_false=True)
+        asked = self.answer(True)
+        self.t.test_item()
+        self.assertEqual(len(asked), 1)                                        # nur die Sicherheitsfrage vorab
+        self.assertIn("abgelehnt", self.t.lbl_found._text)
+        self.assertEqual(list(self.t.verified.values()), ["fail"])
+
+    def test_declining_the_warning_does_nothing(self):
+        self.t.find_items(); calls = self.fake_try(); self.answer(False)          # "Nein" auf die erste Frage
+        self.t.tv.sel = ("0",)
+        self.t.test_item()
+        self.assertEqual(calls, [])
+        self.assertEqual(self.t.verified, {})
+
+    def test_error_from_the_game_is_shown_plainly(self):
+        self.t.find_items(); self.answer(True)
+
+        def boom(*a, **k): raise ValueError("Im Spiel gibt es kein Objekt der Klasse X")
+        self.patch(IT, "try_give", boom)
+        self.t.test_item()
+        self.assertIn("Test nicht möglich", self.t.lbl_found._text)
+        self.assertIn("kein Objekt", self.t.lbl_found._text)
+        self.assertFalse(self.t._busy)
+
     def test_checks_search_and_category_buttons(self):
         self.t.find_items()
         self.t.set_visible(False)

@@ -189,11 +189,19 @@ SHAPE_TEXT = {"name+menge": "Name + Menge", "id+menge": "Nummer + Menge", "klass
               "name": "nur Name", "id": "nur Nummer", "name+zahl": "Name + Zahl"}
 
 
-def rate_functions(prof, sdk):
+def func_key(sug):
+    """Schluessel einer Geben-Funktion fuer 'getestet' (Klasse.Funktion)."""
+    d = sug.data
+    return f"{d.get('owner', '')}.{d.get('name', sug.title)}"
+
+
+def rate_functions(prof, sdk, verified=None):
     """Baubare Geben-Funktionen bewerten -> [{'sug','score','reach','relevant','reasons'}], beste zuerst.
     reach: 'hooked' | 'member' | 'zero' - woher die Cave das Objekt (this) nimmt.  'zero' = die Funktion gehoert zu einer
     Klasse, deren Instanz der Trainer nicht erreicht (z. B. Subsystem): sie wird mit this=0 gerufen -> meist wirkungslos.
-    relevant: erreichbar UND sieht nach 'Item geben' aus (kein Entfernen/Auswaehlen/Vorschau/Schluessel-Item)."""
+    relevant: erreichbar UND sieht nach 'Item geben' aus (kein Entfernen/Auswaehlen/Vorschau/Schluessel-Item).
+    verified: {Klasse.Funktion: 'ok' | 'fail'} - Ergebnis des Tests '1 Item geben' (ok: +4, fail: -8)."""
+    verified = verified or {}
     ok, _bad = give_candidates(prof, sdk)
     out = []
     for s in ok:
@@ -218,8 +226,14 @@ def rate_functions(prof, sdk):
         if special:
             score -= 3
             reasons.append("Spezial-Items")
-        out.append({"sug": s, "score": round(score, 1), "reach": mode, "reasons": reasons,
-                    "relevant": mode != "zero" and not (bad_name or bad_owner or special)})
+        state = verified.get(func_key(s), "")
+        if state == "ok":
+            score += 4
+        elif state == "fail":
+            score -= 8
+            reasons.append("Test fehlgeschlagen")
+        out.append({"sug": s, "score": round(score, 1), "reach": mode, "reasons": reasons, "verified": state,
+                    "relevant": mode != "zero" and not (bad_name or bad_owner or special or state == "fail")})
     out.sort(key=lambda r: -r["score"])
     return out
 
@@ -228,7 +242,77 @@ def function_label(rated):
     """Anzeigetext einer bewerteten Funktion: 'Klasse.Funktion (Name + Menge)'."""
     d = rated["sug"].data
     shape = SHAPE_TEXT.get(d.get("shape", ""), "")
-    return f"{d.get('owner', '')}.{d.get('name', rated['sug'].title)}" + (f"  [{shape}]" if shape else "")
+    return (f"{d.get('owner', '')}.{d.get('name', rated['sug'].title)}" + (f"  [{shape}]" if shape else "")
+            + ("  ✔ getestet" if rated.get("verified") == "ok" else ""))
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Test: EIN Item live geben (ProcessEvent auf der echten Instanz) - zeigt, ob die Funktion im Spiel wirkt
+# ----------------------------------------------------------------------------------------------------------------
+FUNC_STATIC = 0x2000
+
+
+def test_assignments(func, fp, item, amount, sdk):
+    """Parameter fuer ue_call.encode_params: ID-Parameter = das Item, Mengen-Parameter = amount, alles andere 0."""
+    cls = CG.classify_params(func.data["params"], sdk)
+    names = {p.name for p in fp.params}
+    out = {}
+    for a in cls:
+        if a["name"] not in names:
+            continue
+        if a["role"] == "id":
+            if a["kind"] == "fname":
+                out[a["name"]] = "hex:" + bytes(item["fname"]).hex()
+            elif item.get("id") is None:
+                raise ValueError("Dieses Item hat keine Zahlen-ID - mit einem anderen Item testen")
+            else:
+                out[a["name"]] = str(int(item["id"]))
+        elif a["role"] == "count":
+            out[a["name"]] = str(amount)
+    if not any(a["role"] == "id" for a in cls):
+        raise ValueError("Die Funktion hat keinen Parameter fuer die Item-ID")
+    return out
+
+
+def returned_false(fp, outs):
+    """True, wenn die Funktion ein bool zurueckgibt und 'false' meldet (= Spiel hat das Item abgelehnt)."""
+    ret = next((p for p in fp.params if p.pflags & 0x400), None)
+    if ret is None or P.base_name(ret.type) != "bool":
+        return False
+    return any(k == "ReturnValue" and str(v).strip() == "0" for k, v in outs)
+
+
+def try_give(live, client, sdk, func, item, base, amount=1, caller=None):
+    """EIN Item ueber die Funktion in einer ECHTEN Instanz des laufenden Spiels geben (nicht ueber die Cave).
+    -> {'instance', 'instances', 'outs', 'returned_false', 'reach'}.  Wirft ValueError mit verstaendlichem Text."""
+    import ue_call
+    d = func.data
+    sdk.load_params()
+    fp = sdk.params_for(d["owner"], d["name"])
+    if fp is None:
+        raise ValueError("Kein Parameter-Layout fuer diese Funktion gefunden (…_parameters.hpp im SDK-Ordner?)")
+    if live.index is None:
+        live.build_index()
+    function = live.find_function(d["owner"], d["name"])
+    if not function:
+        raise ValueError("Die Funktion wurde im laufenden Spiel nicht gefunden (Klasse nicht geladen?)")
+    if d.get("flags", 0) & FUNC_STATIC:
+        obj = live.default_object(d["owner"])
+        found = [obj] if obj else []
+    else:
+        found = [i["addr"] for i in live.instances(d["owner"]) if "Default__" not in i["name"]]
+    if not found:
+        raise ValueError(f"Im Spiel gibt es kein Objekt der Klasse {d['owner']} - Spielstand laden (nicht im Hauptmenue) "
+                         "und es erneut versuchen")
+    obj = found[0]
+    assign = test_assignments(func, fp, item, amount, sdk)
+    pidx = sdk.offset("process_event_index", "processeventindex", default=77)
+    prva = sdk.offset("process_event")
+    pe = ue_call.process_event_addr(client.read_memory, obj, pidx, fallback=(base + prva) if prva else None)
+    outs = ue_call.call_ufunction(client, obj, function, fp, assign, pe, caller)
+    mode, _off, _note = CG.choose_this(sdk, d["owner"])
+    return {"instance": obj, "instances": len(found), "outs": outs, "returned_false": returned_false(fp, outs),
+            "reach": mode}
 
 
 def row_number_id(row):

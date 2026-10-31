@@ -41,6 +41,7 @@ class ItemsTab(BaseTab):
         self.rated_tables = []            # alle Tabellen bewertet (ue_items.rate_tables), beste zuerst
         self.rated_funcs = []             # alle baubaren Geben-Funktionen bewertet (ue_items.rate_functions)
         self.func_rating = None           # Bewertung der gewaehlten Funktion
+        self.verified = {}                # {Klasse.Funktion: 'ok' | 'fail'} - Ergebnis des Tests '1 Item testen'
         self.cands = []                   # Tabellen-Vorschlaege aus dem SDK
         self.table = None                 # (addr, name) der gelesenen Tabelle
         self.items, self.on, self.view = [], [], []
@@ -88,6 +89,8 @@ class ItemsTab(BaseTab):
         top.pack(fill="x")
         self.b_find = pbtn(top, "🔎  ITEMS FINDEN", self.find_items, primary=True)
         self.b_find.pack(side="left")
+        self.b_test = pbtn(top, "🧪  1 ITEM TESTEN", self.test_item)
+        self.b_test.pack(side="left", padx=(6, 0))
         self.lbl_found = tk.Label(top, text="Klicke ITEMS FINDEN - alles Weitere passiert automatisch.", bg=BG_CARD,
                                   fg=TEXT_DIM, font=FONT_LABEL, anchor="w", justify="left", wraplength=820)
         self.lbl_found.pack(side="left", padx=12, fill="x", expand=True)
@@ -222,6 +225,7 @@ class ItemsTab(BaseTab):
             return self._found("Nicht verbunden - im Hauptfenster auf VERBINDEN klicken und den Spielstand laden.", ERROR)
         gp = getattr(getattr(self.win, "app", None), "gp", None)
         sdk = proj.sdk
+        verified = dict(((gp.discover or {}).get("verified") or {}) if gp is not None else {})
         self._busy = True
         self._found("Suche läuft … (beim ersten Mal kann das je nach Spiel eine Minute dauern)", WARN)
 
@@ -249,7 +253,7 @@ class ItemsTab(BaseTab):
                 if r:
                     table, rows, cols = pick, r, c
                     break
-            rated_f = IT.rate_functions(prof, sdk)                         # nur Funktionen, die der Trainer bauen kann
+            rated_f = IT.rate_functions(prof, sdk, verified)               # nur Funktionen, die der Trainer bauen kann
             funcs, bad = IT.give_candidates(prof, sdk)
             try:                                                      # stimmt die Image-Basis mit der Konsole ueberein?
                 bc = IB.check_image_base(client.get_maps_named(), self.base)
@@ -266,8 +270,11 @@ class ItemsTab(BaseTab):
 
         def ok(res):
             self._busy = False
+            self.verified = verified
             if gp is not None and res["fresh"]:
                 gp.discover = {"sig": res["sig"], "json": P.to_json(res["prof"])}
+                if verified:
+                    gp.discover["verified"] = verified
                 gp.save()
             if ue is not None:
                 ue.live = res["live"]
@@ -375,6 +382,82 @@ class ItemsTab(BaseTab):
         good = bool(self.items and self.func) and not weak and not (self.basecheck and self.basecheck.status == "shifted")
         self._found("   |   ".join(parts), ACCENT if good else WARN)
         self.update_summary()
+
+    # --- Test: EIN Item live geben ------------------------------------------------------------
+    def _test_item(self):
+        """Das Item fuer den Test: die angeklickte Zeile, sonst das erste angehakte."""
+        idx = self._sel_idx()
+        if idx:
+            return self.items[idx[0]]
+        chosen = self._chosen()
+        return chosen[0] if chosen else None
+
+    def test_item(self):
+        """Gibt EIN Item ueber die gewaehlte Funktion direkt im laufenden Spiel (nicht ueber den Trainer) - zeigt, ob sie wirkt."""
+        if self._busy:
+            return self.log("Es läuft noch ein Auftrag - kurz warten", "warn")
+        ue, proj, client = self._ue(), self._proj(), getattr(self.win, "client", None)
+        live = getattr(ue, "live", None)
+        item = self._test_item()
+        if self.func is None or live is None or proj is None or client is None:
+            return self._found("Erst Schritt ① und ITEMS FINDEN (Spiel laden, verbinden).", ERROR)
+        if item is None:
+            return self._found("Erst ein Item anklicken oder anhaken, das getestet werden soll.", ERROR)
+        title = self._func_title(self.func)
+        if not messagebox.askyesno("1 Item testen", f"Es wird EIN Item ({item['name']}) über {title} direkt im Spiel "
+                                   "gegeben. Das läuft auf einem Hilfs-Thread des Spiels - vorher speichern und im Spiel "
+                                   "bleiben (nicht im Hauptmenü).\n\nJetzt testen?", parent=self.win):
+            return
+        func, sdk, base = self.func, proj.sdk, self.base
+        self._busy = True
+        self._found("Test läuft …", WARN)
+
+        def job():
+            return IT.try_give(live, client, sdk, func, item, base, 1)
+
+        def ok(res):
+            self._busy = False
+            self._test_done(func, item, res)
+
+        def fail(e):
+            self._busy = False
+            self._found("✗ Test nicht möglich: " + (str(e) or e.__class__.__name__), ERROR)
+            self.log(str(e), "err")
+        self.bg(job, ok, fail)
+
+    def _test_done(self, func, item, res):
+        key = IT.func_key(func)
+        if res["returned_false"]:
+            self._set_verified(key, "fail")
+            self._found(f"✗ Das Spiel hat das Item abgelehnt (Rückgabe: false) - diese Funktion passt nicht: {key}", ERROR)
+            return
+        said = messagebox.askyesno("1 Item testen", f"Der Aufruf wurde ausgeführt ({item['name']}).\n\nIst das Item jetzt "
+                                   "im Inventar? (Inventar ggf. einmal schließen und neu öffnen)", parent=self.win)
+        self._set_verified(key, "ok" if said else "fail")
+        if said and res["reach"] == "zero":
+            self._found("✔ Die Funktion wirkt im Spiel - ABER der Trainer erreicht ihr Objekt nicht, ein fertiger Trainer "
+                        "würde nichts bewirken. Das hilft bei der Weiterentwicklung (Zeigerkette zum Objekt).", WARN)
+        elif said:
+            self._found(f"✔ Die Funktion wirkt im Spiel und der Trainer erreicht ihr Objekt: {key}", ACCENT)
+        else:
+            self._found(f"✗ Nichts angekommen - diese Funktion passt nicht (oder braucht ein anderes Item): {key}", ERROR)
+
+    def _set_verified(self, key, state):
+        """Testergebnis merken (im Spielprofil), Funktionsliste neu bewerten und die beste neu wählen."""
+        self.verified[key] = state
+        gp = getattr(getattr(self.win, "app", None), "gp", None)
+        if gp is not None and gp.discover:
+            gp.discover["verified"] = dict(self.verified)
+            gp.save()
+        proj = self._proj()
+        if self.prof is None or proj is None:
+            return
+        self.rated_funcs = IT.rate_functions(self.prof, proj.sdk, self.verified)
+        cur = IT.func_key(self.func) if self.func else ""
+        self.func_rating = next((r for r in self.rated_funcs if IT.func_key(r["sug"]) == cur), None)
+        self._fill_choices()
+        if self.func_rating is not None:
+            self.func = self.func_rating["sug"]
 
     def _weak_reason(self):
         """Warum die gewaehlte Funktion nur eine Notloesung ist (leicht verstaendlich)."""

@@ -1,9 +1,10 @@
 """ue_items: Items einteilen, in Pakete/Projekte verteilen, Trainer bauen (ohne Konsole, mit Fake-Image)."""
-import os, shutil, sys, tempfile, unittest
+import os, shutil, struct, sys, tempfile, unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
 import cave_trainer as TR
+import uesdk
 import test_cave_trainer as TS
 import test_ue_profile as TP
 import ue_cavegen as CG
@@ -177,6 +178,97 @@ class ConfusingGame(unittest.TestCase):
         rated = IT.rate_functions(P.build(sdk), sdk)
         self.assertTrue(rated)
         self.assertFalse(any(r["relevant"] for r in rated))
+
+
+class FakeMem:
+    """Kleiner Fake-Speicher fuer try_give: vtable von Objekt 0x1000 -> ProcessEvent 0x3000."""
+    def __init__(self):
+        self.m = bytearray(0x10000); self.nxt = 0x8000; self.freed = []
+        struct.pack_into("<Q", self.m, 0x1000, 0x2000)
+        struct.pack_into("<Q", self.m, 0x2000 + 8 * 77, 0x403000)
+    def read_memory(self, a, n): return bytes(self.m[a:a + n])
+    def write_memory(self, a, d): self.m[a:a + len(d)] = d
+    def allocate_memory(self, n): a = self.nxt; self.nxt += n + 0x40; return a
+    def free_memory(self, a, n): self.freed.append(a)
+
+
+class FakeGameLive:
+    index = {}
+    def __init__(self, instances=(0x1000,)):
+        self.inst = [{"addr": a, "name": f"Obj_{i}"} for i, a in enumerate(instances)]
+    def find_function(self, owner, name): return 0xF00
+    def instances(self, owner, **k): return self.inst
+    def default_object(self, owner): return 0x1000
+
+
+def item_fp(with_return=True):
+    ms = [uesdk.Member("ItemName", "FName", 0, 8, pflags=0x80), uesdk.Member("Count", "int32", 8, 4, pflags=0x80)]
+    if with_return:
+        ms.append(uesdk.Member("ReturnValue", "bool", 0x10, 1, pflags=0x400))
+    return uesdk.FuncParams("/Script/Game.ItemBagComponent.AddItem", 0x18, ms)
+
+
+class TryGive(unittest.TestCase):
+    """Test '1 Item geben': echte Instanz + ProcessEvent, Parameter aus Item und Menge."""
+    def setUp(self):
+        self.objs = [(1, 0x7000_1000, "DataTable", "DataTable /Game/Data/DT_ItemParam.DT_ItemParam")]
+        self.sdk = TP.sdk_from(GAME_C, self.objs)
+        self.sdk.func_params = {"/Script/Game.ItemBagComponent.AddItem": item_fp()}
+        self.prof = P.build(self.sdk)
+        self.func = next(r["sug"] for r in IT.rate_functions(self.prof, self.sdk) if r["sug"].data["name"] == "AddItem"
+                         and r["sug"].data["owner"] == "UItemBagComponent")
+        self.item = {"name": "Item_A", "fname": bytes.fromhex("0b" + "00" * 7), "id": None, "category": "x"}
+
+    def run_call(self, ret=1, live=None, mem=None):
+        mem = mem or FakeMem(); seen = {}
+
+        def caller(c, rip, obj, fn, params):
+            seen.update(rip=rip, obj=obj, fn=fn, buf=c.read_memory(params, 0x18))
+            c.write_memory(params + 0x10, bytes([ret]))                       # "Spiel" schreibt den bool-Rueckgabewert
+            return 0
+        res = IT.try_give(live or FakeGameLive(), mem, self.sdk, self.func, self.item, 0x400000, 7, caller)
+        return res, seen, mem
+
+    def test_item_and_amount_reach_the_call(self):
+        res, seen, mem = self.run_call()
+        self.assertEqual((seen["rip"], seen["obj"], seen["fn"]), (0x403000, 0x1000, 0xF00))
+        self.assertEqual(seen["buf"][:8], bytes.fromhex("0b" + "00" * 7))                # FName aus der Tabellenzeile
+        self.assertEqual(struct.unpack_from("<i", seen["buf"], 8)[0], 7)               # Menge
+        self.assertFalse(res["returned_false"])
+        self.assertEqual((res["instance"], res["reach"]), (0x1000, "member"))
+        self.assertEqual(len(mem.freed), 1)
+
+    def test_false_return_is_reported(self):
+        self.assertTrue(self.run_call(ret=0)[0]["returned_false"])
+
+    def test_clear_errors(self):
+        with self.assertRaises(ValueError) as c:
+            IT.try_give(FakeGameLive(instances=()), FakeMem(), self.sdk, self.func, self.item, 0x400000)
+        self.assertIn("kein Objekt der Klasse UItemBagComponent", str(c.exception))
+        self.sdk.func_params = {}
+        with self.assertRaises(ValueError) as c:
+            IT.try_give(FakeGameLive(), FakeMem(), self.sdk, self.func, self.item, 0x400000)
+        self.assertIn("Parameter-Layout", str(c.exception))
+
+    def test_number_id_functions(self):
+        sdk = TP.sdk_from(TP.GAME_B)
+        func = next(s for s in IT.give_candidates(P.build(sdk), sdk)[0] if s.data["name"] == "GiveItemById")
+        fp = uesdk.FuncParams("/Script/Game.MyGameMode.GiveItemById", 8,
+                              [uesdk.Member("ItemID", "int32", 0, 4, pflags=0x80), uesdk.Member("Amount", "int32", 4, 4, pflags=0x80)])
+        self.assertEqual(IT.test_assignments(func, fp, {"fname": b"", "id": 42}, 3, sdk), {"ItemID": "42", "Amount": "3"})
+        with self.assertRaises(ValueError):
+            IT.test_assignments(func, fp, {"fname": b"", "id": None}, 3, sdk)
+
+    def test_verified_changes_ranking_and_label(self):
+        key = IT.func_key(self.func)
+        base = {r["sug"].title: r for r in IT.rate_functions(self.prof, self.sdk)}
+        ok = {r["sug"].title: r for r in IT.rate_functions(self.prof, self.sdk, {key: "ok"})}
+        bad = {r["sug"].title: r for r in IT.rate_functions(self.prof, self.sdk, {key: "fail"})}
+        self.assertEqual(ok[key]["score"], base[key]["score"] + 4)
+        self.assertIn("✔ getestet", IT.function_label(ok[key]))
+        self.assertFalse(bad[key]["relevant"])
+        self.assertIn("Test fehlgeschlagen", bad[key]["reasons"])
+        self.assertNotEqual(IT.rate_functions(self.prof, self.sdk, {key: "fail"})[0]["sug"].title, key)
 
 
 class FakeLiveFn:
