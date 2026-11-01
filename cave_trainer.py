@@ -268,6 +268,20 @@ def image_span(maps, base, max_gap=0x100000):
     return out
 
 
+def far_span(maps, base, targets, limit=LIMIT):
+    """Regionen AUSSERHALB des Images, die komplett in rel32-Reichweite aller `targets` liegen (Ausweichplatz fuer die
+    Cave, wenn das Image-Padding zu weit von der Item-Funktion entfernt ist)."""
+    img = image_span(maps, base)
+    inside = lambda s, e: any(a < e and s < b for a, b, _p in img)  # noqa: E731
+    out = []
+    for s, e, p in sorted((int(a), int(b), int(c)) for a, b, c in maps):
+        if inside(s, e) or not p & 1:
+            continue
+        if all(abs(s - t) <= limit and abs(e - t) <= limit for t in targets):
+            out.append((s, e, p))
+    return out
+
+
 def in_span(span, addr):
     return any(s <= addr < e for s, e, _p in span)
 
@@ -347,7 +361,11 @@ class Slots:
     def __init__(self, read, span, log=print):
         self.read, self.span, self.log = read, span, log
         self._code, self._data = None, None
+        self.targets = []               # Adressen, die die Cave per rel32 erreichen muss (Item-Funktion, ProcessEvent, Zeilen ...)
+        self.far = None                 # Slots ueber Regionen AUSSERHALB des Images (Ausweichplatz), lazy
+        self.far_span = []
         self.reclaimed = []             # [(start, ende, fuellbyte)]: Reste einer frueheren ReaperPy-Cave, die ueberschrieben werden duerfen
+        self.used_far = False
         self.last_reclaim = None        # Fuellbyte, wenn die zuletzt vergebene Cave in so einem Rest liegt, sonst None
 
     def _scan_code(self):
@@ -494,17 +512,40 @@ class Slots:
                      "nach dem freien Platz auf).")
         return " ".join(lines)
 
+    def reaches(self, addr, size, near):
+        """Liegt [addr, addr+size) in rel32-Reichweite ALLER Ziele (nicht nur der Item-Funktion)?"""
+        ts = self.targets or [near]
+        return all(abs(addr - t) <= LIMIT and abs(addr + size - t) <= LIMIT for t in ts)
+
+    def _far_slots(self):
+        if self.far is None:
+            self.far = Slots(self.read, self.far_span, self.log) if self.far_span else False
+            if self.far:
+                self.far.targets = self.targets
+        return self.far
+
     def alloc_code(self, need, near):
         if self._code is None:
             self._code = self._scan_code()
         need = (need + 15) & ~15
         for r in self._code:
             cave = (r[1] - need) & ~0xF
-            if cave < r[0] or abs(cave - near) > LIMIT:
+            if cave < r[0] or not self.reaches(cave, need, near):
                 continue
             r[1] = cave
             self.last_reclaim = next((f for rs, re_, f in self.reclaimed if rs <= cave < re_), None)
             return cave, need
+        far = self._far_slots()                                     # Ausweichplatz: Padding anderer Module in Reichweite
+        if far:
+            try:
+                got = far.alloc_code(need, near)
+                self.log(f"[trainer] Cave ausserhalb des Images (Ausweichplatz {got[0]:#x}) - im Image war nichts in "
+                         "rel32-Reichweite (+-2 GB) aller Ziele")
+                self.last_reclaim = far.last_reclaim
+                self.used_far = True
+                return got
+            except TrainerError:
+                pass
         raise TrainerError("Kein freier Code-Platz (Padding am Ende einer ausfuehrbaren Image-Region) fuer die Cave "
                            f"gefunden. {self.explain(need)}")
 
@@ -514,10 +555,16 @@ class Slots:
         need = (need + FLAG_ALIGN - 1) & ~(FLAG_ALIGN - 1)
         for r in self._data:
             addr = (r[1] - need) & ~(FLAG_ALIGN - 1)
-            if addr < r[0] or abs(addr - near) > LIMIT:
+            if addr < r[0] or not self.reaches(addr, need, near):
                 continue
             r[1] = addr
             return addr, need
+        far = self._far_slots()
+        if far:
+            try:
+                return far.alloc_data(need, near)
+            except TrainerError:
+                pass
         raise TrainerError("Kein beschreibbarer Leerraum im Spiel-Image fuer die Schalter gefunden "
                            "(Null-Stueck am Ende der letzten beschreibbaren Region, mind. 0x100 Byte)")
 
@@ -659,10 +706,13 @@ def plan(read, maps, base, options, impl, orig_pe, slots, log=print, settle=0.4,
             except Exception:  # noqa: BLE001
                 pass
     slots_alloc = Slots(read, span, log)
+    slots_alloc.targets = [impl, orig_pe, *row_impls]
+    slots_alloc.far_span = far_span(maps, base, slots_alloc.targets)
     slots_alloc.code_capacity()                                      # Code-Platz zuerst suchen (erkennt Reste einer frueheren Cave)
 
     need_flags = flag_bytes_needed(len(options))
     p.flag_addr, p.flag_size = slots_alloc.alloc_data(need_flags, impl)
+    slots_alloc.targets.append(p.flag_addr)                          # die Cave muss auch die Schalter per rel32 erreichen
     first = bytes(read(p.flag_addr, p.flag_size))
     if any(first):
         raise TrainerError(f"Schalter-Bereich {p.flag_addr:#x} ist nicht leer - das Spiel nutzt ihn")
@@ -679,6 +729,9 @@ def plan(read, maps, base, options, impl, orig_pe, slots, log=print, settle=0.4,
     if len(code) > reserved:
         raise TrainerError(f"Cave-Groesse stimmt nicht ({len(code)} > {reserved}) - Programmfehler")
     p.cave, p.cave_bytes = cave, code
+    if slots_alloc.used_far:
+        p.warnings.append("Die Cave liegt ausserhalb des Spiel-Images (im Image war nichts in rel32-Reichweite). "
+                          "Gilt nur, solange das Modul dort gleich geladen wird - nach einem Neustart pruefen.")
     live = bytes(read(cave, len(code)))
     if slots_alloc.last_reclaim is not None:                         # Rest einer frueheren ReaperPy-Cave: gilt als frei
         n = len(code)

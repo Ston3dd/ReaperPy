@@ -29,7 +29,3 @@ dumps/
 # Archive gehoeren nicht ins Repo (Releases laufen ueber GitHub Actions)
 *.zip
 *.rar
-
-# Archive gehoeren nicht ins Repo (Releases laufen ueber GitHub Actions)
-*.zip
-*.rar

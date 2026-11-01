@@ -1,8 +1,8 @@
 # ReaperPy
 
 **A toolkit for the PS5 on top of the [ps5debug-NG](https://github.com/Pharaoh2k/ps5debug-NG) payload: patches and code caves, memory scanner,
-pointer scan, debugger, disassembler, Unreal Engine live tools and a cheat menu - with export to GoldHEN/etaHEN cheat
-formats (`.json`, `.shn`, `.mc4`).**
+pointer scan, debugger, disassembler, Unreal Engine and Unity tools (items as a trainer in three clicks), a cheat menu -
+with export to GoldHEN/etaHEN cheat formats (`.json`, `.shn`, `.mc4`).**
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
@@ -41,7 +41,9 @@ formats (`.json`, `.shn`, `.mc4`).**
 | **Pointer scan** | Build pointer paths to a value (with a map, or the fast on-console scan level by level). |
 | **Debugger** | Attach, software breakpoints, hardware watchpoints, registers, stack, threads, step into / over / out, run to. |
 | **Disassembler / memory** | Hex view with value inspector, snapshots and compare, save a region to file; x86-64 disassembly; AOB signatures. |
+| **Items as a trainer** | **Unreal and Unity games:** find every item of the game, pick the right table and give function automatically, **test** it, **give items right away** or save them as a ready-made trainer - in three clicks. Respects the game's inventory limits; **INVENTORY TO MAX** for games that have an expansion function. |
 | **Unreal Engine tools** | Live object browser, value editing and freezing, an *Entdecker* ("Discoverer") that finds item tables and give-functions, and a **cheat menu** generated from the game's SDK. |
+| **Unity (IL2CPP) tools** | Live values, method patches (always true, fixed return value, empty), enum names for item IDs and the ITEMS tab, from an Il2CppDumper folder. |
 | **Calling and logging** | Call any game function with arguments; log every call of a function through a code cave. |
 | **Safety net** | Journal / undo for every write the tools make. |
 | **Console notifications** | On-screen messages on the PS5 when ReaperPy connects, when a cheat is switched on/off (also while the debugger is attached) and when the debugger attaches / detaches. |
@@ -102,8 +104,12 @@ money), press **FIRST SCAN**, change the number in the game, type the new one, p
 addresses are left. Add them to the address list, set or freeze the value. *Who writes this?* shows the instruction
 that changes it - **EDIT CHEATS** turns it into a NOP patch or a code cave.
 
-**3. Unreal Engine game - all items as a trainer.** Open **ITEMS**, choose the game folder (step 1), click **FIND ITEMS**
-(step 2), then **SAVE TRAINER** (step 3). No tables, FNames or IDs to know - see [below](#unreal-engine-games).
+**3. Unreal Engine game - all items as a trainer.** Open **UNREAL -> ITEMS**, choose the game folder (step 1), click
+**FIND ITEMS** (step 2), then **SAVE TRAINER** (step 3) - or tick items and press **GIVE NOW** to get them immediately. No
+tables, FNames or IDs to know - see [below](#unreal-engine-games).
+
+**3a. Unity game - all items as a trainer.** **UNITY -> ITEMS**: the same three steps with the Il2CppDumper folder - see
+[below](#unity-il2cpp-games).
 
 **3b. Unreal Engine game - single values.** Open **UE-LIVE**, choose the game's SDK folder (output of
 [ps4-unreal-dumper](https://github.com/TetzkatLipHoka/ps4-unreal-dumper)), click a value such as
@@ -131,16 +137,19 @@ the registers when it stops, **STEP** / **STEP OVER** / **STEP OUT**, **CONTINUE
 
 ### Simple tabs
 
+The Unreal and Unity tools are grouped: the tab **★ UNREAL** holds ITEMS, VALUES, LIVE, CHEAT MENU, DISCOVERER and EXPERT (the
+static UE-AUTO tools), the tab **★ UNITY** holds ITEMS, QUICK (values) and MANUAL. Below they are listed by their short names.
+
 | Tab | What it does |
 |---|---|
 | **START** | Three big steps for beginners with plain-language status: connected? codes found? Leads to the simple tools. |
 | **FIND VALUE** | The cheat searcher. Layout: found addresses on the left, scan controls on the right, your **address list** at the bottom. See [below](#find-value-the-cheat-searcher). |
 | **EDIT CHEATS** | Write a patch: name, author, offset from the image base. *Simple patch / NOP* (original bytes -> new bytes) or *Code cave* (assembly in a separate box, `jmp OriginReturn` goes back). Assembler or hex bytes are accepted; saved as `.reapproj`. |
 | **VALUES** | Health, stamina, gold, experience, ammo ... as ready-made patches, for **Unreal Engine and Unity**, in three steps (game folder -> FIND THE IMPORTANT STUFF -> SAVE PATCHES). See [below](#unreal-engine-games). |
-| **ITEMS** | The easy way for Unreal Engine games: **all items as a ready-made trainer in three steps** (game folder -> FIND ITEMS -> SAVE TRAINER). See [below](#unreal-engine-games). |
+| **ITEMS** (Unreal) | The easy way for Unreal Engine games: **all items as a ready-made trainer in three steps** (game folder -> FIND ITEMS -> SAVE TRAINER), plus **TEST 1 ITEM**, **GIVE NOW**, **TEST CHECKED ITEMS** and **INVENTORY TO MAX**. See [below](#unreal-engine-games). |
 | **UE-LIVE** | Live values of an Unreal Engine game: pick a member, see all live instances, change / freeze them. |
 | **UE DISCOVERER** | Analyses the SDK and tells you what is there to find: item structs, item tables, give-functions, stat enums, cheat managers - with a check whether a cave trainer can be built for each ("✔" / "✗ not possible: reason"). |
-| **UNITY** | The same idea for Unity (IL2CPP) games: load the Il2CppDumper folder, then change / freeze live values, patch methods (always true, fixed return value, skip) and look up enum names (item IDs). See [below](#unity-il2cpp-games). |
+| **UNITY** | The same idea for Unity (IL2CPP) games: **ITEMS** (all items as a trainer in three steps), then, from the Il2CppDumper folder, live values, method patches (always true, fixed return value, skip) and enum names (item IDs). See [below](#unity-il2cpp-games). |
 | **CHEAT MENU** | Switches and values for the player character, generated from the SDK. Works in shipping builds without a CheatManager. |
 
 ### FIND VALUE (the cheat searcher)
@@ -231,17 +240,44 @@ depend on how the game implements movement and damage - if a game ignores them, 
 ReaperPy reads the output of [ps4-unreal-dumper](https://github.com/TetzkatLipHoka/ps4-unreal-dumper): `offsets.json`,
 `SDK/SDK_HEADERS`, optionally `dump.bin`, `dump.json`, `GObjects.txt`. UE 4.23+ and UE 5 (FNamePool) are supported.
 
-**Items as a trainer (the easy way) - tab ITEMS**
+**Items as a trainer (the easy way) - tab UNREAL -> ITEMS**
 
 1. **Game** - choose the game folder (remembered) and connect in the main window; start the game and load a save.
-2. **FIND ITEMS** - ReaperPy picks the item table and a give-function it can build a trainer for, reads all items live and
-   sorts them into categories (from a category/type column or the item names, e.g. `Item_Fish_Trout` -> *Fish*). Tick or
-   untick items (click the box, double-click, Space, right-click menu), search by name, filter by category, **ALL ON / ALL
-   OFF** act on the visible rows. If the automatic choice looks wrong, change *Item table* / *Give function* above the list.
-3. **SAVE TRAINER** - enter the amount per item and save. Items become entries of 14 per category (*Fish 1*, *Fish 2* ...,
-   no "Item" in the names). Very large lists are spread over several projects (`Items 1`, `Items 2` ...; at most 400 items
-   and 64 entries per project) - activate only **one** at a time. The folder is a normal ReaperPy project: choose it,
-   activate `00 BASIS` once, then click entries. Saving only reads the game; nothing is changed until you activate BASIS.
+2. **FIND ITEMS** - ReaperPy rates every table and function of the game, picks the item table(s) and a give-function it can
+   build a trainer for, reads all items live and sorts them into categories (from a category/type column or the item names,
+   e.g. `Item_Fish_Trout` -> *Fish*). Only suitable entries are offered; effect, UI, sound, enemy and text tables are left out.
+   Tick or untick items (click the box, double-click, Space, right-click menu), search by name, filter by category, **ALL ON /
+   ALL OFF** act on the visible rows.
+   - **Filter** *strict / normal / off* - how strictly tables and functions are filtered (default *normal*; *off* hides nothing).
+     If nothing is found, the log tells where the filter dropped things.
+   - **Read all item lists together** - merges all item tables (up to 12) into one list.
+   - **Change the choice myself (advanced users only)** shows *Item list* and *Give function*; *also show unsuitable ones* adds the
+     rest with the reason. Functions that were tested successfully are marked "tested".
+3. **SAVE TRAINER** - enter the amount per item and save. The amount is cut to the game's own limit per item where the item table
+   has one (`OwnLimitByBackPack`, ...). Items become entries of 14 per category (*Fish 1*, *Fish 2* ...). Very large lists are
+   spread over several projects (`Items 1`, `Items 2` ...; at most 400 items and 64 entries per project) - activate only **one**
+   at a time. The folder is a normal ReaperPy project: choose it, activate `00 BASIS` once, then click entries. Saving only
+   reads the game; nothing is changed until you activate BASIS.
+
+**Test it, or give items right away.** All of these run through a short code cave that the game executes itself on its own thread
+(the same safe way as a saved trainer); the hook is removed afterwards. Save the game first and stay in the game (not in the main
+menu).
+
+| Button | What it does |
+|---|---|
+| **TEST 1 ITEM** | Gives ONE item through the chosen function and asks whether it arrived. The answer is remembered for this game: tested functions are ranked up and marked "tested", failed ones are ranked down. |
+| **GIVE NOW** | Gives all ticked items immediately (no trainer, no BASIS). The items arrive like picked-up ones; save in the game to keep them. |
+| **TEST CHECKED ITEMS** | Checks the trainer *before* you save it: image base, give function, native code, object, hook, free cave space, and every item's name against the game. Optionally (asks first) triggers each item once in the running game. Failed items are unticked. |
+| **INVENTORY TO MAX** | Only shown if the game has an inventory-expansion function (found in the SDK, for example `DevExpansionEnableSlotByMaxLevel`). Runs it once; close and reopen the inventory afterwards. |
+
+**Backpack full?** Items land where the give function puts them - usually the backpack, which has a limit. ReaperPy cuts the amount to
+that limit; for more room use **INVENTORY TO MAX**, or choose the warehouse function (`...ToWarehouse`) under *Change the choice
+myself*, or give fewer items / categories at a time.
+
+**Objects the trainer cannot reach.** Some games keep the inventory in a game-instance subsystem that the player controller does not
+reach. ReaperPy then calls the object through its fixed address (checked against its vtable, skipped if the object is gone). This
+is valid until the game is closed: after every game start load a save, **FIND ITEMS** and **SAVE TRAINER** again. The status line
+and the save dialog tell you when this applies.
 
 **Health, gold, experience, ammo (tab VALUES).** One tab for both engines; same three steps.
 - *Unreal Engine:* the values of the player character come from the SDK (health, stamina, mana, shield, ammo, money,
@@ -292,6 +328,15 @@ works on console memory dumps). The tab is called **UNITY**.
 Your folder should contain `dump.cs` and `script.json` (the `DummyDll` folder is optional - it holds the same information as
 .NET stubs for dnSpy/ILSpy; the offsets and addresses ReaperPy needs are in `dump.cs`). Nested folders, e.g. unzipped
 archives, are fine - the files are searched for.
+
+**Items as a trainer - tab UNITY -> ITEMS.** The same three steps as in the Unreal tab: choose the folder, **FIND ITEMS**,
+**SAVE TRAINER**. ReaperPy picks the item list (the `ItemID`-style enum in `dump.cs`), the method that gives items (`AddItem`,
+`GiveItem` ... with an item-ID parameter and an optional amount) and an entry point (an `Update` method of the inventory class) on
+its own. Categories, several projects, preview before writing and **CHECK TRAINER** work as in the Unreal tab. Finding items needs
+no console connection; saving does. Not tried on a real game yet - methods that take an item object or string are listed with the
+reason and skipped (use the other pages then).
+
+**Values, methods and names - the other pages**
 
 1. **UNITY -> GAME FOLDER...** choose the folder, loading takes about 10 s for a large game.
 2. Start the game on the console and load a save, connect ReaperPy, press **(2) DETECT MODULE**. ReaperPy takes the module
@@ -413,8 +458,10 @@ and 3.12, Windows with 3.12, with Keystone and Capstone installed); `ruff` runs 
 | `scanner.py`, `pointerscan.py`, `ptrscan_server.py` | Scanner and pointer scan |
 | `debugger.py`, `unwind.py` | Debug session, stack unwinder |
 | `patch_engine.py`, `reapatch.py`, `cave_trainer.py`, `export_goldhen.py`, `cheatfmt.py` | Patches, caves, trainers and export |
-| `ue_*.py`, `uesdk.py`, `uecheat.py`, `cheatmenu.py` | Unreal Engine support and the cheat menu logic |
+| `ue_*.py`, `uesdk.py`, `uecheat.py`, `cheatmenu.py` | Unreal Engine support and the cheat menu logic (`ue_items.py`: rating of tables and functions, items, amount limits, inventory expansion) |
+| `item_check.py` | Tests for items: pre-check (read only), live test with a short cave, give-now and expansion through the cave |
 | `il2cpp_dump.py`, `tools_unity_gui.py` | Unity (IL2CPP) support: Il2CppDumper output, live instances, method patches |
+| `unity_items.py`, `tools_unity_items_gui.py` | Unity ITEMS: items as a trainer for IL2CPP games |
 | `updater.py`, `update_ui.py`, `version.py` | Self-update from GitHub Releases (download, SHA-256 check, backup + rollback), update dialog, program version |
 | `imagebase.py` | Checks the image base against the console's memory map (never guesses) |
 | `scripts/`, `.github/workflows/` | Changelog / release-note helpers; CI (tests, lint) and the release build |

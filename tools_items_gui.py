@@ -18,6 +18,7 @@ from tkinter import filedialog, messagebox, ttk
 
 import cave_trainer as TR
 import imagebase as IB
+import item_check as IC
 import ue_items as IT
 import ue_profile as P
 import ue_quick as Q
@@ -41,6 +42,7 @@ class ItemsTab(BaseTab):
         self.rated_tables = []            # alle Tabellen bewertet (ue_items.rate_tables), beste zuerst
         self.rated_funcs = []             # alle baubaren Geben-Funktionen bewertet (ue_items.rate_functions)
         self.func_rating = None           # Bewertung der gewaehlten Funktion
+        self.expand_funcs = []            # Funktionen 'Inventar/Slots erweitern' (ue_items.find_expand), leer = kein Knopf
         self.verified = {}                # {Klasse.Funktion: 'ok' | 'fail'} - Ergebnis des Tests '1 Item testen'
         self.cands = []                   # Tabellen-Vorschlaege aus dem SDK
         self.table = None                 # (addr, name) der gelesenen Tabelle
@@ -56,6 +58,13 @@ class ItemsTab(BaseTab):
         self.v_func = tk.StringVar()
         self.v_expert = tk.BooleanVar(value=False)        # Auswahl-Zeile (Tabelle/Funktion) einblenden
         self.v_all = tk.BooleanVar(value=False)           # auch unpassende Tabellen/Funktionen zeigen
+        self.v_level = tk.StringVar(value=IT.DEFAULT_LEVEL)   # Filter: streng | normal | aus
+        self.v_merge = tk.BooleanVar(value=True)          # ALLE Item-Listen zusammen lesen (nicht nur die erste)
+        self.v_cleanup = tk.BooleanVar(value=True)        # nicht bestandene Items nach dem Test automatisch abhaken
+        self.tables_used = []                             # Namen der gelesenen Item-Listen
+        self.report = None                                # item_check.Report des letzten Tests
+        self.results = {}                                 # Item-Index -> item_check.Result
+        self.diag = ""                                    # Zaehlerstand der Filter (fuer "nichts gefunden")
 
         tk.Label(self, text="▸  ITEMS  →  TRAINER", bg=BG, fg=ACCENT, font=FONT_HEAD).pack(anchor="w", padx=14,
                                                                                          pady=(10, 0))
@@ -89,10 +98,11 @@ class ItemsTab(BaseTab):
         top.pack(fill="x")
         self.b_find = pbtn(top, "🔎  ITEMS FINDEN", self.find_items, primary=True)
         self.b_find.pack(side="left")
-        self.b_test = pbtn(top, "🧪  1 ITEM TESTEN", self.test_item)
-        self.b_test.pack(side="left", padx=(6, 0))
+        self.b_one = pbtn(top, "🧪  1 ITEM TESTEN", self.test_item)
+        self.b_one.pack(side="left", padx=(6, 0))
         self.b_live = pbtn(top, "⚡  JETZT GEBEN", self.give_live)
         self.b_live.pack(side="left", padx=(6, 0))
+        self.b_expand = pbtn(top, "📦  INVENTAR AUF MAX", self.expand_inventory)      # nur sichtbar, wenn das Spiel so etwas anbietet
         self.lbl_found = tk.Label(top, text="Klicke ITEMS FINDEN - alles Weitere passiert automatisch.", bg=BG_CARD,
                                   fg=TEXT_DIM, font=FONT_LABEL, anchor="w", justify="left", wraplength=820)
         self.lbl_found.pack(side="left", padx=12, fill="x", expand=True)
@@ -117,6 +127,12 @@ class ItemsTab(BaseTab):
         self.chk_all.configure(command=self._fill_choices)
         self.chk_all.pack(side="left", padx=8)
         self.opt_row = opt                                                  # die Auswahl-Zeile 'sel' erscheint darunter
+        clabel(opt, "Filter").pack(side="left", padx=(16, 4))
+        self.cb_level = ttk.Combobox(opt, textvariable=self.v_level, values=list(IT.LEVELS), width=8, state="readonly")
+        self.cb_level.pack(side="left")
+        self.cb_level.bind("<<ComboboxSelected>>", lambda _e: self._level_changed())
+        self.chk_merge = _check(opt, "Alle Item-Listen zusammen lesen", self.v_merge)
+        self.chk_merge.pack(side="left", padx=12)
 
         flt = tk.Frame(body, bg=BG_CARD)
         flt.pack(fill="x", pady=(8, 4))
@@ -130,12 +146,16 @@ class ItemsTab(BaseTab):
         self.cb_cat.bind("<<ComboboxSelected>>", lambda _e: self.fill())
         pbtn(flt, "ALLE AN", lambda: self.set_visible(True)).pack(side="left")
         pbtn(flt, "ALLE AUS", lambda: self.set_visible(False)).pack(side="left", padx=4)
+        self.b_test = pbtn(flt, "🧪  ANGEHAKTE TESTEN", self.run_test)
+        self.b_test.pack(side="left", padx=(12, 0))
+        self.chk_cleanup = _check(flt, "Nicht bestandene abhaken", self.v_cleanup)
+        self.chk_cleanup.pack(side="left", padx=8)
         self.lbl_count = clabel(flt, "")
         self.lbl_count.pack(side="right")
 
         fr = tk.Frame(body, bg=BG_CARD)
         fr.pack(fill="both", expand=True)
-        self.tv = tree(fr, [("c", "✓"), ("n", "ITEM"), ("k", "KATEGORIE")], [40, 340, 200], height=9,
+        self.tv = tree(fr, [("c", "✓"), ("n", "ITEM"), ("k", "KATEGORIE"), ("t", "TEST")], [40, 300, 170, 260], height=9,
                        anchors={"c": "center"},
                        actions=[("Auswahl anhaken", lambda: self.set_selected(True)),
                                 ("Auswahl abhaken", lambda: self.set_selected(False)),
@@ -227,9 +247,13 @@ class ItemsTab(BaseTab):
             return self._found("Nicht verbunden - im Hauptfenster auf VERBINDEN klicken und den Spielstand laden.", ERROR)
         gp = getattr(getattr(self.win, "app", None), "gp", None)
         sdk = proj.sdk
-        verified = dict(((gp.discover or {}).get("verified") or {}) if gp is not None else {})
+        disc = (gp.discover or {}) if gp is not None else {}
+        verified = dict(disc.get("verified") or {}) if disc.get("verified_v") == IT.VERIFY_VERSION else {}   # alte Tests verfallen
         self._busy = True
         self._found("Suche läuft … (beim ersten Mal kann das je nach Spiel eine Minute dauern)", WARN)
+        level, merge = self.v_level.get(), self.v_merge.get()
+        if level not in IT.LEVELS:
+            level = IT.DEFAULT_LEVEL
 
         def job():
             sig = P.signature(sdk)
@@ -247,16 +271,26 @@ class ItemsTab(BaseTab):
                 live.build_index()
             tables = P.find_table_objects(live)
             cands = IT.table_candidates(prof)
-            rated_t = IT.rate_tables(cands, tables)                        # ALLE Tabellen des Spiels bewerten
-            ranked = IT.choose_table(cands, tables)                        # nur die, die nach Items aussehen
-            table = rows = cols = None
-            for s, pick in ranked[:6]:                                   # erste Tabelle, die wirklich Zeilen liefert
+            rated_t = IT.rate_tables(cands, tables, level)                 # ALLE Tabellen des Spiels bewerten
+            if merge:                                                      # ALLE Item-Listen, nicht nur die beste
+                ranked = [(s, pick) for s, pick, _r in IT.choose_tables(cands, tables, level)]
+            else:
+                ranked = IT.choose_table(cands, tables, level)             # nur die, die nach Items aussehen
+            table = rows = cols = items = None
+            parts, used = [], []
+            for s, pick in ranked[:IT.MAX_TABLES if merge else 6]:       # Tabellen, die wirklich Zeilen liefern
                 r, c = P.read_table(live.rd, live.fname_str, pick[0], s.data.get("columns", []))
                 if r:
-                    table, rows, cols = pick, r, c
-                    break
-            rated_f = IT.rate_functions(prof, sdk, verified)               # nur Funktionen, die der Trainer bauen kann
-            funcs, bad = IT.give_candidates(prof, sdk)
+                    parts.append((pick[1], r, c))
+                    used.append(pick)
+                    if not merge:
+                        table, rows, cols = pick, r, c
+                        break
+            if merge and parts:
+                table, items = used[0], IT.merge_tables(parts)
+                rows, cols = parts[0][1], parts[0][2]
+            rated_f = IT.rate_functions(prof, sdk, level, verified, live, live.rd)                  # nur Funktionen, die der Trainer bauen kann
+            funcs, bad = IT.give_candidates(prof, sdk, level)
             try:                                                      # stimmt die Image-Basis mit der Konsole ueberein?
                 bc = IB.check_image_base(client.get_maps_named(), self.base)
             except Exception as e:  # noqa: BLE001
@@ -266,9 +300,11 @@ class ItemsTab(BaseTab):
             except Exception as e:  # noqa: BLE001
                 self._ilog(f"Platz fuer die Cave nicht ermittelt: {e}")
                 cap = None
-            return {"prof": prof, "sig": sig, "fresh": fresh, "live": live, "tables": tables, "cands": cands,
+            expand = IT.find_expand(sdk)
+            return {"expand": expand, "prof": prof, "sig": sig, "fresh": fresh, "live": live, "tables": tables, "cands": cands,
                     "table": table, "rows": rows or [], "cols": cols or [], "funcs": funcs, "bad": bad, "cap": cap, "basecheck": bc,
-                    "rated_t": rated_t, "rated_f": rated_f}
+                    "rated_t": rated_t, "rated_f": rated_f, "items": items, "used": [u[1] for u in used], "level": level,
+                    "n_tables": len(tables), "n_parts": len(parts)}
 
         def ok(res):
             self._busy = False
@@ -276,7 +312,7 @@ class ItemsTab(BaseTab):
             if gp is not None and res["fresh"]:
                 gp.discover = {"sig": res["sig"], "json": P.to_json(res["prof"])}
                 if verified:
-                    gp.discover["verified"] = verified
+                    gp.discover.update({"verified": verified, "verified_v": IT.VERIFY_VERSION})
                 gp.save()
             if ue is not None:
                 ue.live = res["live"]
@@ -284,6 +320,8 @@ class ItemsTab(BaseTab):
             self.funcs, self.func_bad = res["funcs"], res["bad"]
             self.rated_tables, self.rated_funcs = res["rated_t"], res["rated_f"]
             self.cap = res.get("cap")
+            self.expand_funcs = res.get("expand") or []
+            self._update_expand()
             self._set_basecheck(res.get("basecheck"))
             self.func_rating = self.rated_funcs[0] if self.rated_funcs else None      # beste Funktion (erreichbare zuerst)
             good = [r for r in self.rated_funcs if r["relevant"]]
@@ -291,15 +329,43 @@ class ItemsTab(BaseTab):
                 self.func_rating = good[0]
             self.func = self.func_rating["sug"] if self.func_rating else (self.funcs[0] if self.funcs else None)
             self.table = res["table"]
+            self.tables_used = res.get("used") or ([res["table"][1]] if res["table"] else [])
+            self.diag = self._diag_text(res)
             self._fill_choices()
-            self.set_items(res["rows"], res["cols"])
+            self.set_items(res["rows"], res["cols"], res.get("items"))
             self._report()
+            if not self.items or not self.func:
+                for line in self.diag.splitlines():                       # Zaehlerstand ins Log: hilft bei "nichts gefunden"
+                    self.log(line, "info")
 
         def fail(e):
             self._busy = False
             self._found("Das hat nicht geklappt: " + (str(e) or e.__class__.__name__), ERROR)
             self.log(str(e), "err")
         self.bg(job, ok, fail)
+
+    def _level_changed(self):
+        """Filter umgestellt: Suche mit der neuen Stufe wiederholen (nur wenn schon einmal gesucht wurde)."""
+        if self.prof is not None and not self._busy:
+            self.find_items()
+
+    def _diag_text(self, res):
+        """Wo im Filter wie viel uebrig bleibt - damit 'passiert nichts' einen erkennbaren Grund hat."""
+        level = res.get("level", IT.DEFAULT_LEVEL)
+        rt = res.get("rated_t", [])
+        rel = [r for r in rt if r["relevant"]]
+        lines = [f"Filter '{level}': {res.get('n_tables', len(rt))} Tabellen im Spiel, {len(rel)} sehen nach Items aus, "
+                 f"{res.get('n_parts', 0)} davon lieferten Zeilen.",
+                 f"Geben-Funktionen: {len(res.get('rated_f', []))} baubar, "
+                 f"{sum(1 for r in res.get('rated_f', []) if r['relevant'])} passend; "
+                 f"{len(res.get('bad', []))} verworfen."]
+        if not res.get("items") and not res.get("rows"):
+            top = ", ".join(f"{r['name']} ({r['score']})" for r in rt[:5])
+            lines.append("Beste Tabellen nach Name: " + (top or "keine") + " - Filter auf 'aus' stellen, um alle zu sehen.")
+        if not res.get("rated_f"):
+            why = res["bad"][0][1] if res.get("bad") else "keine Funktion mit Item-ID im SDK"
+            lines.append("Keine baubare Geben-Funktion: " + why)
+        return "\n".join(lines)
 
     def _set_basecheck(self, bc):
         self.basecheck = bc
@@ -320,6 +386,48 @@ class ItemsTab(BaseTab):
         self._set_basecheck(IB.Result("ok", bc.live_base, bc.live_base, ""))
         self.lbl_done.configure(text=f"Image-Basis auf {bc.live_base:#x} gestellt (laut Speicherkarte). "
                                      "Jetzt ITEMS FINDEN erneut klicken.", fg=ACCENT)
+
+    def _update_expand(self):
+        """Den Max-Level-Knopf nur zeigen, wenn das Spiel eine passende Funktion hat."""
+        if self.expand_funcs:
+            self.b_expand.pack(side="left", padx=(6, 0), after=self.b_live)
+        else:
+            self.b_expand.pack_forget()
+
+    def expand_inventory(self):
+        """Inventar-Erweiterung des Spiels (z. B. DevExpansionEnableSlotByMaxLevel) einmal ausfuehren."""
+        if self._busy:
+            return self.log("Es läuft noch ein Auftrag - kurz warten", "warn")
+        ue, proj, client = self._ue(), self._proj(), getattr(self.win, "client", None)
+        live = getattr(ue, "live", None)
+        if not self.expand_funcs or live is None or proj is None or client is None:
+            return self._found("Erst Schritt ① und ITEMS FINDEN (Spiel laden, verbinden).", ERROR)
+        func = self.expand_funcs[0]
+        if not messagebox.askyesno("Inventar auf Max", f"Es wird {func.title} im Spiel einmal ausgeführt (schaltet laut Name "
+                                   "mehr Inventar-Plätze frei) - über eine kurze Cave, die das Spiel selbst ausführt. Vorher "
+                                   "speichern und im Spiel bleiben (nicht im Hauptmenü).\n\nJetzt ausführen?", parent=self.win):
+            return
+        sdk, base = proj.sdk, self.base
+        self._busy = True
+        self._found("Erweitere Inventar … (nicht anfassen)", WARN)
+
+        def job():
+            maps = [(m[0], m[1], m[2]) for m in client.get_maps()]
+            return IC.run_expand(func, sdk, live, client.read_memory, client.write_memory, base, maps, log=self._ilog)
+
+        def ok(ran):
+            self._busy = False
+            if ran:
+                self._found("✔ Inventar-Erweiterung ausgeführt - Inventar im Spiel schließen und neu öffnen.", ACCENT)
+            else:
+                self._found("Die Cave wurde nicht ausgeführt (das Spiel ruft ProcessEvent gerade nicht auf) - im Spiel "
+                            "bewegen / Menü schließen und erneut klicken.", WARN)
+
+        def fail(e):
+            self._busy = False
+            self._found("✗ Erweitern nicht möglich: " + (str(e) or e.__class__.__name__), ERROR)
+            self.log(str(e), "err")
+        self.bg(job, ok, fail)
 
     def _toggle_expert(self):
         """Tabelle/Funktion nur auf Wunsch zeigen: fuer Anfaenger genuegt die Statuszeile."""
@@ -363,7 +471,10 @@ class ItemsTab(BaseTab):
 
     def _report(self):
         parts = []
-        if self.table and self.items:
+        if self.table and self.items and len(self.tables_used) > 1:
+            parts.append(f"✔ {len(self.items)} Items aus {len(self.tables_used)} Tabellen "
+                         f"({', '.join(self.tables_used[:3])}{' …' if len(self.tables_used) > 3 else ''})")
+        elif self.table and self.items:
             parts.append(f"✔ {len(self.items)} Items aus der Tabelle {self.table[1]}")
         elif self.live_tables:
             parts.append("✗ Keine Item-Liste automatisch erkannt - oben 'Auswahl selbst ändern' ankreuzen und eine Liste "
@@ -372,7 +483,9 @@ class ItemsTab(BaseTab):
             parts.append("✗ Im Spiel wurden keine Tabellen gefunden - Spielstand geladen (nicht im Hauptmenü)?")
         weak = self.func_rating is not None and not self.func_rating["relevant"]
         if self.func and not weak:
-            parts.append(f"✔ Geben-Funktion: {self._func_title(self.func)}")
+            parts.append(f"✔ Geben-Funktion: {self._func_title(self.func)}"
+                         + (" (feste Objekt-Adresse: der Trainer gilt nur bis zum Spielende)"
+                            if (self.func_rating or {}).get("reach") == "abs" else ""))
         elif self.func:
             parts.append(f"⚠ Geben-Funktion: {self._func_title(self.func)} - {self._weak_reason()}")
         else:
@@ -406,16 +519,27 @@ class ItemsTab(BaseTab):
         if item is None:
             return self._found("Erst ein Item anklicken oder anhaken, das getestet werden soll.", ERROR)
         title = self._func_title(self.func)
-        if not messagebox.askyesno("1 Item testen", f"Es wird EIN Item ({item['name']}) über {title} direkt im Spiel "
-                                   "gegeben. Das läuft auf einem Hilfs-Thread des Spiels - vorher speichern und im Spiel "
-                                   "bleiben (nicht im Hauptmenü).\n\nJetzt testen?", parent=self.win):
+        if not messagebox.askyesno("1 Item testen", f"Es wird EIN Item ({item['name']}) über {title} im Spiel "
+                                   "gegeben - über eine kurze Cave, die das Spiel selbst ausführt (Haken wird danach "
+                                   "wieder entfernt). Vorher speichern und im Spiel bleiben (nicht im Hauptmenü)."
+                                   "\n\nJetzt testen?", parent=self.win):
             return
         func, sdk, base = self.func, proj.sdk, self.base
         self._busy = True
         self._found("Test läuft …", WARN)
 
         def job():
-            return IT.try_give(live, client, sdk, func, item, base, 1)
+            maps = [(m[0], m[1], m[2]) for m in client.get_maps()]
+            try:
+                r = IC.give_via_cave([item], func, sdk, live, client.read_memory, client.write_memory, base, maps, 1,
+                                     log=self._ilog)
+            except (TR.TrainerError, ValueError) as e:      # Weg ueber die Cave geht nicht (nichts veraendert) -> alter Weg
+                self.log(f"Weg über die Cave nicht möglich ({e}) - versuche den direkten Aufruf", "warn")
+                return IT.try_give(live, client, sdk, func, item, base, 1)
+            if not r["given"]:
+                raise ValueError(r["error"] or "Die Cave wurde nicht ausgeführt - im Spiel bewegen und erneut versuchen")
+            return {"instance": 0, "instances": 0, "outs": [], "returned_false": False, "reach": r["reach"],
+                    "detail": ["   Aufruf über eine kurze Cave im Spiel-Thread (Haken danach entfernt)"]}
 
         def ok(res):
             self._busy = False
@@ -445,8 +569,9 @@ class ItemsTab(BaseTab):
         key = IT.func_key(self.func)
         hint = "" if self.verified.get(key) == "ok" else "\n\nDiese Funktion ist noch nicht getestet - erst '1 ITEM TESTEN'."
         if not messagebox.askyesno("Jetzt geben", f"{len(chosen)} Items x {amount} werden SOFORT über {key} ins Spiel gegeben "
-                                   "(ohne Trainer). Das läuft auf einem Hilfs-Thread des Spiels - vorher speichern, im Spiel "
-                                   "bleiben (nicht im Hauptmenü), nicht zu viele Items auf einmal." + hint
+                                   "(ohne Trainer). Das geschieht über eine kurze Cave, die das Spiel selbst ausführt (der "
+                                   "Haken wird danach wieder entfernt) - vorher speichern, im Spiel bleiben (nicht im "
+                                   "Hauptmenü)." + hint
                                    + "\n\nJetzt geben?", parent=self.win):
             return
         func, sdk, base = self.func, proj.sdk, self.base
@@ -454,7 +579,14 @@ class ItemsTab(BaseTab):
         self._found("Gebe Items … (nicht anfassen)", WARN)
 
         def job():
-            return IT.give_many(live, client, sdk, func, chosen, base, amount)
+            maps = [(m[0], m[1], m[2]) for m in client.get_maps()]
+            prog = lambda k, n: self.win.ui(lambda: self._found(f"Gebe Items … {k + 1}/{n}", WARN))  # noqa: E731
+            try:
+                return IC.give_via_cave(chosen, func, sdk, live, client.read_memory, client.write_memory, base, maps, amount,
+                                        log=self._ilog, progress=prog)
+            except (TR.TrainerError, ValueError) as e:      # Weg ueber die Cave geht nicht (nichts veraendert) -> alter Weg
+                self.log(f"Weg über die Cave nicht möglich ({e}) - versuche den direkten Aufruf", "warn")
+                return IT.give_many(live, client, sdk, func, chosen, base, amount)
 
         def ok(res):
             self._busy = False
@@ -472,7 +604,9 @@ class ItemsTab(BaseTab):
             msg += f"  ({len(res['rejected'])} vom Spiel abgelehnt, z. B. {res['rejected'][0]})"
         if res["skipped"]:
             msg += f"  ({len(res['skipped'])} ohne Zahlen-ID übersprungen)"
-        self._found(msg, ACCENT if res["given"] else WARN)
+        if res.get("error"):
+            msg += "  - " + res["error"]
+        self._found(msg, ACCENT if res["given"] and not res.get("error") else WARN)
         self.log(msg, "ok" if res["given"] else "warn")
 
     def _test_done(self, func, item, res):
@@ -487,9 +621,11 @@ class ItemsTab(BaseTab):
         said = messagebox.askyesno("1 Item testen", f"Der Aufruf wurde ausgeführt ({item['name']}).\n\nIst das Item jetzt "
                                    "im Inventar? (Inventar ggf. einmal schließen und neu öffnen)", parent=self.win)
         self._set_verified(key, "ok" if said else "fail")
-        if said and res["reach"] == "zero":
+        if said and res["reach"] == "zero" and (self.func_rating or {}).get("reach") != "abs":
             self._found("✔ Die Funktion wirkt im Spiel - ABER der Trainer erreicht ihr Objekt nicht, ein fertiger Trainer "
                         "würde nichts bewirken. Das hilft bei der Weiterentwicklung (Zeigerkette zum Objekt).", WARN)
+        elif said and res["reach"] == "unused":
+            self._found(f"✔ Die Funktion wirkt im Spiel; sie braucht ihr Objekt nicht, der Trainer ruft sie direkt auf: {key}", ACCENT)
         elif said:
             self._found(f"✔ Die Funktion wirkt im Spiel und der Trainer erreicht ihr Objekt: {key}", ACCENT)
         else:
@@ -500,12 +636,13 @@ class ItemsTab(BaseTab):
         self.verified[key] = state
         gp = getattr(getattr(self.win, "app", None), "gp", None)
         if gp is not None and gp.discover:
-            gp.discover["verified"] = dict(self.verified)
+            gp.discover.update({"verified": dict(self.verified), "verified_v": IT.VERIFY_VERSION})
             gp.save()
         proj = self._proj()
         if self.prof is None or proj is None:
             return
-        self.rated_funcs = IT.rate_functions(self.prof, proj.sdk, self.verified)
+        self.rated_funcs = IT.rate_functions(self.prof, proj.sdk, self.v_level.get(), self.verified,
+                                           getattr(self._ue(), "live", None), getattr(getattr(self._ue(), "live", None), "rd", None))
         cur = IT.func_key(self.func) if self.func else ""
         self.func_rating = next((r for r in self.rated_funcs if IT.func_key(r["sug"]) == cur), None)
         self._fill_choices()
@@ -557,12 +694,15 @@ class ItemsTab(BaseTab):
         r = next((r for n, r in self._func_choices() if n == name), None)
         if r is not None:
             self.func_rating, self.func = r, r["sug"]
+            self.report, self.results = None, {}                       # anderer Funktion -> alter Test gilt nicht mehr
+            self.fill()
         self._report()
 
     # --- Liste ----------------------------------------------------------------------------------
-    def set_items(self, rows, cols):
-        self.items = IT.build_items(rows, cols)
+    def set_items(self, rows, cols, items=None):
+        self.items = items if items is not None else IT.build_items(rows, cols)
         self.on = [True] * len(self.items)
+        self.report, self.results = None, {}
         cats = sorted({i["category"] for i in self.items}, key=lambda k: (k == IT.OTHER, k.lower()))
         self.cb_cat.configure(values=[ALL_CATS] + cats)
         self.v_cat.set(ALL_CATS)
@@ -582,14 +722,17 @@ class ItemsTab(BaseTab):
             self.view.append(i)
         for i in self.view[:MAX_SHOWN]:
             it = self.items[i]
-            self.tv.insert("", "end", iid=str(i), values=(CHK[self.on[i]], it["name"], it["category"]))
+            self.tv.insert("", "end", iid=str(i), values=self._vals(i))
         self.update_summary()
+
+    def _vals(self, i):
+        it, r = self.items[i], self.results.get(i)
+        return (CHK[self.on[i]], it["name"], it["category"], r.label if r is not None else "")
 
     def _refresh_rows(self, idx):
         for i in idx:
-            it = self.items[i]
             try:
-                self.tv.item(str(i), values=(CHK[self.on[i]], it["name"], it["category"]))
+                self.tv.item(str(i), values=self._vals(i))
             except tk.TclError:
                 pass                                        # Zeile gerade ausgefiltert
         self.update_summary()
@@ -657,6 +800,142 @@ class ItemsTab(BaseTab):
         self.fill()
 
     # ------------------------------------------------------------------
+    # Test der angehakten Items (BEVOR ein Trainer daraus gebaut wird)
+    # ------------------------------------------------------------------
+    def _scope(self):
+        """Indizes der angehakten Items; ist eine Kategorie gewaehlt, nur die dieser Kategorie."""
+        cat = self.v_cat.get()
+        return [i for i, (it, f) in enumerate(zip(self.items, self.on)) if f and (cat == ALL_CATS or it["category"] == cat)]
+
+    def _test_ready(self):
+        """-> (proj, client, live) oder None (mit Meldung)."""
+        if self._busy:
+            self.log("Es läuft noch ein Auftrag - kurz warten", "warn")
+            return None
+        if self.func is None:
+            self.lbl_done.configure(text="Es gibt keine baubare Geben-Funktion - siehe Meldung bei Schritt ②.", fg=ERROR)
+            return None
+        ue, proj, client = self._ue(), self._proj(), getattr(self.win, "client", None)
+        live = getattr(ue, "live", None)
+        if proj is None or client is None or live is None:
+            self.lbl_done.configure(text="Erst Schritt ① und ITEMS FINDEN (Spiel laden, verbinden).", fg=ERROR)
+            return None
+        return proj, client, live
+
+    def run_test(self):
+        """Stufe 1: Vorab-Test (nur Lesen) fuer alle angehakten Items (der gewaehlten Kategorie)."""
+        idx = self._scope()
+        if not idx:
+            self.lbl_done.configure(text="Erst Items anhaken (und ggf. oben eine Kategorie wählen) - dann testen.", fg=ERROR)
+            return
+        ready = self._test_ready()
+        if ready is None:
+            return
+        proj, client, live = ready
+        func, sdk, base = self.func, proj.sdk, self.base
+        its = [self.items[i] for i in idx]
+        self._busy = True
+        self.lbl_done.configure(text=f"Teste {len(its)} Items … (nur Lesen, im Spiel wird nichts verändert)", fg=WARN)
+
+        def job():
+            maps = [(m[0], m[1], m[2]) for m in client.get_maps()]
+            return IC.preflight(its, func, sdk, live, client.read_memory, base, maps, log=self._ilog)
+
+        def ok(rep):
+            self._busy = False
+            self.report = rep
+            self.results = {i: r for i, r in zip(idx, rep.results)}
+            self._show_test(idx, "Vorab-Test")
+            if rep.blocking or not any(r.status != IC.FAIL for r in rep.results):
+                return
+            if messagebox.askyesno(
+                    "Live-Test?",
+                    "Der Vorab-Test (nur Lesen) ist durch.\n\nZusätzlich LIVE testen? Dabei wird kurz ein Test-Haken ins "
+                    "Spiel gesetzt und jedes Item einmal ausgelöst - so sieht man, ob die Funktion im Spiel wirklich "
+                    "läuft. Der Haken wird danach wieder entfernt.\n\nVoraussetzung: Spielstand geladen, du bist im Spiel "
+                    "(kein Menü, keine Zwischensequenz). Am besten vorher speichern.", parent=self.win):
+                self._live_test(idx, its, proj, client, live)
+
+        def fail(e):
+            self._busy = False
+            self.lbl_done.configure(text="Test hat nicht geklappt: " + (str(e) or e.__class__.__name__), fg=ERROR)
+            self.log(str(e), "err")
+        self.bg(job, ok, fail)
+
+    def _live_test(self, idx, its, proj, client, live):
+        """Stufe 2: Test-Cave mit je einem Schalter je Item; wartet, bis die Cave ihn verbraucht."""
+        try:
+            amount = self._amount()
+        except ValueError as e:
+            self.lbl_done.configure(text=str(e), fg=ERROR)
+            return
+        func, sdk, base = self.func, proj.sdk, self.base
+        results = [self.results[i] for i in idx]
+        self._busy = True
+        self.lbl_done.configure(text="Live-Test läuft … im Spiel bleiben und nichts anfassen.", fg=WARN)
+
+        def job():
+            maps = [(m[0], m[1], m[2]) for m in client.get_maps()]
+            prog = lambda k, n: self.win.ui(lambda: self.lbl_done.configure(text=f"Live-Test {k + 1}/{n} …", fg=WARN))  # noqa: E731
+            return IC.live_probe(its, results, func, sdk, live, client.read_memory, client.write_memory, base, maps,
+                                 amount, client=client, log=self._ilog, progress=prog)
+
+        def ok(n):
+            self._busy = False
+            self._show_test(idx, "Live-Test")
+            ran = [i for i in idx if self.results[i].ran]
+            if not ran:
+                return
+            first = self.items[ran[0]]["name"]
+            ans = messagebox.askyesnocancel(
+                "Ist etwas angekommen?",
+                f"Das Spiel sollte '{first}' ({amount}×) bekommen haben.\n\nSchau im Inventar nach (ggf. einmal "
+                "schließen und neu öffnen).\n\nJa = Item ist da\nNein = nichts angekommen\nAbbrechen = weiß nicht",
+                parent=self.win)
+            if ans is not None:
+                IC.apply_manual_answer(self.results_list(idx), range(len(idx)), bool(ans))
+                self._show_test(idx, "Live-Test")
+
+        def fail(e):
+            self._busy = False
+            msg = str(e) or e.__class__.__name__
+            self.lbl_done.configure(text="Live-Test nicht möglich (im Spiel wurde nichts verändert): " + msg, fg=ERROR)
+            self.log(msg, "err")
+        self.bg(job, ok, fail)
+
+    def results_list(self, idx):
+        return [self.results[i] for i in idx]
+
+    def _show_test(self, idx, what):
+        """Ergebnis anzeigen: Spalte TEST, Zusammenfassung, nicht bestandene abhaken (wenn gewuenscht)."""
+        rep = self.report
+        off = []
+        if self.v_cleanup.get():
+            for i in idx:
+                if self.results[i].status == IC.FAIL and self.on[i]:
+                    self.on[i] = False
+                    off.append(i)
+        self.fill()
+        n = {IC.OK: 0, IC.WARN: 0, IC.FAIL: 0}
+        for i in idx:
+            n[self.results[i].status] += 1
+        head = f"{what}: {n[IC.OK]} von {len(idx)} Items in Ordnung" + (f", {n[IC.WARN]} mit Hinweis" if n[IC.WARN] else "") + \
+            (f", {n[IC.FAIL]} nicht brauchbar" + (" (abgehakt)" if off else "") if n[IC.FAIL] else "") + "."
+        lines = [head] + ["  " + x for x in rep.text().splitlines()[:9]] if rep is not None else [head]
+        if rep is not None and rep.blocking:
+            lines.append("→ Mit dieser Geben-Funktion wird ein Trainer NICHT funktionieren. Oben 'Auswahl selbst ändern' "
+                         "ankreuzen und eine andere Funktion wählen, oder den Filter lockern.")
+        elif n[IC.FAIL] == 0 and n[IC.WARN] == 0:
+            lines.append("→ Alles bestanden: Du kannst den Trainer speichern.")
+        bad = next((self.results[i] for i in idx if self.results[i].status != IC.OK and self.results[i].reasons), None)
+        if bad is not None:
+            lines.append("Erster Hinweis: " + bad.reasons[0])
+        ok_color = ACCENT if n[IC.FAIL] == 0 and n[IC.WARN] == 0 and not (rep and rep.blocking) else WARN
+        self.lbl_done.configure(text="\n".join(lines), fg=ok_color)
+        self.update_summary()
+        self.log(head, "ok" if ok_color == ACCENT else "warn")
+
+    # ------------------------------------------------------------------
     # Schritt 3: Trainer speichern
     # ------------------------------------------------------------------
     def _chosen(self):
@@ -718,6 +997,11 @@ class ItemsTab(BaseTab):
         if self.basecheck is not None and self.basecheck.status == "shifted":
             self.lbl_done.configure(text="✗ " + self.basecheck.message + " → oben BASIS ÜBERNEHMEN klicken.", fg=ERROR)
             return
+        if self.report is not None and self.report.blocking and not messagebox.askyesno(
+                "Der Test ist gescheitert", "Der letzte Test dieser Items ist gescheitert:\n\n" + self.report.text() +
+                "\n\nEin Trainer mit dieser Funktion wirkt sehr wahrscheinlich nicht. Trotzdem speichern?", parent=self.win):
+            self.lbl_done.configure(text="Abgebrochen - es wurde nichts geschrieben.", fg=WARN)
+            return
         pkgs, _preview = self._projects()
         func, sdk, base, game = self.func, proj.sdk, self.base, getattr(proj, "title", "") or getattr(proj, "name", "")
         self._busy = True
@@ -766,6 +1050,11 @@ class ItemsTab(BaseTab):
             if len(made) > 1:
                 msg.append("Wichtig: Es gibt mehrere Projekte - immer nur EINES gleichzeitig aktivieren "
                            "(zum Wechseln erst dessen BASIS ausschalten).")
+            if (self.func_rating or {}).get("reach") == "abs":
+                msg.append("Wichtig: Dieser Trainer ruft das Objekt über seine feste Adresse auf - sie gilt nur bis zum Beenden "
+                           "des Spiels. Nach jedem Spielstart: Spielstand laden, ITEMS FINDEN und TRAINER SPEICHERN neu.")
+            msg.append("Die Menge wird je Item auf die Obergrenze des Spiels gekürzt (z. B. OwnLimitByBackPack). Rucksack und Lager "
+                       "sind begrenzt: lieber wenige Items/Kategorien auf einmal, oder die Lager-Funktion (AddItemToWarehouse) wählen.")
             msg.append("Am echten Spiel zuerst speichern; bei einem Absturz die Anleitung (README) im Projektordner lesen.")
             self.lbl_done.configure(text="\n".join(msg), fg=ACCENT)
             for w in made[0][3].warnings if made else []:
@@ -869,6 +1158,14 @@ class ItemsTab(BaseTab):
                     lines.append(f"✗ {len(changed)} Item-Nummern sind in deinem Spiel anders (und {len(missing)} Items fehlen) - "
                                  "deshalb passiert im Spiel nichts, wenn du einen Eintrag aktivierst.")
                     adapt = (res["ok_version"] or bool(moved)) and bool(changed)
+                    for a, was, now in changed[:5]:                      # Beispiele, damit man das Muster sieht (Index? Nummer?)
+                        lines.append(f"      {a}: gespeichert {was} → jetzt {now}")
+                    for a in missing[:3]:
+                        lines.append(f"      fehlt in der Liste: {a}")
+                    for a, was, now in changed:
+                        self.log(f"[fname] {a}: gespeichert {was} → jetzt {now}", "warn")
+                    if good:
+                        lines.append(f"      ({len(good)} Items stimmen)")
             fix = bool(moved)
             self.lbl_done.configure(text="\n".join(lines), fg=ACCENT if res["ok_version"] and not adapt else WARN)
             if (adapt or fix) and self._ask_adapt(

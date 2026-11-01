@@ -291,16 +291,65 @@ class TryGive(unittest.TestCase):
         with self.assertRaises(ValueError):
             IT.test_assignments(func, fp, {"fname": b"", "id": None}, 3, sdk)
 
+    def test_level_and_verified_work_together(self):
+        """Filterstufe und Testergebnis sind unabhaengig: 'fail' sperrt die Funktion in JEDER Stufe, 'ok' wertet in jeder auf."""
+        key = IT.func_key(self.func)
+        for level in IT.LEVELS:
+            base = {IT.func_key(r["sug"]): r for r in IT.rate_functions(self.prof, self.sdk, level)}
+            ok = {IT.func_key(r["sug"]): r for r in IT.rate_functions(self.prof, self.sdk, level, {key: "ok"})}
+            bad = {IT.func_key(r["sug"]): r for r in IT.rate_functions(self.prof, self.sdk, level, {key: "fail"})}
+            self.assertEqual(ok[key]["score"], base[key]["score"] + 4, level)
+            self.assertFalse(bad[key]["relevant"], level)
+            self.assertIn("Test fehlgeschlagen", bad[key]["reasons"], level)
+
     def test_verified_changes_ranking_and_label(self):
         key = IT.func_key(self.func)
         base = {r["sug"].title: r for r in IT.rate_functions(self.prof, self.sdk)}
-        ok = {r["sug"].title: r for r in IT.rate_functions(self.prof, self.sdk, {key: "ok"})}
-        bad = {r["sug"].title: r for r in IT.rate_functions(self.prof, self.sdk, {key: "fail"})}
+        ok = {r["sug"].title: r for r in IT.rate_functions(self.prof, self.sdk, verified={key: "ok"})}
+        bad = {r["sug"].title: r for r in IT.rate_functions(self.prof, self.sdk, verified={key: "fail"})}
         self.assertEqual(ok[key]["score"], base[key]["score"] + 4)
         self.assertIn("✔ getestet", IT.function_label(ok[key]))
         self.assertFalse(bad[key]["relevant"])
         self.assertIn("Test fehlgeschlagen", bad[key]["reasons"])
-        self.assertNotEqual(IT.rate_functions(self.prof, self.sdk, {key: "fail"})[0]["sug"].title, key)
+        self.assertNotEqual(IT.rate_functions(self.prof, self.sdk, verified={key: "fail"})[0]["sug"].title, key)
+
+
+class TryGiveWithoutObject(unittest.TestCase):
+    """Die Klasse der Funktion hat im Spiel kein Objekt (CheatManager im Shipping-Build), die Funktion liest this aber nicht."""
+    def setUp(self):
+        TryGive.setUp(self)
+
+    run_call = TryGive.run_call
+
+    class Live(FakeGameLive):
+        def instances(self, owner, **k):
+            return [{"addr": 0x1000, "name": "PC_0"}] if owner == "APlayerController" else []
+
+        def function_entry(self, owner, name):
+            return (0x1234, None)
+
+    def _run(self, unused):
+        old = (CG.find_impl, CG.impl_ignores_this)
+        CG.find_impl = lambda read, base, thunk: 0x401000
+        CG.impl_ignores_this = lambda read, impl: unused
+        try:
+            return self.run_call(live=self.Live())
+        finally:
+            CG.find_impl, CG.impl_ignores_this = old
+
+    def test_player_controller_is_used_as_caller(self):
+        res, seen, _mem = self._run(True)
+        self.assertEqual(seen["obj"], 0x1000)
+        self.assertEqual(res["reach"], "unused")
+
+    def test_still_an_error_when_the_function_reads_this(self):
+        with self.assertRaises(ValueError) as c:
+            self._run(False)
+        self.assertIn("kein Objekt der Klasse", str(c.exception))
+
+    def test_still_an_error_when_unknown(self):
+        with self.assertRaises(ValueError):
+            self._run(None)
 
 
 class FakeLiveFn:
@@ -383,6 +432,35 @@ class BuildTrainer(unittest.TestCase):
         with self.assertRaises(ValueError) as c:
             IT.make_options(pk, ok[0], self.sdk, FakeLiveFn(), self.img.read, self.img.BASE, 5)
         self.assertIn("native Implementierung", str(c.exception))
+
+
+class Limits(unittest.TestCase):
+    def test_row_limits_and_clamp(self):
+        row = {"values": {"OwnLimitByBackPack": 30, "OwnLimitByWarehouse": 999, "Price": 5, "Flag": True}}
+        lim = IT.row_limits(row)
+        self.assertEqual(lim, {"OwnLimitByBackPack": 30, "OwnLimitByWarehouse": 999})
+        item = {"limits": lim}
+        self.assertEqual(IT.clamp_amount(item, "AddItemToBackPack", 500), 30)
+        self.assertEqual(IT.clamp_amount(item, "AddItemToWarehouse", 500), 500)
+        self.assertEqual(IT.clamp_amount(item, "AddItemToWarehouse", 2000), 999)
+        self.assertEqual(IT.clamp_amount({}, "x", 500), 500)
+
+
+INV = "".join([
+    TP.cls("UInventorySubsystem", "UGameInstanceSubsystem", [],
+           ["void DevExpansionEnableSlotByMaxLevel();", "int32 GetSlotCount();", "void UnlockSlot(int32 Index);",
+            "void ExpandBackpackToMax();", "void AddItem(class FName ItemName, int32 Count);", "void UnlockAll();"]),
+])
+
+
+class Expand(unittest.TestCase):
+    def test_finds_only_parameterless_expansion_functions_best_first(self):
+        found = IT.find_expand(TP.sdk_from(INV))
+        self.assertEqual([s.title for s in found],
+                         ["UInventorySubsystem.DevExpansionEnableSlotByMaxLevel", "UInventorySubsystem.ExpandBackpackToMax"])
+
+    def test_game_without_such_a_function_offers_nothing(self):
+        self.assertEqual(IT.find_expand(TP.sdk_from(TP.GAME_A)), [])
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 name: Release
 
-# Neuen Release bauen:   git tag v5.9.1 && git push origin v5.9.1
+# Neuen Release bauen:   git tag v6.0.0 && git push origin v6.0.0
 on:
   push:
     tags: ["v*"]

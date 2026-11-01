@@ -31,7 +31,7 @@ SIZES = {"bool": 1, "int8": 1, "uint8": 1, "int16": 2, "uint16": 2, "int32": 4, 
          "uint64": 8, "int8_t": 1, "uint8_t": 1, "int16_t": 2, "uint16_t": 2, "int32_t": 4, "uint32_t": 4,
          "int64_t": 8, "uint64_t": 8}
 SIGNED = {"int8", "int16", "int32", "int", "int64", "int8_t", "int16_t", "int32_t", "int64_t"}
-THIS_MODES = ("zero", "hooked", "member")
+THIS_MODES = ("zero", "hooked", "member", "abs")
 
 
 # --------------------------------------------------------------------------------------------------
@@ -151,11 +151,99 @@ def _this_path(sdk, start, owner, depth=0, path=(), seen=None):
     return None
 
 
-def choose_this(sdk, owner, hooked="APlayerController", static=False):
+_REG_FAMILIES = {
+    "rax": ("rax", "eax", "ax", "al", "ah"), "rbx": ("rbx", "ebx", "bx", "bl", "bh"), "rcx": ("rcx", "ecx", "cx", "cl", "ch"),
+    "rdx": ("rdx", "edx", "dx", "dl", "dh"), "rsi": ("rsi", "esi", "si", "sil"), "rdi": ("rdi", "edi", "di", "dil"),
+    "rbp": ("rbp", "ebp", "bp", "bpl"), "rsp": ("rsp", "esp", "sp", "spl"),
+    **{f"r{n}": (f"r{n}", f"r{n}d", f"r{n}w", f"r{n}b") for n in range(8, 16)}}
+_REG_OF = {alias: fam for fam, names in _REG_FAMILIES.items() for alias in names}
+_CALLER_SAVED = {"rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11"}
+_REG_WORD = re.compile(r"[a-z][a-z0-9]*")
+_WRITE_ONLY = {"mov", "movq", "movd", "movabs", "movzx", "movsx", "movsxd", "lea", "pop"}
+_NO_DEST = {"cmp", "test", "push", "call", "jmp", "bt", "ucomiss", "ucomisd", "comiss", "comisd"}
+
+
+def _regs_in(text):
+    return {_REG_OF[w] for w in _REG_WORD.findall(text.lower()) if w in _REG_OF}
+
+
+def analyze_this_use(lines, first_reg="rdi"):
+    """Liest die ersten Befehle einer Methode und verfolgt `this` (rdi) samt Kopien in anderen Registern.
+    -> True  = this wird nie gelesen/weitergegeben (der Aufruf geht auch mit this = 0),
+       False = this wird benutzt (Speicherzugriff ueber this, Null-Pruefung, Weitergabe an einen Aufruf, Ablage im Speicher),
+       None  = nicht sicher zu sagen (Sprung, zu lang, Kopie lebt noch am Ende).
+    `lines`: [{'mnemonic','op_str'}] (Intel-Schreibweise, wie asm_tools.disassemble_lines)."""
+    tainted = {first_reg}
+    for ln in lines:
+        mn = str(ln.get("mnemonic", "")).lower()
+        ops = [o.strip() for o in str(ln.get("op_str", "")).split(",")] if ln.get("op_str") else []
+        if mn == "db":
+            return None
+        if mn.startswith("ret"):
+            return True
+        if mn == "call":
+            if "rdi" in tainted or any(r in tainted for r in _regs_in(" ".join(ops))):
+                return False                                   # this wird weitergereicht / Aufruf ueber this
+            tainted -= _CALLER_SAVED                           # Rueckgabe: nur geschuetzte Register behalten ihre Kopie
+            continue
+        if mn == "jmp":
+            return None if tainted else True
+        if mn.startswith("j"):                                 # bedingte Spruenge: weiterlesen (Fall-through)
+            continue
+        used_in_mem = any("[" in o and (_regs_in(o) & tainted) for o in ops)
+        if used_in_mem:
+            return False
+        if mn == "push":
+            if _regs_in(ops[0] if ops else "") & tainted:
+                return None                                    # this auf dem Stack: nicht verfolgbar
+            continue
+        if mn in ("test", "cmp"):
+            if any(_regs_in(o) & tainted for o in ops):
+                return False                                   # Null-Pruefung/Vergleich: bei this=0 anderer Weg
+            continue
+        if mn == "xchg" and len(ops) == 2:
+            both = _regs_in(ops[0]) | _regs_in(ops[1])
+            if both & tainted:
+                tainted |= both
+            continue
+        if len(ops) == 2 and "[" in ops[0] and (_regs_in(ops[1]) & tainted):
+            return False                                       # this in den Speicher geschrieben
+        dest = _regs_in(ops[0]) if ops and "[" not in ops[0] and mn not in _NO_DEST else set()
+        src_t = any(_regs_in(o) & tainted for o in ops[1:])
+        if not dest:
+            pass
+        elif mn in ("xor", "sub") and len(ops) == 2 and ops[0].lower() == ops[1].lower():
+            tainted -= dest                                    # xor eax,eax: Register ist 0
+        elif mn in _WRITE_ONLY:
+            tainted = (tainted | dest) if src_t else (tainted - dest)   # Kopie von this bzw. mit anderem Wert ueberschrieben
+        elif src_t:
+            tainted |= dest                                    # rechnet mit this weiter -> abgeleitet
+        if not tainted:
+            return True
+    return None if tainted else True
+
+
+def impl_ignores_this(read, impl, max_insn=120):
+    """Liest die native Implementierung (nur Lesen) -> True | False | None, siehe analyze_this_use.
+    Ohne Capstone oder bei Lesefehlern: None (= unbekannt, nichts aendern)."""
+    try:
+        import asm_tools
+        lines = asm_tools.disassemble_lines(bytes(read(impl, 0x500)), impl, max_insn)
+    except Exception:  # noqa: BLE001
+        return None
+    return analyze_this_use(lines)
+
+
+def choose_this(sdk, owner, hooked="APlayerController", static=False, this_unused=None):
     """Woher kommt `this`?  -> (modus, offset_oder_kette, hinweis).
     offset_oder_kette: 0 (hooked/zero), eine Zahl (ein Zeiger) oder ein Tupel von Offsets (Pawn -> Inventar)."""
     if static:
         return "zero", 0, "statische Funktion: this wird nicht gebraucht"
+    if this_unused:                                  # aus dem Code erkannt: this wird nie gelesen -> immer aufrufen, kein Objekt noetig
+        if P.derives_from(sdk, hooked, owner) or hooked == owner:
+            return "hooked", 0, f"{owner} ist Elternklasse von {hooked}: this = das gehookte Objekt"
+        return "zero", 0, (f"Die Funktion liest this nicht (aus dem Code erkannt) - {owner} muss nicht existieren, "
+                           "der Aufruf laeuft immer (this = 0)")
     if P.derives_from(sdk, hooked, owner) or hooked == owner:
         return "hooked", 0, f"{owner} ist Elternklasse von {hooked}: this = das gehookte Objekt"
     found = _this_path(sdk, hooked, owner)
@@ -175,9 +263,12 @@ class CallSpec:
     """impl_rva = native Implementierung (RVA); this_mode zero|hooked|member (+this_off / this_path); args = Liste von Dicts
     {name, kind, size, signed, value, mode} mit mode 'val' | 'ref'; value: int/float oder 8 Byte (FName)."""
 
-    def __init__(self, impl_rva, args, this_mode="zero", this_off=0, function="", this_path=None):
+    def __init__(self, impl_rva, args, this_mode="zero", this_off=0, function="", this_path=None, this_abs=0, this_vt=0):
         if this_mode not in THIS_MODES:
             raise T.TrainerError(f"this-Modus '{this_mode}' unbekannt")
+        if this_mode == "abs" and not (int(this_abs) and int(this_vt)):
+            raise T.TrainerError("this-Modus 'abs' braucht die Objekt-Adresse und deren vtable (zur Pruefung)")
+        self.this_abs, self.this_vt = int(this_abs or 0), int(this_vt or 0)
         path = [int(x) for x in this_path] if this_path else []
         off = int(this_off or 0)
         if this_mode == "member" and not path:
@@ -199,13 +290,15 @@ class CallSpec:
                       for a in self.args]}
         if len(self.this_path) > 1:
             d["this_path"] = [hex(x) for x in self.this_path]
+        if self.this_mode == "abs":
+            d["this_abs"], d["this_vt"] = hex(self.this_abs), hex(self.this_vt)
         return d
 
     @classmethod
     def from_json(cls, d):
         path = [int(x, 16) if isinstance(x, str) else int(x) for x in d["this_path"]] if d.get("this_path") else None
         return cls(int(d["impl_rva"], 16), d["args"], d.get("this", "zero"), int(d.get("this_off", "0"), 16),
-                   d.get("function", ""), path)
+                   d.get("function", ""), path, int(d.get("this_abs", "0"), 16), int(d.get("this_vt", "0"), 16))
 
 
 def _raw_value(a):
@@ -229,6 +322,16 @@ def emit_call(e, spec, base):
     skip = None
     if spec.this_mode == "zero":
         e.raw("31FF")                                           # xor edi,edi
+    elif spec.this_mode == "abs":
+        # feste Adresse des Objekts (nur fuer DIESE Spielsitzung).  Nur aufrufen, wenn dort noch das erwartete Objekt steht
+        # (vtable stimmt) - nach einem Neustart des Spiels liegt dort etwas anderes -> Aufruf wird uebersprungen.
+        skip = e.uniq("skip")
+        e.raw("48BF" + struct.pack("<Q", spec.this_abs).hex())  # movabs rdi,addr
+        e.raw("488B07")                                         # mov rax,[rdi]        (vtable)
+        e.raw("48B9" + struct.pack("<Q", spec.this_vt).hex())   # movabs rcx,expected_vtable
+        e.raw("4839C8")                                         # cmp rax,rcx
+        e.raw("0F85")                                           # jne skip
+        e.rel32(skip)
     else:
         e.raw("488B7C2410")                                     # mov rdi,[rsp+0x10]   (gehooktes Objekt)
         hops = spec.this_path if spec.this_mode == "member" else []
@@ -305,8 +408,11 @@ def extra_value(extra, name):
 
 
 def _this_spec(this):
-    """(modus, offset_oder_kette) -> (modus, this_off, this_path)."""
+    """(modus, offset_oder_kette) -> (modus, this_off, this_path).  Fuer 'abs': ('abs', Adresse, vtable) -> this_off = Adresse,
+    this_path = [vtable] (nur Transport; CallSpec bekommt beides getrennt)."""
     mode, off = this[0], this[1]
+    if mode == "abs":
+        return mode, int(off), [int(this[2])]
     if isinstance(off, (list, tuple)):
         path = [int(x) for x in off]
         return mode, (path[0] if path else 0), path
@@ -347,7 +453,10 @@ def build_row(alias, impl_rva, params, ret, sdk, this, id_value=None, count_valu
         mode = "ref" if n.lower() in byref_set or n.split(".")[0].lower() in byref_set else "val"
         args.append({"name": n, "kind": k, "size": a["size"], "signed": a["signed"], "value": val, "mode": mode})
     mode, off, path = _this_spec(this)
-    spec = CallSpec(impl_rva, args, mode, off, function, path)
+    if mode == "abs":
+        spec = CallSpec(impl_rva, args, mode, 0, function, None, off, path[0])
+    else:
+        spec = CallSpec(impl_rva, args, mode, off, function, path)
     for a in spec.args:                 # Wert-Pruefung jetzt, nicht erst beim Bauen
         _raw_value(a)
     return CallRow(alias, spec, fname, int(amount) if isinstance(amount, (int, float)) and amount >= 1 else 1)

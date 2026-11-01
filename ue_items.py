@@ -10,12 +10,17 @@ Alles hier ist rein rechnerisch bzw. bekommt read()/Live-Objekte uebergeben -> o
 Die Cave selbst baut cave_trainer.py / ue_cavegen.py, die Tabelle liest ue_profile.py.
 """
 import re
+import struct
 from collections import OrderedDict
 
 import cave_trainer as TR
 import ue_cavegen as CG
 import ue_profile as P
 
+LEVEL_STRICT, LEVEL_NORMAL, LEVEL_OFF = "streng", "normal", "aus"
+LEVELS = (LEVEL_STRICT, LEVEL_NORMAL, LEVEL_OFF)
+DEFAULT_LEVEL = LEVEL_NORMAL        # Vorgabe im Tab ITEMS: lieber eine Zeile zu viel als ein Item zu wenig
+MAX_TABLES = 12                     # so viele Item-Tabellen werden hoechstens zusammen gelesen
 OTHER = "Sonstiges"                 # Sammelkategorie fuer Items ohne erkennbare Gruppe
 ALL = "Alle"                        # wenn gar keine Einteilung gefunden wird
 MAX_CATEGORIES = 60
@@ -40,9 +45,10 @@ def _extra_params(cls):
     return sum(1 for a in cls if a["role"] == "other")
 
 
-def give_candidates(prof, sdk):
+def give_candidates(prof, sdk, level=LEVEL_STRICT):
     """Geben-Funktionen -> (baubar, [(Vorschlag, Grund)]).  baubar: nur Item-Geben mit ID-Parameter
-    (XP/Geld ohne Item-ID und Funktionen mit wildfremden Parametern bleiben draussen)."""
+    (XP/Geld ohne Item-ID und Funktionen mit wildfremden Parametern bleiben draussen).
+    level 'normal'/'aus': auch Namen ohne das Wort Item (AddToBag, GiveGoods ...) - Hauptsache ID-Parameter + Geben-Verb."""
     ok, bad = [], []
     for s in prof.of("give_function"):
         title = f"{s.data.get('owner', '')}.{s.data.get('name', s.title)}"
@@ -55,7 +61,8 @@ def give_candidates(prof, sdk):
         if not any(a["role"] == "id" for a in cls):
             bad.append((s, "hat keinen Parameter fuer die Item-ID"))
             continue
-        if not ITEM_GIVE.search(title):
+        if level != LEVEL_OFF and not ITEM_GIVE.search(title) and not (
+                level == LEVEL_NORMAL and GIVE_VERB.search(str(s.data.get("name", "")))):
             bad.append((s, "kein Item-Geben (Name ohne Item/Inventar/Loot)"))
             continue
         ok.append(s)
@@ -71,7 +78,9 @@ ITEM_WORDS = re.compile(r"(?i)item|inventor|loot|weapon|consum|equip|material|re
                         r"goods|ware|shop|recipe|craft")
 TABLE_JUNK = re.compile(r"(?i)enemy|enemies|monster|npc|curve|anim|sound|dialog|dialogue|navmesh|particle|"
                         r"widget|subtitle|levelcurve|expcurve")
-ITEM_GIVE = re.compile(r"(?i)item|inventor|loot|pickup|equip|consum|material|resource|weapon|gear")
+ITEM_GIVE = re.compile(r"(?i)item|inventor|loot|pickup|equip|consum|material|resource|weapon|gear|"
+                       r"bag|goods|stash|pouch|belonging|ingredient|armor|armour|accessor")
+GIVE_VERB = re.compile(r"(?i)add|give|grant|obtain|acquire|gain|receive|award|reward|get")
 
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -105,9 +114,20 @@ def _tokens(name):
     return [P._stem(w) for w in P.words(name)]
 
 
-def table_relevance(name, role="", columns=()):
+REL_MIN_NORMAL = 1.5                # Stufe 'normal': Tabelle gilt schon ab hier als Item-Liste
+NEG_PENALTY = {LEVEL_STRICT: 8.0, LEVEL_NORMAL: 8.0}
+NEG_PENALTY_WITH_ITEM_WORD = 1.5    # Stufe 'normal': 'DT_ItemSkill', 'DT_CharacterItem' ... bleiben Item-Listen
+
+
+def rel_min(level=LEVEL_STRICT):
+    return {LEVEL_STRICT: REL_MIN, LEVEL_NORMAL: REL_MIN_NORMAL}.get(level, float("-inf"))
+
+
+def table_relevance(name, role="", columns=(), level=LEVEL_STRICT):
     """Wie sehr sieht diese Tabelle nach einer ITEM-Liste aus?  -> Zahl (>= REL_MIN: ja).  Nur Namen + Zeilenstruct,
-    keine spielspezifischen Namen.  'DT_ItemParam' ~ 9, 'DT_FxParam_Player' ~ -8, 'DT_UIMapParam' ~ -8."""
+    keine spielspezifischen Namen.  'DT_ItemParam' ~ 9, 'DT_FxParam_Player' ~ -8, 'DT_UIMapParam' ~ -8.
+    level 'normal': ein Item-Wort im Namen wiegt schwerer als ein Negativwort ('DT_ItemSkill' bleibt drin), die
+    Spalten (Preis, Stapel, Gewicht ...) zaehlen staerker."""
     toks = _tokens(name)
     low = str(name).lower()
     prim = [TABLE_PRIMARY[t] for t in toks if t in TABLE_PRIMARY]
@@ -126,16 +146,22 @@ def table_relevance(name, role="", columns=()):
     rest = [t for t in toks if t not in TABLE_FILLER]
     if len(rest) == 1 and rest[0] in TABLE_PRIMARY:
         score += 3                                  # genau "DT_Item" / "DT_ItemParam" / "DT_Weapon"
-    score -= 8 * min(neg, 2)
-    score += ROLE_BONUS.get(role, 0)
+    if level == LEVEL_STRICT:
+        score -= 8 * min(neg, 2)
+    elif prim and max(prim) >= 4:
+        score -= NEG_PENALTY_WITH_ITEM_WORD * min(neg, 2)        # klares Item-Wort: Negativwort ist nur ein Hinweis
+    else:
+        score -= NEG_PENALTY[LEVEL_NORMAL] * min(neg, 2) if level == LEVEL_NORMAL else 0
+    score += ROLE_BONUS.get(role, 0) if level == LEVEL_STRICT else max(ROLE_BONUS.get(role, 0), -1)
     cols = [c[0] for c in columns or []]
-    score += min(1.5, 0.5 * sum(1 for c in cols if COLUMN_HINT.search(str(c))))
+    hints = sum(1 for c in cols if COLUMN_HINT.search(str(c)))
+    score += min(1.5, 0.5 * hints) if level == LEVEL_STRICT else min(3.0, 1.0 * hints)
     return round(score, 1)
 
 
-def rate_tables(cands, live_tables):
+def rate_tables(cands, live_tables, level=LEVEL_STRICT):
     """ALLE Tabellen des laufenden Spiels bewerten -> [{'addr','name','score','relevant','role','sug'}], beste zuerst.
-    'sug' ist der passende Zeilenstruct-Vorschlag aus dem SDK (oder None)."""
+    'sug' ist der passende Zeilenstruct-Vorschlag aus dem SDK (oder None).  Stufe 'aus': alles ist relevant."""
     best = {}
     for s in cands:
         pick = P.best_table_for(s, live_tables)
@@ -145,16 +171,17 @@ def rate_tables(cands, live_tables):
     for t in live_tables:
         s = best.get(t)
         role = s.data.get("role", "") if s is not None else ""
-        score = table_relevance(t[1], role, s.data.get("columns", []) if s is not None else [])
-        out.append({"addr": t[0], "name": t[1], "score": score, "relevant": score >= REL_MIN, "role": role, "sug": s})
+        score = table_relevance(t[1], role, s.data.get("columns", []) if s is not None else [], level)
+        out.append({"addr": t[0], "name": t[1], "score": score, "relevant": score >= rel_min(level), "role": role,
+                    "sug": s})
     out.sort(key=lambda r: (-r["score"], r["name"].lower()))
     return out
 
 
-def choose_table(cands, live_tables):
+def choose_table(cands, live_tables, level=LEVEL_STRICT):
     """Tabellen-Vorschlaege -> [(Vorschlag, (addr, name))], beste zuerst; nur Tabellen, die es im laufenden Spiel gibt.
     Nur Item-artige Tabellen (siehe table_relevance); gibt es keine, dann alle nach SDK-Wert (Notlösung)."""
-    rated = [r for r in rate_tables(cands, live_tables) if r["sug"] is not None]
+    rated = [r for r in rate_tables(cands, live_tables, level) if r["sug"] is not None]
     good = [r for r in rated if r["relevant"]]
     if good:
         return [(r["sug"], (r["addr"], r["name"])) for r in good]
@@ -169,12 +196,27 @@ def choose_table(cands, live_tables):
     return [(s, pick) for _score, s, pick in ranked]
 
 
-def order_tables(live_tables):
+def order_tables(live_tables, level=LEVEL_STRICT):
     """Tabellen fuer die Auswahlliste: nur Item-/Loot-/Shop-Namen; Junk (Gegner, UI, Kurven) raus.
-    Gibt es keine Treffer, bleiben alle Tabellen (sortiert, Item-artig zuerst) - sonst waere die Liste leer."""
-    hit = [t for t in live_tables if ITEM_WORDS.search(t[1]) and not TABLE_JUNK.search(t[1])]
+    Gibt es keine Treffer, bleiben alle Tabellen (sortiert, Item-artig zuerst) - sonst waere die Liste leer.
+    Stufe 'aus': nichts wird entfernt; 'normal': Junk-Wort zaehlt nicht, wenn auch ein Item-Wort im Namen steht."""
+    if level == LEVEL_OFF:
+        return sorted(live_tables, key=lambda t: (not ITEM_WORDS.search(t[1]), t[1].lower()))
+    hit = [t for t in live_tables if ITEM_WORDS.search(t[1]) and (
+        level == LEVEL_NORMAL or not TABLE_JUNK.search(t[1]))]
     src = hit or list(live_tables)
     return sorted(src, key=lambda t: (not ITEM_WORDS.search(t[1]), t[1].lower()))
+
+
+def choose_tables(cands, live_tables, level=DEFAULT_LEVEL, limit=MAX_TABLES):
+    """ALLE Item-artigen Tabellen (nicht nur die beste) -> [(Vorschlag, (addr, name), Bewertung)], beste zuerst.
+    Viele Spiele verteilen ihre Items auf mehrere Tabellen (Waffen, Verbrauchsgueter, Material ...): nur die erste zu
+    lesen verliert den Rest.  Ohne Treffer: Notloesung wie choose_table (die besten nach SDK-Wert)."""
+    rated = rate_tables(cands, live_tables, level)
+    good = [r for r in rated if r["relevant"] and r["sug"] is not None]
+    if good:
+        return [(r["sug"], (r["addr"], r["name"]), r) for r in good[:limit]]
+    return [(s, pick, None) for s, pick in choose_table(cands, live_tables, LEVEL_OFF)[:limit]]
 
 
 # --- Geben-Funktionen -------------------------------------------------------------------------------------------
@@ -190,36 +232,76 @@ SHAPE_TEXT = {"name+menge": "Name + Menge", "id+menge": "Nummer + Menge", "klass
               "name": "nur Name", "id": "nur Nummer", "name+zahl": "Name + Zahl"}
 
 
+# Stufe 'normal': nur diese Namensbestandteile sind sicher "kein Geben"; Request/Try/Get ... nur ohne Geben-Verb
+FUNC_HARD_NOT_GIVE = {"remove", "delete", "sub", "subtract", "consume", "use", "discard", "sell", "select", "preset",
+                      "preview", "show", "display", "can", "check", "has", "is", "find", "query"}
+FUNC_VERBS = {"add", "give", "grant", "obtain", "acquire", "gain", "receive", "award", "reward", "get", "create",
+              "spawn", "put", "pickup", "pick"}
+
+
 def func_key(sug):
     """Schluessel einer Geben-Funktion fuer 'getestet' (Klasse.Funktion)."""
     d = sug.data
     return f"{d.get('owner', '')}.{d.get('name', sug.title)}"
 
 
-def rate_functions(prof, sdk, verified=None):
+VERIFY_VERSION = 2          # Stand der Parameter-Befuellung beim Test; aeltere Testergebnisse (Menge 0, WorkId falsch) verfallen
+
+
+def live_object(live, read, owner):
+    """Erstes echtes Objekt der Klasse im laufenden Spiel -> (Adresse, vtable) oder None.  Fuer Funktionen, deren Objekt der
+    Trainer sonst nicht erreicht (Subsystem): die Cave bekommt die feste Adresse - gilt nur bis zum Beenden des Spiels."""
+    try:
+        found = [i for i in live.instances(owner) if "Default__" not in i["name"]]
+        addr = found[0]["addr"]
+        vt = struct.unpack("<Q", read(addr, 8))[0]
+    except Exception:  # noqa: BLE001
+        return None
+    return (addr, vt) if vt >= 0x10000 else None
+
+
+def rate_functions(prof, sdk, level=LEVEL_STRICT, verified=None, live=None, read=None):
     """Baubare Geben-Funktionen bewerten -> [{'sug','score','reach','relevant','reasons'}], beste zuerst.
     reach: 'hooked' | 'member' | 'zero' - woher die Cave das Objekt (this) nimmt.  'zero' = die Funktion gehoert zu einer
     Klasse, deren Instanz der Trainer nicht erreicht (z. B. Subsystem): sie wird mit this=0 gerufen -> meist wirkungslos.
     relevant: erreichbar UND sieht nach 'Item geben' aus (kein Entfernen/Auswaehlen/Vorschau/Schluessel-Item).
-    verified: {Klasse.Funktion: 'ok' | 'fail'} - Ergebnis des Tests '1 Item geben' (ok: +4, fail: -8)."""
+    level: Filterstufe 'streng' | 'normal' | 'aus' (wie give_candidates).  Bei 'normal'/'aus' zaehlen 'RequestAddItem',
+    'TryGiveItem', 'GetItem' als echtes Geben und Spezial-Items nur als Hinweis.
+    verified: {Klasse.Funktion: 'ok' | 'fail'} - Ergebnis des Tests '1 Item geben' (ok: +4, fail: -8; fail ist nie 'relevant')."""
     verified = verified or {}
-    ok, _bad = give_candidates(prof, sdk)
-    out = []
+    ok, _bad = give_candidates(prof, sdk, level)
+    out, objs = [], {}
     for s in ok:
         d = s.data
         fw, ow = set(_tokens(d.get("name", ""))), set(_tokens(d.get("owner", "")))
         mode, _off, _note = CG.choose_this(sdk, d.get("owner", ""))
         score, reasons = float(s.score), []
-        if mode == "zero":
+        if mode == "zero" and live is not None and read is not None:        # Objekt im laufenden Spiel vorhanden -> feste Adresse
+            owner = d.get("owner", "")
+            if owner not in objs:
+                objs[owner] = live_object(live, read, owner)
+            if objs[owner]:
+                mode = "abs"
+        if mode == "abs":
+            score += 1
+            reasons.append("feste Objekt-Adresse (nur diese Spielsitzung)")
+        elif mode == "zero":
             score -= 5
             reasons.append("Objekt nicht erreichbar")
         else:
             score += 3 if mode == "hooked" else 2.5
-        bad_name = bool(fw & FUNC_NOT_GIVE)
+        if level == LEVEL_STRICT:
+            bad_name = bool(fw & FUNC_NOT_GIVE)
+        else:                                   # 'RequestAddItem', 'TryGiveItem', 'GetItem' sind meist echtes Geben
+            bad_name = bool(fw & FUNC_HARD_NOT_GIVE) or (bool(fw & FUNC_NOT_GIVE) and not (fw & FUNC_VERBS))
         bad_owner = bool(ow & OWNER_NOT_GAME)
         special = bool(fw & FUNC_SPECIAL)
         if (fw | ow) & BAG_WORDS:
             score += 1.5                                # BackPack/Inventory/Bag im Namen: das ist das Inventar
+        if fw & {"warehouse", "stash", "storage"}:
+            score -= 0.3                                # gleichauf: erst der Rucksack, das Lager ist die Alternative
+        if any(re.search(r"(?i)slot", str(pa[1])) for pa in d.get("params", []) if len(pa) > 1):
+            score -= 0.5                                # 'in Slot X legen' ist seltener gemeint als 'dem Inventar hinzufuegen'
         if bad_name:
             score -= 10
             reasons.append("kein normales Item-Geben")
@@ -227,7 +309,7 @@ def rate_functions(prof, sdk, verified=None):
             score -= 8
             reasons.append("gehoert zur Anzeige")
         if special:
-            score -= 3
+            score -= 3 if level == LEVEL_STRICT else 1
             reasons.append("Spezial-Items")
         state = verified.get(func_key(s), "")
         if state == "ok":
@@ -236,7 +318,8 @@ def rate_functions(prof, sdk, verified=None):
             score -= 8
             reasons.append("Test fehlgeschlagen")
         out.append({"sug": s, "score": round(score, 1), "reach": mode, "reasons": reasons, "verified": state,
-                    "relevant": mode != "zero" and not (bad_name or bad_owner or special or state == "fail")})
+                    "relevant": mode != "zero" and not (bad_name or bad_owner or (special and level == LEVEL_STRICT)
+                                                        or state == "fail")})
     out.sort(key=lambda r: -r["score"])
     return out
 
@@ -305,6 +388,21 @@ def returned_false(fp, outs):
     return any(k == "ReturnValue" and str(v).strip() == "0" for k, v in outs)
 
 
+def _context_without_this(live, client, sdk, d, base):
+    """Gibt es von der Klasse der Funktion kein Objekt (Shipping-Build: der CheatManager wird nie angelegt), liest die native
+    Implementierung `this` aber nie, dann reicht jedes lebende Objekt als Aufrufer (hier: der PlayerController) ->
+    [Instanz] oder []."""
+    try:
+        ent = live.function_entry(d["owner"], d["name"])
+        impl = CG.find_impl(client.read_memory, base, ent[0]) if ent else None
+        if impl is None or not CG.impl_ignores_this(client.read_memory, impl):
+            return []
+        pcs = [i for i in live.instances("APlayerController") if "Default__" not in i["name"]]
+    except Exception:  # noqa: BLE001
+        return []
+    return [dict(pcs[0], ignores_this=True)] if pcs else []
+
+
 def _prepare_call(live, client, sdk, func, base):
     """Alles, was fuer den Live-Aufruf noetig ist -> (fp, ufunction, [Instanzen], ProcessEvent-Adresse)."""
     import ue_call
@@ -324,6 +422,8 @@ def _prepare_call(live, client, sdk, func, base):
     else:
         found = [i for i in live.instances(d["owner"]) if "Default__" not in i["name"]]
     if not found:
+        found = _context_without_this(live, client, sdk, d, base)      # Funktion braucht ihr Objekt gar nicht (z. B. CheatManager)
+    if not found:
         raise ValueError(f"Im Spiel gibt es kein Objekt der Klasse {d['owner']} - Spielstand laden (nicht im Hauptmenue) "
                          "und es erneut versuchen")
     pidx = sdk.offset("process_event_index", "processeventindex", default=77)
@@ -339,9 +439,11 @@ def try_give(live, client, sdk, func, item, base, amount=1, caller=None):
     d = func.data
     fp, function, found, pe = _prepare_call(live, client, sdk, func, base)
     obj = found[0]["addr"]
-    assign = test_assignments(func, fp, item, amount, sdk)
+    assign = test_assignments(func, fp, item, clamp_amount(item, d.get("name", ""), amount), sdk)
     outs = ue_call.call_ufunction(client, obj, function, fp, assign, pe, caller)
     mode, _off, _note = CG.choose_this(sdk, d["owner"])
+    if found[0].get("ignores_this"):
+        mode = "unused"                                    # die Funktion liest this nicht: Objekt der Klasse nicht noetig
     return {"instance": obj, "instances": len(found), "outs": outs, "returned_false": returned_false(fp, outs),
             "reach": mode, "detail": call_report(fp, assign, outs, found[0], found)}
 
@@ -401,12 +503,43 @@ def _category_column(rows, cols):
     return best[0] if best else None
 
 
-def _item(row, category):
+LIMIT_COLUMN = re.compile(r"(?i)(own|have|hold|carry|max).{0,12}(limit|max|count|num|stack)|(limit|max).{0,6}(backpack|bag|ware|stor|stack|own)|stack.?(max|limit|size)")
+
+
+def row_limits(row):
+    """{Spaltenname: Obergrenze} aus den Zahlen-Spalten der Zeile (z. B. OwnLimitByBackPack / OwnLimitByWarehouse), nur > 0."""
+    out = {}
+    for k, v in row.get("values", {}).items():
+        if LIMIT_COLUMN.search(str(k)) and isinstance(v, int) and not isinstance(v, bool) and v > 0:
+            out[str(k)] = v
+    return out
+
+
+def item_limit(item, func_name=""):
+    """Wie viele dieser Items das Spiel hoechstens erlaubt - passend zum Ziel der Funktion (Rucksack/Lager) - oder None."""
+    lim = item.get("limits") or {}
+    if not lim:
+        return None
+    low = str(func_name).lower()
+    want = ("ware", "stor", "stash") if re.search(r"ware|stor|stash", low) else ("back", "bag", "pack", "own")
+    for k, v in lim.items():
+        if any(w in k.lower() for w in want):
+            return v
+    return min(lim.values())
+
+
+def clamp_amount(item, func_name, amount):
+    """Menge auf die Obergrenze des Spiels kuerzen (sonst lehnt das Spiel ab oder verwirft den Rest)."""
+    lim = item_limit(item, func_name)
+    return min(amount, lim) if lim and isinstance(amount, int) else amount
+
+
+def _item(row, category, table=""):
     return {"name": row["name"], "fname": bytes.fromhex(row["fname_hex"]), "id": row_number_id(row),
-            "category": category}
+            "category": category, "table": table, "limits": row_limits(row)}
 
 
-def build_items(rows, cols=None):
+def build_items(rows, cols=None, table=""):
     """Tabellenzeilen -> [Item], jedes mit 'category'.  Einteilung: Kategorie-Spalte, sonst Namens-Vorsilbe, sonst alle in 'Alle'."""
     rows = [r for r in rows if str(r.get("name", "")).strip() and str(r["name"]).lower() not in ("none", "null")]
     col = _category_column(rows, cols)
@@ -418,7 +551,7 @@ def build_items(rows, cols=None):
                 lab = f"{_tidy(col)} {v}"
             else:
                 lab = _tidy(v) if v not in (None, "", "?") else OTHER
-            out.append(_item(r, lab))
+            out.append(_item(r, lab, table))
         return out
     pref = [name_prefix(r["name"]) for r in rows]
     counts = {}
@@ -428,8 +561,41 @@ def build_items(rows, cols=None):
     groups = {p for p, n in counts.items() if n >= 2}
     covered = sum(n for p, n in counts.items() if p in groups)
     if 2 <= len(groups) <= MAX_CATEGORIES and rows and covered >= 0.6 * len(rows):
-        return [_item(r, p if p in groups else OTHER) for r, p in zip(rows, pref)]
-    return [_item(r, ALL) for r in rows]
+        return [_item(r, p if p in groups else OTHER, table) for r, p in zip(rows, pref)]
+    return [_item(r, ALL, table) for r in rows]
+
+
+TABLE_AFFIX = re.compile(r"(?i)^(dt|data\s?table|tbl|mst)[_\s]+|[_\s]*(data|table|param|params|master|list|info|dt)$")
+
+
+def table_label(name):
+    """'DT_ConsumableData' -> 'Consumable'; leer -> 'Tabelle'."""
+    n = str(name).split("::")[-1].split(".")[-1]
+    prev = None
+    while n and n != prev:
+        prev, n = n, TABLE_AFFIX.sub("", n)
+    return _tidy(n) if n else "Tabelle"
+
+
+def merge_tables(parts):
+    """[(Tabellenname, rows, cols)] -> [Item] aus ALLEN Tabellen.  Hat eine Tabelle keine eigene Einteilung, wird sie
+    nach der Tabelle benannt ('Weapon', 'Consumable' ...).  Gleiche FName+Name in zwei Tabellen: nur einmal."""
+    parts = [p for p in parts if p[1]]
+    multi = len(parts) > 1
+    out, seen = [], set()
+    for tname, rows, cols in parts:
+        its = build_items(rows, cols, tname)
+        if multi and its and all(i["category"] == ALL for i in its):
+            lab = table_label(tname)
+            for i in its:
+                i["category"] = lab
+        for i in its:
+            key = (i["fname"], i["name"])
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(i)
+    return out
 
 
 def group_items(items):
@@ -517,6 +683,71 @@ def hook_targets(sdk, live, read, base):
     return pe, slots, notes
 
 
+def resolve_this(sdk, live, read, owner, impl, log=lambda _m: None):
+    """Woher nimmt die Cave `this`?  -> (modus, offset) bzw. ("abs", adresse, vtable) wenn das Objekt nur live erreichbar ist."""
+    unused = CG.impl_ignores_this(read, impl)
+    mode, off, note = CG.choose_this(sdk, owner, this_unused=unused)
+    this = (mode, off)
+    if mode == "zero" and not unused:
+        ab = live_object(live, read, owner)
+        if ab:
+            this = ("abs", ab[0], ab[1])
+            note = (f"this = feste Adresse {ab[0]:#x} des laufenden {owner}-Objekts (vtable {ab[1]:#x}) - gilt nur bis zum "
+                    "Beenden des Spiels; ein Neustart braucht einen neu gespeicherten Trainer")
+    log("this: " + note)
+    return this
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Inventar erweitern / Max-Level: nur anbieten, wenn das Spiel eine passende Funktion hat
+# ----------------------------------------------------------------------------------------------------------------
+EXPAND_VERB = ("expan", "extend", "unlock", "upgrade", "increas", "enlarge", "grow")
+EXPAND_NOUN = ("slot", "capacit", "inventor", "backpack", "bag", "pocket", "storage", "warehouse", "stash", "pouch")
+EXPAND_BAD = re.compile(r"(?i)^(get|is|can|has|on|set|check|calc|update|remove|lock|should|find|bp_?get)")
+EXPAND_BONUS = (("max", 3.0), ("all", 1.5), ("full", 1.5), ("dev", 1.0), ("cheat", 1.0), ("level", 1.0))
+
+
+def find_expand(sdk):
+    """Funktionen ohne Parameter, die das Inventar (Slots/Kapazitaet) erweitern, z. B. 'DevExpansionEnableSlotByMaxLevel'.
+    -> [Suggestion] beste zuerst; leer, wenn das Spiel so etwas nicht anbietet (dann zeigt die Oberflaeche keinen Knopf)."""
+    out = []
+    for cname, cls in sdk.classes.items():
+        if P.NOT_GAME.search(cname) and "cheat" not in cname.lower():
+            continue
+        for fname, ret, args, flags, native in P.class_functions(cls):
+            low = fname.lower()
+            if EXPAND_BAD.search(fname) or not any(v in low for v in EXPAND_VERB) or not any(n in low for n in EXPAND_NOUN):
+                continue
+            if P.split_args(args):
+                continue                                        # nur Funktionen ohne Parameter (nichts einzugeben)
+            try:
+                CG.check_return(ret)
+            except Exception:  # noqa: BLE001
+                continue
+            score = 4.0 + sum(w for k, w in EXPAND_BONUS if k in low)
+            score += 1.0 if re.search(r"(?i)inventor|backpack|bag|storage", cname) else 0
+            score += 0.5 if native else 0
+            out.append(P._sug("expand_function", f"{cname}.{fname}", min(score, 10), "()", [f"Name: {fname}"],
+                              {"owner": cname, "name": fname, "params": [], "shape": "", "ret": ret, "flags": flags,
+                               "native": native}))
+    return sorted(out, key=lambda s: (-s.score, s.title))
+
+
+def make_expand_option(func, sdk, live, read, base, log=lambda _m: None):
+    """Eine Cave-Option mit EINEM Aufruf der parameterlosen Erweiterungs-Funktion."""
+    d = func.data
+    ent = live.function_entry(d["owner"], d["name"])
+    if not ent:
+        raise ValueError(f"{d['owner']}.{d['name']} wurde im laufenden Spiel nicht gefunden")
+    impl = CG.find_impl(read, base, ent[0])
+    if impl is None:
+        raise ValueError("Die native Implementierung der Funktion wurde nicht erkannt (Blueprint-Funktion oder ungewohnter "
+                         "Thunk) - dafuer laesst sich keine feste Cave bauen.")
+    this = resolve_this(sdk, live, read, d["owner"], impl, log)
+    row = CG.build_row(TR.clean_name(d["name"]), impl - base, [], d.get("ret"), sdk, this, function=f"{d['owner']}.{d['name']}")
+    return TR.Option("Erweitern", [row])
+
+
 def make_options(pkgs, func, sdk, live, read, base, amount, log=lambda _m: None):
     """Pakete -> [Option] mit je einer Aufruf-Zeile je Item (Geben-Funktion aus dem Spiel)."""
     d = func.data
@@ -532,8 +763,7 @@ def make_options(pkgs, func, sdk, live, read, base, amount, log=lambda _m: None)
     if impl is None:
         raise ValueError("Die native Implementierung der Geben-Funktion wurde nicht erkannt (Blueprint-Funktion oder "
                          "ungewohnter Thunk) - dafuer laesst sich keine feste Cave bauen.")
-    mode, off, note = CG.choose_this(sdk, d["owner"])
-    log("this: " + note)
+    this = resolve_this(sdk, live, read, d["owner"], impl, log)
     byref = [a["name"] for a in cls if a["kind"] == "fname" and a.get("ref")]
     fname_of = f"{d['owner']}.{d['name']}"
     extra = {a["name"]: (1 if a["kind"] == "int" and re.search(r"(?i)notify|show|message|bshow", a["name"]) else 0)
@@ -550,8 +780,9 @@ def make_options(pkgs, func, sdk, live, read, base, amount, log=lambda _m: None)
         skipped += len(bad)
         if not ok:
             continue
-        rows = [CG.build_row(TR.clean_name(i["name"]), impl - base, d["params"], d.get("ret"), sdk, (mode, off),
-                             id_value=(i["fname"] if ida["kind"] == "fname" else i["id"]), count_value=amount,
+        rows = [CG.build_row(TR.clean_name(i["name"]), impl - base, d["params"], d.get("ret"), sdk, this,
+                             id_value=(i["fname"] if ida["kind"] == "fname" else i["id"]),
+                             count_value=clamp_amount(i, d.get("name", ""), amount),
                              extra=extra, byref=byref, function=fname_of) for i in ok]
         options.append(TR.Option(name, rows))
     return options, skipped
@@ -574,7 +805,7 @@ def give_many(live, client, sdk, func, items, base, amount, progress=None, calle
     given, rejected, skipped = 0, [], []
     for n, item in enumerate(items):
         try:
-            assign = test_assignments(func, fp, item, amount, sdk)
+            assign = test_assignments(func, fp, item, clamp_amount(item, func.data.get("name", ""), amount), sdk)
         except ValueError:
             skipped.append(item["name"])                           # Item ohne Zahlen-ID
             continue

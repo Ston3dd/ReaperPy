@@ -22,6 +22,7 @@ class Client:
         return [(s + self.moved, e + self.moved, p, "eboot.bin") for s, e, p in self.img.maps[:1]] + \
                [(s, e, p, "anon:x") for s, e, p in self.img.maps[1:]]
     def read_memory(self, a, n): return self.img.read(a, n)
+    def write_memory(self, a, data): self.img.write(a, bytes(data))
     def get_maps(self): return self.img.maps
 
 
@@ -43,6 +44,11 @@ class T(unittest.TestCase):
         self.patch(IT, "hook_targets", lambda sdk, live, read, base: (self.img.pe, [self.img.slot], []))
         self.live.function_entry = lambda owner, name: (0x1234, None)
         self.live.build_index = lambda: None
+        import item_check as IC
+
+        def no_cave(*a, **k):
+            raise ValueError("Test: Weg über die Cave abgeschaltet")        # die alten Tests pruefen den direkten Aufruf
+        self.patch(IC, "give_via_cave", no_cave)
 
     def patch(self, obj, name, val):
         old = getattr(obj, name); setattr(obj, name, val); self.addCleanup(setattr, obj, name, old)
@@ -213,7 +219,7 @@ class T(unittest.TestCase):
         self.assertTrue(os.path.isdir(d))
         opts = TR.load_options(d)
         self.assertEqual(sum(len(o.rows) for o in opts), 3)
-        self.assertEqual(opts[0].rows[0].amount, 500)
+        self.assertEqual(opts[0].rows[0].amount, 99)      # auf die Obergrenze der Tabelle (z. B. MaxStack 99) gekuerzt
 
     def test_save_validation_messages(self):
         self.t.find_items()
@@ -233,6 +239,48 @@ class T(unittest.TestCase):
         self.assertIn("mehrere Projekte", self.t.lbl_done._text)
         self.assertTrue(os.path.isdir(os.path.join(self.tmp, "Spiel", "Items 1")))
         self.assertTrue(os.path.isdir(os.path.join(self.tmp, "Spiel", "Items 2")))
+
+
+class ViaCave(unittest.TestCase):
+    """TEST 1 ITEM / GIVE NOW geben ueber die Cave im Spiel-Thread (nicht ueber einen fremden Thread)."""
+    patch = T.patch
+    answer = T.answer
+
+    def setUp(self):
+        T.setUp(self)
+        import item_check as IC
+        self.IC = IC
+        self.seen = []
+
+        def fake(items, func, sdk, live, read, write, base, maps, amount, log=None, wait=None, progress=None, tick=None):
+            self.seen.append(([i["name"] for i in items], amount))
+            return {"total": len(items), "given": len(items), "rejected": [], "skipped": [], "error": None, "reach": "unused"}
+        self.patch(IC, "give_via_cave", fake)
+        self.patch(IT, "try_give", lambda *a, **k: self.fail("direkter Aufruf darf nicht noetig sein"))
+        self.patch(IT, "give_many", lambda *a, **k: self.fail("direkter Aufruf darf nicht noetig sein"))
+        self.asked = self.answer(True)
+
+    def test_give_now_uses_the_cave_and_reports(self):
+        self.t.find_items()
+        self.t.give_live()
+        self.assertEqual(len(self.seen), 1)
+        self.assertGreater(len(self.seen[0][0]), 0)
+        self.assertIn("✔", self.t.lbl_found._text)
+
+    def test_test_one_item_uses_the_cave_and_unused_object_is_not_a_warning(self):
+        self.t.find_items()
+        self.t.tv.sel = ("1",)
+        self.t.test_item()
+        self.assertEqual(len(self.seen), 1)
+        self.assertEqual(len(self.seen[0][0]), 1)
+        self.assertNotIn("ABER", self.t.lbl_found._text)
+
+    def test_partial_failure_is_shown(self):
+        self.t.find_items()
+        self.patch(self.IC, "give_via_cave", lambda items, *a, **k: {"total": len(items), "given": 1, "rejected": [],
+                                                                      "skipped": [], "error": "Cave nicht ausgeführt", "reach": "unused"})
+        self.t.give_live()
+        self.assertIn("Cave nicht ausgeführt", self.t.lbl_found._text)
 
 
 class BaseCheck(T):
@@ -305,6 +353,16 @@ class Portability(T):
         self.assertEqual(opts[0].rows[0].fname, want)
         self.assertEqual(opts[0].rows[0].spec.args[0]["value"], want)           # der echte Aufruf-Wert
 
+    def test_changed_item_numbers_are_shown_as_examples(self):
+        d = self.build()
+        for it in self.t.items:
+            it["fname"] = bytes([x ^ 0x5A for x in it["fname"]])
+        self.t._ask_adapt = lambda text: False
+        self.t._check_dir(d)
+        txt = self.t.lbl_done._text
+        self.assertIn(": gespeichert ", txt)                      # Beispiele: Item, gespeicherte Nummer -> jetzige Nummer
+        self.assertIn(" → jetzt ", txt)
+
     def test_other_game_version_is_reported_and_not_adapted(self):
         d = self.build()
         self.img.write(self.img.impl, b"\x90" * 32)
@@ -363,6 +421,45 @@ class Portability(T):
         self.assertIn("anderer Stelle", self.t.lbl_done._text)
         self.assertEqual(Path(os.path.join(d, "_trainer_spec.json")).read_bytes(), before)
 
+
+
+class ExpandButton(unittest.TestCase):
+    """INVENTAR AUF MAX: nur bei Spielen mit passender Funktion, laeuft ueber die Cave."""
+    patch = T.patch
+    answer = T.answer
+
+    def setUp(self):
+        T.setUp(self)
+        import item_check as IC
+        self.IC, self.ran = IC, []
+        self.patch(IC, "run_expand", lambda func, *a, **k: self.ran.append(func.title) or True)
+        self.asked = self.answer(True)
+
+    def test_no_button_in_a_game_without_such_a_function(self):
+        self.t.find_items()
+        self.assertEqual(self.t.expand_funcs, [])
+        self.t.expand_inventory()
+        self.assertEqual(self.ran, [])
+
+    def test_button_appears_and_runs_once(self):
+        fake = IT.P._sug("expand_function", "UInv.DevExpansionEnableSlotByMaxLevel", 9, "()", [],
+                         {"owner": "UInv", "name": "DevExpansionEnableSlotByMaxLevel", "params": [], "ret": "void",
+                          "flags": 0, "native": 1})
+        self.patch(IT, "find_expand", lambda sdk: [fake])
+        self.t.find_items()
+        self.assertEqual(len(self.t.expand_funcs), 1)
+        self.t.expand_inventory()
+        self.assertEqual(self.ran, ["UInv.DevExpansionEnableSlotByMaxLevel"])
+        self.assertIn("✔", self.t.lbl_found._text)
+
+    def test_declined_confirmation_does_nothing(self):
+        fake = IT.P._sug("expand_function", "UInv.ExpandAll", 9, "()", [], {"owner": "UInv", "name": "ExpandAll", "params": [],
+                                                                            "ret": "void", "flags": 0, "native": 1})
+        self.patch(IT, "find_expand", lambda sdk: [fake])
+        self.t.find_items()
+        self.answer(False)
+        self.t.expand_inventory()
+        self.assertEqual(self.ran, [])
 
 
 if __name__ == "__main__":

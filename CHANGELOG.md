@@ -2,26 +2,124 @@
 
 Older release notes (German) are in [`docs/history/`](docs/history/).
 
-## Unreleased
+## 6.0.0 - 2026-11-01
+
+**Items for everyone.** The ITEMS tab for Unreal games was rebuilt so that a beginner gets items into the game without knowing
+tables, FNames or functions; items can now be given **right away** (no trainer needed), the amount respects the game's
+inventory limits, and there is a one-click **INVENTORY TO MAX** for games that offer it. Unity (IL2CPP) games get their own
+ITEMS tab. Release notes for GitHub: [`docs/history/RELEASE_NOTES_v6.0.0.md`](docs/history/RELEASE_NOTES_v6.0.0.md).
+Self-update from 5.9.1 works as before (config, profiles, logs, library and `applied.json` are kept).
+
+### Highlights
+- **Unreal ITEMS tab shows only what matters.** Every table of the game is rated; only item lists are offered, the best give
+  function is picked on its own, and the game-specific choices are hidden behind "Change the choice myself (advanced users only)".
+- **Items arrive on the game thread.** TEST 1 ITEM and GIVE NOW run through a short cave that the game executes itself - the
+  same safe way the trainer works. They no longer hang or freeze the game.
+- **Limits and bigger inventories.** The amount per item is cut to the game's own limit (`OwnLimitByBackPack`, ...), and
+  **INVENTORY TO MAX** runs the game's own expansion function (e.g. `DevExpansionEnableSlotByMaxLevel`) - the button only
+  appears for games that have one.
+- **UNITY > ITEMS** - the same three steps for Unity (IL2CPP) games.
 
 ### Added
-- **ITEMS tab (Unreal): only suitable item lists and give functions are shown.** Every table of the game is rated by name and row struct (`DT_ItemParam`, `DT_WeaponParam` count as item lists; effect, UI, sound, zombie or text tables do not). Give functions are rated by whether the trainer can reach their object (`this` from the PlayerController), and functions that remove/select/preview items, belong to a display actor or give key items are ranked down. The drop-downs are hidden behind "Change the choice myself (advanced users only)" and list only suitable entries ("also show unsuitable ones" shows the rest, with the reason). If the best function cannot be reached by the trainer, the status line and the save preview say so.
-- **GIVE NOW button (ITEMS tab).** Gives all ticked items immediately, in the running game, through the chosen function (ProcessEvent on the real object - works for functions of subsystems the trainer cave cannot reach). No trainer, no cave; the items stay until the game is closed. Asks before it starts and reminds you to run TEST 1 ITEM first.
-- **TEST 1 ITEM button.** Gives ONE item through the chosen function directly in the running game (ProcessEvent on a real instance, not through the cave) and asks whether it arrived. The answer is remembered in the game profile (`discover.verified`): tested functions are ranked up and marked "tested", failed ones are ranked down. If the game returns `false` the function is marked as failed without asking. If the call works but the trainer cannot reach the object, it says so. Tests: `tests/test_ue_items.py` (`TryGive`, `ConfusingGame`), `tests/test_gui_items.py`.
+- **ITEMS tab (Unreal): only suitable item lists and give functions are shown.** Every table is rated by name and row struct
+  (`DT_ItemParam`, `DT_WeaponParam` count as item lists; effect, UI, sound, enemy or text tables do not). Give functions are rated by
+  whether the trainer can reach their object, and functions that remove / select / preview items, belong to a display actor or
+  give key items are ranked down. "Also show unsuitable ones" shows the rest with the reason. If the best function cannot be
+  reached, the status line and the save preview say so.
+- **Filter levels** `streng` (strict) / `normal` (default) / `aus` (off) for tables and give functions. `normal` keeps tables like
+  `DT_ItemSkill` or `DT_CharacterItem` and functions like `RequestAddItem` / `AddToBag`; `aus` hides nothing. Changing the level
+  searches again.
+- **All item lists are read and merged** instead of only the first table (up to 12; tables without their own grouping are named
+  after the table). *Read all item lists together* can be switched off.
+- When nothing is found, the log and the status say where the filter dropped things (tables seen / relevant / with rows,
+  functions found / rejected and why).
+- **TEST 1 ITEM** gives ONE item through the chosen function, **GIVE NOW** gives all ticked items immediately (no trainer, no
+  BASIS). Both run through a short cave on the game thread, ask before they start, remove the hook afterwards and reuse a cave
+  that is still there. TEST 1 ITEM asks whether the item arrived; the answer is remembered per game
+  (`discover.verified` in the game profile): tested functions are ranked up and marked "tested", failed ones are ranked down and never
+  count as suitable - in every filter level. Test results of older program versions are dropped (`verified_v`).
+- **TEST CHECKED ITEMS** (German: `ANGEHAKTE TESTEN`) checks everything that is ticked before a trainer is made. Stage 1 is
+  read only: image base, give function found, native code executable, `this` object reachable, ProcessEvent hook slots, free cave
+  space, and per item a name / FName / ID check against the live name pool. Stage 2 (optional, asks first) puts a short test hook
+  into the game, triggers each item once and waits until the cave clears its switch - proof that hook, cave and game function
+  really run; the hook is always removed again, even on errors. One question at the end ("did it arrive?") flags the whole set if
+  not. Results show in a TEST column; failed items are unchecked automatically (switchable); saving after a failed test asks
+  first. Logic in `item_check.py`.
+- **Amount limits.** The amount is cut per item to the limit stored in the item table (columns such as `OwnLimitByBackPack` /
+  `OwnLimitByWarehouse`; the one that matches the give function - backpack or warehouse - is used). The save dialog explains this.
+- **INVENTORY TO MAX** - runs a parameterless inventory-expansion function of the game once (found in the SDK by name, e.g.
+  `UDMXInventorySubsystem.DevExpansionEnableSlotByMaxLevel`) through the cave. The button is shown only when the game has such a
+  function.
+- **Objects the trainer cannot reach through the PlayerController** (e.g. a game-instance subsystem like
+  `UDMXInventorySubsystem`) are called through their fixed address (`this` mode `abs`: address plus vtable check, skipped when the
+  object is gone). This is valid only until the game is closed: after every game start load a save, FIND ITEMS and SAVE TRAINER
+  again. The status line, the pre-check and the save dialog say so.
+- **UNITY > ITEMS tab** - the same three steps as the Unreal ITEMS tab, for Unity (IL2CPP) games: pick the game folder, click
+  **FIND ITEMS**, click **SAVE TRAINER**. The tool picks the item list (the `ItemID`-style enum from `dump.cs`), the method that
+  gives items (`AddItem`, `GiveItem` ... with an item-ID parameter and an optional amount) and an entry point (an `Update` /
+  `LateUpdate` / `FixedUpdate` method of the inventory class, of a class with a field that points to the inventory, or any
+  `Update` for static methods) on its own and shows what it chose. The trainer is written like the Unreal one: categories in
+  packages of 14, several projects when the cave does not fit, preview before writing, `LIESMICH_TRAINER.txt`, **CHECK TRAINER**
+  for the version anchors. Finding the items needs no console connection.
+- How the Unity trainer works (`unity_items.py`): a `jmp` at the start of the chosen `Update` method; its first instructions are moved
+  into the cave (rip-relative addresses and `jcc` / `call` / `jmp` are re-encoded). The cave checks one switch byte per entry,
+  clears it atomically and calls the game's give method once per item (System V call, `MethodInfo* = 0`), then runs the moved
+  instructions. Raw machine code, no assembler needed to apply it.
+- START tab card and English texts for the new tabs.
+- Tests: `tests/test_unity_items.py` (finding, relocation, encoding checked against GNU `as`, **the cave is executed on an x86-64
+  CPU**), `tests/test_gui_unity_items.py`, `tests/test_item_check.py`, `tests/test_gui_items_check.py`, `tests/test_this_analysis.py`,
+  more cases in `tests/test_ue_items.py` (real signatures such as `AddItemToBackPack`, amount limits, inventory expansion),
+  `tests/test_gui_items.py` and `tests/test_ue_cavegen.py` (the `abs` mode is executed on a real CPU).
 
-- **UNITY > ITEMS tab** - the same three steps as the Unreal ITEMS tab, for Unity (IL2CPP) games: pick the game folder, click **FIND ITEMS**, click **SAVE TRAINER**. The tool picks the item list (the `ItemID`-style enum from `dump.cs`), the method that gives items (`AddItem`, `GiveItem` ... with an item-ID parameter and an optional amount) and an entry point (an `Update`/`LateUpdate`/`FixedUpdate` method of the inventory class, or of a class with a field that points to the inventory, or any `Update` for static methods) on its own, and shows what it chose in drop-downs. The trainer is written like the Unreal one: categories split into packages of 14, several projects when the cave does not fit, preview before writing, `LIESMICH_TRAINER.txt`, **CHECK TRAINER** for the version anchors. Finding the items needs no console connection.
-- How it works (`unity_items.py`): a `jmp` at the start of the chosen `Update` method; its first instructions are moved into the cave (rip-relative addresses and `jcc`/`call`/`jmp` are re-encoded). The cave checks one switch byte per entry, clears it atomically and calls the game's give method once per item (System V call, `MethodInfo* = 0`), then runs the moved instructions. Raw machine code, no assembler needed to apply it.
-- The leftover-cave fix (cave left behind after BASIS is switched off / loaded via GoldHEN) also covers the Unity cave: it is recognised by its code signature, the space is reused, the base patch gets `VerifyAlso`, a free-space `0 bytes` is explained.
-- START tab card and English texts for the new tab.
-- Tests: `tests/test_unity_items.py` (finding, relocation, encoding checked against GNU `as`, **the cave is executed on an x86-64 CPU**: arguments, `this` modes, stack alignment, callee-saved registers, switch reset, original code still runs, leftover cave) and `tests/test_gui_unity_items.py`.
-
-### Known limits
-- **Not tested on a real game or console yet.** Needs an item-ID parameter that is a number or enum; methods that take an item object/string are listed with the reason and skipped (use WERTE/EXPERTE then).
-- With a `this` taken from a field of the hooked class (e.g. `Player.inventory`) the items go to the first such object that runs after the click.
+### Changed
+- When several give functions rate equally, the backpack function is preferred over the warehouse one (and over functions with a
+  slot index). Pick `AddItemToWarehouse` under "Change the choice myself" to fill the warehouse instead.
+- Give functions are rated higher when the trainer can reach their object (hooked +3, member +2.5, fixed address +1) and lower
+  when it cannot (-5); a name or class that does not fit (remove, preview, display actor) costs points.
+- Test suite: 912 tests (CI: Linux Python 3.10 / 3.12, Windows Python 3.12; `ruff check .` clean).
 
 ### Fixed
-- **Give functions with an unusual amount parameter or a second FName** (e.g. `AddItemToBackPack(FName ItemId, int32 Add, FName WorkId, bool bCallEvent)`): `Add` is now recognised as the amount (the only other number parameter), a slot index (`SlotIndex`) is no longer taken for the item ID, and further FName IDs such as `WorkId` stay empty (`None`) instead of getting the item (TEST 1 ITEM) or aborting with "FName missing" (SAVE TRAINER).
-- **Trainer on another console: "does not fit into the largest free code gap of the game (0 bytes)".** The cave of an earlier trainer stays at the end of the code region after BASIS is switched off (or when it was loaded through GoldHEN/etaHEN). The free-space scan saw that region end as occupied and reported 0 bytes, so SAVE TRAINER and CHECK / ADAPT TRAINER failed on that console although game and version were identical. Leftover ReaperPy caves (also several stacked ones) are now recognised by their code signature and the space is reused; the base patch gets a `VerifyAlso` list so it activates both on that console and on a clean one; old switch bytes are left alone (new switches are placed in front of them). If there is really no space (foreign data at the region end), the message now says so and the log lists why. The free-space scan also looks through the last 64 KB of each executable region for zero/0xCC runs, not only at the very end, so a foreign cave (GoldHEN/etaHEN cheat, plugin) sitting at the end of the page padding no longer hides the free part in front of it. With 0 bytes the log now shows a map of the region end (`.` = 00, `c` = CC, `#` = data). Tests: `tests/test_cave_trainer.py` (`LeftoverCaveTests`).
+- **Items were given but landed in a full backpack / the amount was refused.** The amount is now cut to the game's limit (see
+  Added) and the warehouse and the expansion function are available as alternatives.
+- **GIVE NOW and TEST 1 ITEM no longer hang after 1-2 items ("Giving aborted: timed out") or freeze the game.** They called the
+  give function from a foreign thread; a function that creates items can wait for the game thread there and never return. Both now use
+  the cave on the game thread (see Added). Only when that is impossible (nothing has been changed then) the old direct call is tried.
+  If the game never runs the cave, the message says so.
+- **Items are given even when the give function's class has no object in the game (e.g. `USBCheatManager` in a shipping
+  build).** The cave took `this` from `PlayerController.CheatManager`; when that pointer is 0 it skipped the call - everything was
+  green, nothing arrived. The native function is now read (read only) and followed for `this`: if it never reads or passes on
+  `this`, the trainer calls it with `this = 0` always, the pre-check says so, and TEST 1 ITEM / GIVE NOW use the PlayerController as
+  caller. Unclear code keeps the old behaviour. If the ProcessEvent slot already points into game code (a cheat loaded earlier,
+  e.g. by GoldHEN/etaHEN), the check says so.
+- **Give functions with an unusual signature** (e.g. `AddItemToBackPack(FName ItemId, int32 Add, FName WorkId, bool bCallEvent)`):
+  `Add` is recognised as the amount, a slot index (`SlotIndex`) is no longer taken for the item ID, and further FName IDs such as
+  `WorkId` stay empty instead of getting the item (TEST 1 ITEM) or aborting with "FName missing" (SAVE TRAINER). Earlier wrong
+  test results ("nothing arrived" because the amount was 0) are dropped automatically.
+- **Cave outside the game image when the image has no room in reach.** If the padding at the end of the image is more than
+  +-2 GB (rel32) away from the give function, ProcessEvent or the switches, the trainer now looks for free padding in other modules
+  (`cave_trainer.far_span`) that is in reach of **all** targets, and warns that this only holds while the module is loaded at the
+  same place. Before, SAVE TRAINER stopped with "no free code space".
+- **Trainer on another console: "does not fit into the largest free code gap of the game (0 bytes)".** The cave of an earlier
+  trainer stays at the end of the code region after BASIS is switched off (or when it was loaded through GoldHEN/etaHEN). The
+  free-space scan saw that end as occupied and reported 0 bytes. Leftover ReaperPy caves (also several stacked ones) are now
+  recognised by their code signature and the space is reused; the base patch gets a `VerifyAlso` list so it activates on that
+  console and on a clean one; old switch bytes are left alone. If there is really no space the message says so and the log lists
+  why. The scan also looks through the last 64 KB of each executable region for zero / `0xCC` runs, so a foreign cave at the end of
+  the padding no longer hides the free part in front of it. With 0 bytes the log shows a map of the region end (`.` = 00, `c` = CC,
+  `#` = data). Test: `tests/test_cave_trainer.py` (`LeftoverCaveTests`).
+- **CHECK / ADAPT TRAINER shows examples of changed item numbers** (up to 5 `saved -> now`, up to 3 missing entries, the number of
+  matching items) and lists every change in the log (`[fname]`).
+- The leftover-cave fix also covers the Unity cave: it is recognised by its code signature, the space is reused, the base patch
+  gets `VerifyAlso`, a free space of `0 bytes` is explained.
+
+### Known limits
+- **Unity ITEMS is not tested on a real game or console yet.** It needs an item-ID parameter that is a number or enum; methods that
+  take an item object / string are listed with the reason and skipped (use VALUES / EXPERT then). With a `this` taken from a field of
+  the hooked class (e.g. `Player.inventory`) the items go to the first such object that runs after the click.
+- Unreal ITEMS was tried on two real games, but not on every engine layout. Whether an item shows up in the inventory is judged by
+  you (TEST 1 ITEM asks); a function that "runs" without effect is flagged only by your answer.
+- Fixed-address trainers (`abs`) are valid for one game session only. The inventory limits come from the item table; a game that
+  enforces a limit somewhere else can still cap the amount.
 
 ## 5.9.1 - 2026-10-30
 

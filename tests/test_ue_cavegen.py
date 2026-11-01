@@ -176,6 +176,22 @@ class NativeCalls(unittest.TestCase):
         self.fire(1, rdi=obj)                                              # naechster Eintrag funktioniert weiter
         self.assertEqual([c[1] for c in self.calls()], [4])
 
+    def test_this_abs_calls_only_while_the_object_is_still_there(self):
+        """Feste Objektadresse (Subsystem): Aufruf nur, wenn dort noch die erwartete vtable steht - sonst uebersprungen."""
+        tgt = self.base + OBJ2_OFF
+        struct.pack_into("<Q", self.mm, OBJ2_OFF, 0xBEEF0001)                    # 'vtable' des Objekts
+        sp = C.CallSpec(0, [arg("n", "int", 7)], "abs", 0, "", None, tgt, 0xBEEF0001)
+        self.install([self.opt("A", sp), self.opt("B", spec([arg("n", "int", 4)]))])
+        self.assertEqual(self.fire(0, rdi=0x1234), 77)
+        self.assertEqual([(c[0], c[1]) for c in self.calls()], [(tgt, 7)])           # this = die feste Adresse
+        struct.pack_into("<Q", self.mm, OBJ2_OFF, 0x1111)                           # Spiel neu gestartet: anderes Objekt dort
+        ctypes.memset(self.base + LOG_OFF, 0, 8)
+        self.assertEqual(self.fire(0, rdi=0x1234), 77)                              # ProcessEvent laeuft trotzdem weiter
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(self.mm[FLAG_OFF], 0)
+        self.fire(1)                                                                # naechster Eintrag funktioniert weiter
+        self.assertEqual([c[1] for c in self.calls()], [4])
+
     def test_mixed_stellar_blade_row_and_call_row(self):
         sb = T.Row("Item_Gold", bytes.fromhex("0a00000000000000"), 77)
         cr = C.CallRow("x", spec([arg("n", "int", 5)]), None, 1)
@@ -239,6 +255,15 @@ class Logic(unittest.TestCase):
         self.assertEqual(z[0], "zero")
         self.assertIn("Absturz", z[2])
         self.assertEqual(C.choose_this(sdk, "UInventoryComponent", static=True)[0], "zero")
+
+    def test_abs_this_json_roundtrip_and_validation(self):
+        r = C.build_row("A", 0x10, [("class FName", "N"), ("int32", "Count")], "void", Sdk(), ("abs", 0x105F9E6D00, 0x7123456),
+                        id_value=bytes(range(1, 9)), count_value=3)
+        self.assertEqual((r.spec.this_mode, r.spec.this_abs, r.spec.this_vt), ("abs", 0x105F9E6D00, 0x7123456))
+        back = C.CallSpec.from_json(r.spec.to_json())
+        self.assertEqual((back.this_mode, back.this_abs, back.this_vt), ("abs", 0x105F9E6D00, 0x7123456))
+        with self.assertRaises(T.TrainerError):
+            C.CallSpec(0, [], "abs", 0, "", None, 0x1000, 0)                          # ohne vtable keine Pruefung moeglich
 
     def test_build_row_fills_roles_extra_and_validates(self):
         params = [("class FName", "ItemName"), ("int32", "Count"), ("int32", "Level"), ("bool", "bNotify")]
