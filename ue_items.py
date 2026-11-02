@@ -260,6 +260,20 @@ def live_object(live, read, owner):
     return (addr, vt) if vt >= 0x10000 else None
 
 
+def scan_info(live):
+    """Angaben, mit denen die Cave das Objekt bei jedem Spielstart selbst in GObjects findet -> dict oder None.
+    Adresse als RVA (feste Position im Spiel-Image), Offsets und Item-Groesse stammen aus der erkannten Objektliste."""
+    try:
+        arr, base, item = int(live.arr), int(live.base), int(live.item_size)
+        lay = [int(x) for x in live.layout]
+        rva = arr - base
+        if not 0 < rva < 0x4000_0000 or not 4 <= item <= 0x100 or len(lay) < 3:
+            return None
+        return {"gobjects_rva": rva, "objs_off": lay[0], "num_off": lay[2], "item_size": item, "flags_off": 8}
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def rate_functions(prof, sdk, level=LEVEL_STRICT, verified=None, live=None, read=None):
     """Baubare Geben-Funktionen bewerten -> [{'sug','score','reach','relevant','reasons'}], beste zuerst.
     reach: 'hooked' | 'member' | 'zero' - woher die Cave das Objekt (this) nimmt.  'zero' = die Funktion gehoert zu einer
@@ -282,7 +296,11 @@ def rate_functions(prof, sdk, level=LEVEL_STRICT, verified=None, live=None, read
                 objs[owner] = live_object(live, read, owner)
             if objs[owner]:
                 mode = "abs"
-        if mode == "abs":
+        persistent = mode == "abs" and scan_info(live) is not None
+        if persistent:
+            score += 2
+            reasons.append("Objekt wird bei jedem Spielstart selbst gefunden")
+        elif mode == "abs":
             score += 1
             reasons.append("feste Objekt-Adresse (nur diese Spielsitzung)")
         elif mode == "zero":
@@ -317,7 +335,7 @@ def rate_functions(prof, sdk, level=LEVEL_STRICT, verified=None, live=None, read
         elif state == "fail":
             score -= 8
             reasons.append("Test fehlgeschlagen")
-        out.append({"sug": s, "score": round(score, 1), "reach": mode, "reasons": reasons, "verified": state,
+        out.append({"sug": s, "score": round(score, 1), "reach": mode, "persistent": persistent, "reasons": reasons, "verified": state,
                     "relevant": mode != "zero" and not (bad_name or bad_owner or (special and level == LEVEL_STRICT)
                                                         or state == "fail")})
     out.sort(key=lambda r: -r["score"])
@@ -708,7 +726,12 @@ def resolve_this(sdk, live, read, owner, impl, log=lambda _m: None):
     this = (mode, off)
     if mode == "zero" and not unused:
         ab = live_object(live, read, owner)
-        if ab:
+        sc = scan_info(live) if ab else None
+        if ab and sc:
+            this = ("scan", ab[1], sc)
+            note = (f"this = das {owner}-Objekt (vtable {ab[1]:#x}); die Cave sucht es bei jedem Spielstart selbst in GObjects "
+                    "- der Trainer funktioniert auch nach einem Neustart des Spiels")
+        elif ab:
             this = ("abs", ab[0], ab[1])
             note = (f"this = feste Adresse {ab[0]:#x} des laufenden {owner}-Objekts (vtable {ab[1]:#x}) - gilt nur bis zum "
                     "Beenden des Spiels; ein Neustart braucht einen neu gespeicherten Trainer")

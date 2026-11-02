@@ -158,9 +158,14 @@ def _check_this(func, sdk, live, read, rep, impl=None):
         rep.checks.append(Check("Objekt (this)", OK, "die Funktion gehört zum PlayerController selbst"))
         return
     if mode == "zero" and IT.live_object(live, read, d.get("owner", "")):
-        rep.checks.append(Check("Objekt (this)", OK,
-                                f"{d.get('owner', '')} ist im laufenden Spiel vorhanden - der Trainer ruft es über seine feste "
-                                "Adresse auf (gilt nur bis zum Spielende; nach jedem Spielstart neu speichern)."))
+        if IT.scan_info(live):
+            rep.checks.append(Check("Objekt (this)", OK,
+                                    f"{d.get('owner', '')} ist im laufenden Spiel vorhanden - die Cave sucht es bei jedem "
+                                    "Spielstart selbst (funktioniert auch nach einem Neustart des Spiels)."))
+        else:
+            rep.checks.append(Check("Objekt (this)", OK,
+                                    f"{d.get('owner', '')} ist im laufenden Spiel vorhanden - der Trainer ruft es über seine feste "
+                                    "Adresse auf (gilt nur bis zum Spielende; nach jedem Spielstart neu speichern)."))
         return
     if mode == "zero":
         rep.checks.append(Check("Objekt (this)", WARN,

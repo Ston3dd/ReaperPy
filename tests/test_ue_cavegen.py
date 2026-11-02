@@ -345,3 +345,187 @@ class Logic(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ======================================================================================================
+# this-Modus 'scan': das Objekt wird bei JEDEM Spielstart selbst in GObjects gefunden (kein feste Adresse)
+# ======================================================================================================
+GOBJ_OFF, CHUNKTAB_OFF, ITEMS_OFF = 0x3800, 0x3900, 0x3A00      # nachgebaute FChunkedFixedUObjectArray / Chunk-Tabelle / Items
+VT, ITEM = 0xBEEF1000, 0x18
+SCAN = {"gobjects_rva": GOBJ_OFF, "objs_off": 0, "num_off": 20, "item_size": ITEM, "flags_off": 8}
+
+
+@unittest.skipUnless(NATIVE, "braucht Linux x86-64, as, ld, objcopy")
+class NativeScan(NativeCalls):
+    def objects(self, entries):
+        """entries: Liste (Objektadresse oder 0, ...) -> GObjects mit einem Chunk; Objekt-Offsets liegen im mmap."""
+        struct.pack_into("<Q", self.mm, GOBJ_OFF + 0, self.base + CHUNKTAB_OFF)          # Objects
+        struct.pack_into("<i", self.mm, GOBJ_OFF + 20, len(entries))                      # NumElements
+        struct.pack_into("<Q", self.mm, CHUNKTAB_OFF, self.base + ITEMS_OFF)              # Chunk 0
+        for i, o in enumerate(entries):
+            struct.pack_into("<Q", self.mm, ITEMS_OFF + i * ITEM, o)
+
+    def obj(self, off, vt=VT, flags=0):
+        struct.pack_into("<Q", self.mm, off, vt)
+        struct.pack_into("<i", self.mm, off + 8, flags)
+        return self.base + off
+
+    def scan_spec(self, n=7):
+        return C.CallSpec(0, [arg("n", "int", n)], "scan", 0, "", None, 0, VT, SCAN)
+
+    def cell(self):
+        return struct.unpack("<Q", self.mm[FLAG_OFF + 8:FLAG_OFF + 16])[0]
+
+    def test_scan_finds_the_object_skips_default_and_foreign_objects(self):
+        cdo = self.obj(0x4000, flags=0x10)                     # Class Default Object: gleiche vtable, aber nicht das echte
+        other = self.obj(0x4040, vt=0x1234)                    # anderes Objekt
+        real = self.obj(0x4080)
+        self.objects([0, other, cdo, 0, real])
+        self.install([self.opt("A", self.scan_spec())])
+        self.assertEqual(self.fire(0), 77)
+        self.assertEqual([(c[0], c[1]) for c in self.calls()], [(real, 7)])         # this = das echte Objekt
+        self.assertEqual(self.cell(), real)                                          # gemerkt
+        self.assertEqual(self.mm[FLAG_OFF], 0)
+        pe = struct.unpack("<4Q", self.mm[PE_BUF:PE_BUF + 32])
+        self.assertEqual(pe[:3], (0x1111, 0x2222, 0x3333))                           # ProcessEvent bekommt die Originalargumente
+
+    def test_scan_survives_a_game_restart_object_lives_elsewhere(self):
+        """Der Kern: nach einem Neustart steht das Objekt an einer ANDEREN Adresse (und die Zelle ist wieder 0)."""
+        first = self.obj(0x4000)
+        self.objects([first])
+        self.install([self.opt("A", self.scan_spec())])
+        self.fire(0)
+        self.assertEqual(self.calls()[0][0], first)
+        # 'Neustart': Zelle leer, Objekt an neuer Adresse, alte Stelle zeigt etwas anderes
+        struct.pack_into("<Q", self.mm, FLAG_OFF + 8, 0)
+        struct.pack_into("<Q", self.mm, 0x4000, 0x7777)
+        second = self.obj(0x4100)
+        self.objects([0, second])
+        ctypes.memset(self.base + LOG_OFF, 0, 8)
+        self.fire(0)
+        self.assertEqual([(c[0], c[1]) for c in self.calls()], [(second, 7)])
+
+    def test_scan_cell_is_used_then_refreshed_when_the_object_changes(self):
+        a = self.obj(0x4000)
+        self.objects([a])
+        self.install([self.opt("A", self.scan_spec())])
+        self.fire(0)
+        self.objects([])                                        # Liste leer: nur die Zelle kann noch helfen
+        ctypes.memset(self.base + LOG_OFF, 0, 8)
+        self.fire(0)
+        self.assertEqual([c[0] for c in self.calls()], [a])
+        struct.pack_into("<Q", self.mm, 0x4000, 0x9999)         # Objekt zerstoert, Zelle veraltet
+        b = self.obj(0x4100)
+        self.objects([b])
+        ctypes.memset(self.base + LOG_OFF, 0, 8)
+        self.fire(0)
+        self.assertEqual([c[0] for c in self.calls()], [b])
+        self.assertEqual(self.cell(), b)
+
+    def test_scan_not_found_skips_the_call_but_everything_else_runs(self):
+        self.objects([self.obj(0x4000, vt=0x1111)])             # kein Objekt mit der gesuchten vtable (z. B. Hauptmenue)
+        self.install([self.opt("A", self.scan_spec(), spec([arg("n", "int", 5)])), self.opt("B", spec([arg("n", "int", 4)]))])
+        self.assertEqual(self.fire(0), 77)                      # ProcessEvent laeuft weiter
+        self.assertEqual([c[1] for c in self.calls()], [5])     # die zweite Zeile (this = 0) laeuft, die Suche-Zeile nicht
+        self.assertEqual(self.mm[FLAG_OFF], 0)                  # Schalter zurueckgesetzt
+        self.fire(1)
+        self.assertEqual([c[1] for c in self.calls()], [5, 4])
+
+    def test_scan_no_objects_array_is_harmless(self):
+        struct.pack_into("<Q", self.mm, GOBJ_OFF, 0)            # Chunk-Tabelle noch nicht da
+        self.install([self.opt("A", self.scan_spec())])
+        self.assertEqual(self.fire(0), 77)
+        self.assertEqual(self.calls(), [])
+
+    def test_scan_skips_empty_chunks_and_null_items_and_finds_late_object(self):
+        struct.pack_into("<Q", self.mm, GOBJ_OFF, self.base + CHUNKTAB_OFF)
+        struct.pack_into("<i", self.mm, GOBJ_OFF + 20, 3 * 65536)                # drei Chunks, Chunk 0 und 1 leer (Zeiger 0)
+        struct.pack_into("<Q", self.mm, CHUNKTAB_OFF, 0)
+        struct.pack_into("<Q", self.mm, CHUNKTAB_OFF + 8, 0)
+        struct.pack_into("<Q", self.mm, CHUNKTAB_OFF + 16, self.base + ITEMS_OFF)
+        real = self.obj(0x4000)
+        for i in range(10):
+            struct.pack_into("<Q", self.mm, ITEMS_OFF + i * ITEM, 0)
+        struct.pack_into("<Q", self.mm, ITEMS_OFF + 9 * ITEM, real)
+        self.install([self.opt("A", self.scan_spec())])
+        self.fire(0)
+        self.assertEqual([c[0] for c in self.calls()], [real])
+
+    def test_many_rows_share_one_search_and_one_cell(self):
+        real = self.obj(0x4000)
+        self.objects([real])
+        rows = [self.scan_spec(n) for n in range(1, 15)]
+        one_row = len(self.install([self.opt("A", rows[0])]))
+        code = self.install([self.opt("A", *rows)])
+        self.assertLess(len(code) - one_row, 13 * 30)           # je weitere Zeile nur call/test/jz + Aufruf (~24 Byte), keine eigene Suche
+        self.assertEqual(T.scan_keys([self.opt("A", *rows)]), [self.scan_spec().scan_key()])
+        self.fire(0)
+        self.assertEqual([(c[0], c[1]) for c in self.calls()], [(real, n) for n in range(1, 15)])
+
+    def test_two_different_objects_get_two_cells(self):
+        vt2 = 0xBEEF2000
+        a, b = self.obj(0x4000), self.obj(0x4040, vt=vt2)
+        self.objects([a, b])
+        sp2 = C.CallSpec(0, [arg("n", "int", 2)], "scan", 0, "", None, 0, vt2, SCAN)
+        self.install([self.opt("A", self.scan_spec(1), sp2)])
+        self.fire(0)
+        self.assertEqual([(c[0], c[1]) for c in self.calls()], [(a, 1), (b, 2)])
+        self.assertEqual(struct.unpack("<2Q", self.mm[FLAG_OFF + 8:FLAG_OFF + 24]), (a, b))
+        self.assertEqual(T.flag_bytes_needed(1, 2), 8 + 16)
+
+    def test_scan_spec_json_roundtrip_and_validation(self):
+        sp = self.scan_spec()
+        back = C.CallSpec.from_json(__import__("json").loads(__import__("json").dumps(sp.to_json())))
+        self.assertEqual((back.this_mode, back.scan_key()), ("scan", sp.scan_key()))
+        self.assertEqual(sp.to_json()["this"], "scan")
+        with self.assertRaises(T.TrainerError):
+            C.CallSpec(0, [], "scan", 0, "", None, 0, 0, SCAN)                       # ohne vtable
+        with self.assertRaises(T.TrainerError):
+            C.CallSpec(0, [], "scan", 0, "", None, 0, VT, {"gobjects_rva": 1})       # unvollstaendig
+        self.assertIsNone(spec([arg("n", "int", 1)]).scan_key())
+
+    def test_build_row_accepts_scan_this(self):
+        class S:
+            enums = {}
+        row = C.build_row("x", 0, [], None, S(), ("scan", VT, SCAN))
+        self.assertEqual((row.spec.this_mode, row.spec.scan_key()), ("scan", self.scan_spec().scan_key()))
+
+
+class PlanWithScan(unittest.TestCase):
+    """plan(): der Schalter-Bereich bekommt hinter den Schaltern je gesuchtem Objekt eine 8-Byte-Zelle."""
+
+    def make(self, n_rows=3):
+        img = TS.FakeImage()
+        sc = {"gobjects_rva": 0x13000, "objs_off": 0, "num_off": 20, "item_size": 0x18, "flags_off": 8}
+        rows = [C.CallRow(f"r{i}", C.CallSpec(img.impl - img.BASE, [arg("n", "int", i + 1)], "scan", 0, "", None, 0, VT, sc),
+                          None, 1) for i in range(n_rows)]
+        opts = [T.Option("A", rows), T.Option("B", rows[:1])]
+        return img, opts, T.plan(img.read, img.maps, img.BASE, opts, img.impl, img.pe, [img.slot], log=lambda _m: None, settle=0)
+
+    def test_flag_area_has_room_for_the_cell(self):
+        img, opts, p = self.make()
+        self.assertEqual(len(T.scan_keys(opts)), 1)
+        self.assertGreaterEqual(p.flag_size, T.flag_bytes_needed(2, 1))
+        self.assertGreaterEqual(p.flag_size, 16)
+        self.assertEqual(p.flag_addr % 8, 0)
+
+    def test_cave_reads_and_writes_the_cell_inside_the_flag_area(self):
+        img, opts, p = self.make()
+        cell = p.flag_addr + T.flag_bytes_needed(2)
+        code = p.cave_bytes
+        found = False
+        for i in range(len(code) - 7):               # mov rdi,[rip+d] (488B3D) / mov [rip+d],rdi (48893D) zeigen auf die Zelle
+            if code[i:i + 3] in (bytes.fromhex("488B3D"), bytes.fromhex("48893D")):
+                d = struct.unpack_from("<i", code, i + 3)[0]
+                if p.cave + i + 7 + d == cell:
+                    found = True
+        self.assertTrue(found)
+
+    def test_project_json_keeps_scan_and_loads_back(self):
+        img, opts, p = self.make()
+        spec_json = T.spec_json(p) if hasattr(T, "spec_json") else None
+        row_json = opts[0].rows[0].to_json()
+        back = C.CallRow.from_json(__import__("json").loads(__import__("json").dumps(row_json)))
+        self.assertEqual(back.spec.scan_key(), opts[0].rows[0].spec.scan_key())
+        self.assertEqual(row_json["call"]["this"], "scan")
+        del spec_json

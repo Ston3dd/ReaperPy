@@ -2,6 +2,19 @@
 
 Older release notes (German) are in [`docs/history/`](docs/history/).
 
+## Unreleased
+
+### Fixed
+- **Item trainers (Unreal) keep working after the game is restarted.** Trainers that call a game object which the cave cannot
+  reach on its own (e.g. `UDMXInventorySubsystem.AddItemToWarehouse`) used to store the object's memory address. That address
+  changes with every game start, so after a restart the cave found something else there and silently did nothing. The cave now
+  finds the object itself: a small routine walks the game's object list (`GObjects`), picks the live object with the right
+  vtable (class default objects are skipped) and remembers it in an 8-byte cell behind the switch bytes. If the object does not
+  exist yet (e.g. main menu) the call is skipped and the game carries on. **Trainers saved with an older version still hold the
+  fixed address - save them once more (ITEMS FIND, SAVE TRAINER).**
+- CI: the German texts of `lager_slots.py` have English translations again, and a test opened a file without an explicit
+  encoding (both made the i18n and encoding-policy tests fail on all three test jobs).
+
 ## 6.0.0 - 2026-11-01
 
 **Items for everyone.** The ITEMS tab for Unreal games was rebuilt so that a beginner gets items into the game without knowing

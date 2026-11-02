@@ -2004,3 +2004,40 @@ EN.update({
     ") werden übernommen - nichts geht verloren.": ") are kept - nothing is lost.",
     " vtable-Slot(s)": " vtable slot(s)",
 })
+
+# lager_slots.py (Lagerplaetze freischalten)
+EN.update({
+    'Keine passende Liste gefunden.\nErwartet wurden 60 aktivierte Einträge und ein deaktivierter Folgeeintrag.': 'No matching list found.\nExpected 60 enabled entries followed by one disabled entry.',
+    'Mehrere mögliche Listenanfänge gefunden:': 'Multiple possible list starts found:',
+    'Unvollständiger Lesezugriff bei 0x': 'Incomplete read at 0x',
+    'Keine passende Liste gefunden.\n\nSpeicherfehler:': 'No matching list found.\n\nMemory error:',
+    'Ungültiger Eintrag bei Slot ': 'Invalid entry at slot ',
+    'Adresse: 0x': 'Address: 0x',
+    'Rückleseprüfung fehlgeschlagen:\n0x': 'Read-back check failed:\n0x',
+    'IP-Adresse fehlt.': 'IP address missing.',
+    'Ungültiger Port.': 'Invalid port.',
+    'Bereits freigeschaltete Slots müssen zwischen 1 und 499 liegen.': 'Already unlocked slots must be between 1 and 499.',
+    'Verbinde mit ': 'Connecting to ',
+    'Spielprozess wurde nicht gefunden.': 'Game process not found.',
+    'Freischalten bestätigen': 'Confirm unlock',
+    'Zu ändernde Einträge: ': 'Entries to change: ',
+    'Es werden ausschließlich die bEnable-Bytes der geprüften Einträge 61–500 geändert.\n\nFortfahren?': 'Only the bEnable bytes of the verified entries 61-500 will be changed.\n\nContinue?',
+    ' aktivierte Einträge ...': ' enabled entries ...',
+    'Listenanfang gefunden: 0x': 'List start found: 0x',
+    'Prüfe alle ': 'Checking all ',
+    ' Einträge ...': ' entries ...',
+    'PRÜFUNG ERFOLGREICH: ': 'CHECK SUCCESSFUL: ',
+    ' Einträge gelesen.': ' entries read.',
+    ' Slots für den Freischaltvorgang vorbereitet.': ' slots prepared for unlocking.',
+    'Nicht geprüft': 'Not checked',
+    'Bitte zuerst den Prüflauf durchführen.': 'Please run the check first.',
+    ' Bytes geschrieben und einzeln zurückgelesen.': ' bytes written and read back individually.',
+})
+
+# this-Modus 'scan' (Objekt bei jedem Spielstart selbst finden)
+EN.update({
+    ' ist im laufenden Spiel vorhanden - die Cave sucht es bei jedem Spielstart selbst (funktioniert auch nach einem Neustart des Spiels).': ' is present in the running game - the cave finds it itself on every game start (also works after the game is restarted).',
+    "this-Modus 'scan' braucht die vtable und die GObjects-Angaben (Adresse, Offsets, Item-Groesse)": "this mode 'scan' needs the vtable and the GObjects details (address, offsets, item size)",
+    "this-Modus 'scan': ObjectFlags-Offset oder Item-Groesse unplausibel": "this mode 'scan': ObjectFlags offset or item size implausible",
+    'Objekt wird bei jedem Spielstart selbst gefunden': 'Object is found again on every game start',
+})

@@ -488,7 +488,8 @@ class ItemsTab(BaseTab):
         if self.func and not weak:
             parts.append(f"✔ Geben-Funktion: {self._func_title(self.func)}"
                          + (" (feste Objekt-Adresse: der Trainer gilt nur bis zum Spielende)"
-                            if (self.func_rating or {}).get("reach") == "abs" else ""))
+                            if (self.func_rating or {}).get("reach") == "abs"
+                            and not (self.func_rating or {}).get("persistent") else ""))
         elif self.func:
             parts.append(f"⚠ Geben-Funktion: {self._func_title(self.func)} - {self._weak_reason()}")
         else:
@@ -1095,7 +1096,7 @@ class ItemsTab(BaseTab):
             if len(made) > 1:
                 msg.append("Wichtig: Es gibt mehrere Projekte - immer nur EINES gleichzeitig aktivieren "
                            "(zum Wechseln erst dessen BASIS ausschalten).")
-            if (self.func_rating or {}).get("reach") == "abs":
+            if (self.func_rating or {}).get("reach") == "abs" and not (self.func_rating or {}).get("persistent"):
                 msg.append("Wichtig: Dieser Trainer ruft das Objekt über seine feste Adresse auf - sie gilt nur bis zum Beenden "
                            "des Spiels. Nach jedem Spielstart: Spielstand laden, ITEMS FINDEN und TRAINER SPEICHERN neu.")
             msg.append("Die Menge wird je Item auf die Obergrenze des Spiels gekürzt (z. B. OwnLimitByBackPack). Rucksack und Lager "

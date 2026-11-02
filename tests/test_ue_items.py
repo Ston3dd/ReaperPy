@@ -104,7 +104,7 @@ class Packages(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             for n in ("G Items", "G Items 2", "G Items 10", "Anderes"):
                 os.makedirs(os.path.join(tmp, n))
-                with open(os.path.join(tmp, n, TR.SPEC_FILE), "w") as f:
+                with open(os.path.join(tmp, n, TR.SPEC_FILE), "w", encoding="utf-8") as f:
                     f.write("{}")
             os.makedirs(os.path.join(tmp, "G Items 3"))                  # ohne Spec: kein Trainer
             self.assertEqual([os.path.basename(d) for d in IT.existing_project_dirs(tmp, "G Items")],
@@ -490,3 +490,23 @@ class Expand(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScanInfo(unittest.TestCase):
+    """scan_info: Angaben, mit denen die Cave das Objekt nach jedem Spielstart selbst in GObjects findet."""
+
+    def live(self, **kw):
+        import types
+        d = dict(arr=0x400000 + 0x91c000, base=0x400000, item_size=0x18, layout=[0, 16, 20, 24, 28])
+        d.update(kw)
+        return types.SimpleNamespace(**d)
+
+    def test_returns_rva_offsets_and_item_size(self):
+        self.assertEqual(IT.scan_info(self.live()), {"gobjects_rva": 0x91c000, "objs_off": 0, "num_off": 20, "item_size": 0x18,
+                                                     "flags_off": 8})
+
+    def test_none_when_objects_were_not_detected_or_are_outside_the_image(self):
+        self.assertIsNone(IT.scan_info(self.live(arr=None)))
+        self.assertIsNone(IT.scan_info(self.live(arr=0x7000000000)))          # Heap statt Image: nach einem Neustart ungueltig
+        self.assertIsNone(IT.scan_info(self.live(item_size=0)))
+        self.assertIsNone(IT.scan_info(object()))

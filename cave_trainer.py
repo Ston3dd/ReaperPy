@@ -144,6 +144,9 @@ class _Emit:
         self.fix = []                   # (Position des disp32, Ziel: int absolut | str Label)
         self.pools = []                 # [(Label, Bytes)] Konstanten hinter dem Code (read-only genuegt)
         self.n = 0                      # Zaehler fuer eindeutige Label
+        self.scans = {}                 # Objekt-Suche: Schluessel -> Label der gemeinsamen Unterroutine
+        self.key_index = {}             # Schluessel -> Nummer der Zelle (8 Byte hinter den Schaltern)
+        self.cell_base = 0              # Adresse der ersten Zelle
 
     def uniq(self, prefix):
         self.n += 1
@@ -168,6 +171,83 @@ class _Emit:
     def label(self, name):
         self.labels[name] = len(self.buf)
 
+    def scan_call(self, key):
+        """`call` auf die gemeinsame Unterroutine, die das Objekt zu `key` liefert (rdi, 0 = nicht gefunden)."""
+        lab = self.scans.get(key)
+        if lab is None:
+            lab = self.scans[key] = self.uniq("findthis")
+        self.raw("E8")
+        self.rel32(lab)
+
+    def emit_scan_routines(self, img_base):
+        """Je Schluessel EINE Unterroutine (alle Zeilen rufen sie): Objekt mit dieser vtable in GObjects suchen und in der
+        Zelle merken.  Erst die Zelle pruefen (vtable stimmt noch -> fertig), sonst GObjects durchlaufen, Klassen-
+        Standardobjekte (RF_ClassDefaultObject = 0x10) ueberspringen.  Nur Caller-Saved-Register (rax rcx rsi rdi r8-r11);
+        rsi/rdi sind in der Cave gerettet.  Ergebnis rdi (0 = nicht gefunden)."""
+        q = lambda v: struct.pack("<Q", v & 0xFFFFFFFFFFFFFFFF).hex()  # noqa: E731
+        d = lambda v: struct.pack("<i", v).hex()  # noqa: E731
+        for key, lab in list(self.scans.items()):
+            vt, gobj_rva, o_objs, o_num, item, o_flags = key
+            cell = self.cell_base + 8 * self.key_index[key]
+            scan, ret, none, loop, chunk = (self.uniq(x) for x in ("scan", "ret", "none", "loop", "chunk"))
+            self.label(lab)
+            self.raw("488B3D")                                  # mov rdi,[rip+Zelle]
+            self.rel32(cell)
+            self.raw("4885FF")                                  # test rdi,rdi
+            self.raw("0F84")                                    # jz scan
+            self.rel32(scan)
+            self.raw("488B07")                                  # mov rax,[rdi]        (vtable des gemerkten Objekts)
+            self.raw("48B9" + q(vt))                            # movabs rcx,vtable
+            self.raw("4839C8")                                  # cmp rax,rcx
+            self.raw("0F84")                                    # je ret               (Objekt ist noch da)
+            self.rel32(ret)
+            self.label(scan)
+            self.raw("48B9" + q(vt))                            # movabs rcx,vtable
+            self.raw("49B8" + q(img_base + gobj_rva))           # movabs r8,&GObjects
+            self.raw("4D8B88" + d(o_objs))                      # mov r9,[r8+Objects]   (Chunk-Tabelle)
+            self.raw("4D85C9")                                  # test r9,r9
+            self.raw("0F84")                                    # jz none
+            self.rel32(none)
+            self.raw("458B90" + d(o_num))                       # mov r10d,[r8+NumElements]
+            self.raw("4531DB")                                  # xor r11d,r11d        (Index)
+            self.label(loop)
+            self.raw("4539D3")                                  # cmp r11d,r10d
+            self.raw("0F8D")                                    # jge none
+            self.rel32(none)
+            self.raw("4489D8")                                  # mov eax,r11d
+            self.raw("C1E810")                                  # shr eax,16           (Chunk-Nummer)
+            self.raw("498B34C1")                                # mov rsi,[r9+rax*8]
+            self.raw("4885F6")                                  # test rsi,rsi
+            self.raw("0F85")                                    # jnz chunk
+            self.rel32(chunk)
+            self.raw("4181CBFFFF0000")                          # or r11d,0xFFFF       (leeren Chunk ueberspringen)
+            self.raw("41FFC3")                                  # inc r11d
+            self.raw("E9")                                      # jmp loop
+            self.rel32(loop)
+            self.label(chunk)
+            self.raw("4489D8")                                  # mov eax,r11d
+            self.raw("25FFFF0000")                              # and eax,0xFFFF
+            self.raw("69C0" + struct.pack("<I", item).hex())    # imul eax,eax,Item-Groesse
+            self.raw("488B3C06")                                # mov rdi,[rsi+rax]    (UObject*)
+            self.raw("41FFC3")                                  # inc r11d
+            self.raw("4885FF")                                  # test rdi,rdi
+            self.raw("0F84")                                    # jz loop
+            self.rel32(loop)
+            self.raw("488B07")                                  # mov rax,[rdi]
+            self.raw("4839C8")                                  # cmp rax,rcx
+            self.raw("0F85")                                    # jne loop
+            self.rel32(loop)
+            self.raw("F747" + f"{o_flags:02X}" + "10000000")    # test dword [rdi+ObjectFlags],0x10  (Default-Objekt?)
+            self.raw("0F85")                                    # jnz loop
+            self.rel32(loop)
+            self.raw("48893D")                                  # mov [rip+Zelle],rdi  (merken)
+            self.rel32(cell)
+            self.label(ret)
+            self.raw("C3")                                      # ret
+            self.label(none)
+            self.raw("31FF")                                    # xor edi,edi
+            self.raw("C3")                                      # ret
+
     def finish(self):
         for name, data in self.pools:
             while len(self.buf) % 8:
@@ -187,8 +267,21 @@ def n_flag_qwords(n_options):
     return (n_options + 7) // 8
 
 
-def flag_bytes_needed(n_options):
-    return n_flag_qwords(n_options) * 8
+def flag_bytes_needed(n_options, n_cells=0):
+    """Schalter (1 Byte je Eintrag, auf Qwords aufgefuellt) + je gesuchtem Objekt eine 8-Byte-Zelle dahinter."""
+    return n_flag_qwords(n_options) * 8 + 8 * n_cells
+
+
+def scan_keys(options):
+    """Verschiedene Objekt-Suchen der Zeilen (this-Modus 'scan'), in der Reihenfolge ihres ersten Auftretens."""
+    keys = []
+    for o in options:
+        for r in o.rows:
+            f = getattr(getattr(r, "spec", None), "scan_key", None)
+            k = f() if callable(f) else None
+            if k is not None and k not in keys:
+                keys.append(k)
+    return keys
 
 
 def build_cave(cave_addr, flag_addr, orig_pe, impl, options, base=0):
@@ -213,6 +306,9 @@ def build_cave(cave_addr, flag_addr, orig_pe, impl, options, base=0):
     if flag_addr % FLAG_ALIGN:
         raise TrainerError("Schalter-Bereich nicht 8-Byte-ausgerichtet")
     e = _Emit(cave_addr)
+    keys = scan_keys(options)
+    e.key_index = {k: i for i, k in enumerate(keys)}
+    e.cell_base = flag_addr + flag_bytes_needed(len(options))           # Zellen direkt hinter den Schaltern
     e.raw("31C0")                                           # xor eax,eax
     for k in range(n_flag_qwords(len(options))):
         e.raw("480B05")                                     # or rax,[rip+disp32]
@@ -236,6 +332,7 @@ def build_cave(cave_addr, flag_addr, orig_pe, impl, options, base=0):
     e.raw("5A" "5E" "5F")                                   # pop rdx, rsi, rdi
     e.raw("E9")                                             # jmp orig_pe
     e.rel32(orig_pe)
+    e.emit_scan_routines(base)                              # gemeinsame Objekt-Suche (nur wenn eine Zeile sie braucht)
     return e.finish()
 
 
@@ -710,7 +807,7 @@ def plan(read, maps, base, options, impl, orig_pe, slots, log=print, settle=0.4,
     slots_alloc.far_span = far_span(maps, base, slots_alloc.targets)
     slots_alloc.code_capacity()                                      # Code-Platz zuerst suchen (erkennt Reste einer frueheren Cave)
 
-    need_flags = flag_bytes_needed(len(options))
+    need_flags = flag_bytes_needed(len(options), len(scan_keys(options)))
     p.flag_addr, p.flag_size = slots_alloc.alloc_data(need_flags, impl)
     slots_alloc.targets.append(p.flag_addr)                          # die Cave muss auch die Schalter per rel32 erreichen
     first = bytes(read(p.flag_addr, p.flag_size))
@@ -834,7 +931,8 @@ def readme_text(p, project_name):
         "",
         "TECHNIK (Offsets = RVA, Basis " + hex(p.base) + ")",
         f"  Cave        base+{p.cave - p.base:#x}  ({len(p.cave_bytes)} Byte, Code-Padding am Region-Ende)",
-        f"  Schalter    base+{p.flag_addr - p.base:#x}  ({p.flag_size} Byte, 1 Byte je Eintrag, Reihenfolge wie oben)",
+        f"  Schalter    base+{p.flag_addr - p.base:#x}  ({p.flag_size} Byte, 1 Byte je Eintrag, Reihenfolge wie oben)"
+        + ("; dahinter {} Zelle(n) fuer das Objekt (this)".format(len(scan_keys(p.options))) if scan_keys(p.options) else ""),
         "  Haken       vtable-Slot(s): " + ", ".join(f"base+{s - p.base:#x}" for s in p.slots),
         f"  Item-Funktion base+{p.impl - p.base:#x}   ProcessEvent base+{p.orig_pe - p.base:#x}",
         "",

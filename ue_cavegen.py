@@ -31,7 +31,7 @@ SIZES = {"bool": 1, "int8": 1, "uint8": 1, "int16": 2, "uint16": 2, "int32": 4, 
          "uint64": 8, "int8_t": 1, "uint8_t": 1, "int16_t": 2, "uint16_t": 2, "int32_t": 4, "uint32_t": 4,
          "int64_t": 8, "uint64_t": 8}
 SIGNED = {"int8", "int16", "int32", "int", "int64", "int8_t", "int16_t", "int32_t", "int64_t"}
-THIS_MODES = ("zero", "hooked", "member", "abs")
+THIS_MODES = ("zero", "hooked", "member", "abs", "scan")
 
 
 # --------------------------------------------------------------------------------------------------
@@ -263,12 +263,22 @@ class CallSpec:
     """impl_rva = native Implementierung (RVA); this_mode zero|hooked|member (+this_off / this_path); args = Liste von Dicts
     {name, kind, size, signed, value, mode} mit mode 'val' | 'ref'; value: int/float oder 8 Byte (FName)."""
 
-    def __init__(self, impl_rva, args, this_mode="zero", this_off=0, function="", this_path=None, this_abs=0, this_vt=0):
+    def __init__(self, impl_rva, args, this_mode="zero", this_off=0, function="", this_path=None, this_abs=0, this_vt=0,
+                 this_scan=None):
         if this_mode not in THIS_MODES:
             raise T.TrainerError(f"this-Modus '{this_mode}' unbekannt")
         if this_mode == "abs" and not (int(this_abs) and int(this_vt)):
             raise T.TrainerError("this-Modus 'abs' braucht die Objekt-Adresse und deren vtable (zur Pruefung)")
         self.this_abs, self.this_vt = int(this_abs or 0), int(this_vt or 0)
+        self.this_scan = None
+        if this_mode == "scan":
+            sc = {k: int(v) for k, v in dict(this_scan or {}).items()}
+            sc.setdefault("flags_off", 8)
+            if not self.this_vt or any(k not in sc for k in ("gobjects_rva", "objs_off", "num_off", "item_size")):
+                raise T.TrainerError("this-Modus 'scan' braucht die vtable und die GObjects-Angaben (Adresse, Offsets, Item-Groesse)")
+            if not 0 <= sc["flags_off"] < 0x80 or not 4 <= sc["item_size"] <= 0x100:
+                raise T.TrainerError("this-Modus 'scan': ObjectFlags-Offset oder Item-Groesse unplausibel")
+            self.this_scan = sc
         path = [int(x) for x in this_path] if this_path else []
         off = int(this_off or 0)
         if this_mode == "member" and not path:
@@ -292,13 +302,24 @@ class CallSpec:
             d["this_path"] = [hex(x) for x in self.this_path]
         if self.this_mode == "abs":
             d["this_abs"], d["this_vt"] = hex(self.this_abs), hex(self.this_vt)
+        if self.this_mode == "scan":
+            d["this_vt"] = hex(self.this_vt)
+            d["this_scan"] = {k: hex(v) for k, v in self.this_scan.items()}
         return d
+
+    def scan_key(self):
+        """Schluessel der Objekt-Suche (gleiche Suche = eine gemeinsame Unterroutine und Zelle) oder None."""
+        if self.this_mode != "scan":
+            return None
+        s = self.this_scan
+        return (self.this_vt, s["gobjects_rva"], s["objs_off"], s["num_off"], s["item_size"], s["flags_off"])
 
     @classmethod
     def from_json(cls, d):
         path = [int(x, 16) if isinstance(x, str) else int(x) for x in d["this_path"]] if d.get("this_path") else None
         return cls(int(d["impl_rva"], 16), d["args"], d.get("this", "zero"), int(d.get("this_off", "0"), 16),
-                   d.get("function", ""), path, int(d.get("this_abs", "0"), 16), int(d.get("this_vt", "0"), 16))
+                   d.get("function", ""), path, int(d.get("this_abs", "0"), 16), int(d.get("this_vt", "0"), 16),
+                   {k: int(v, 16) if isinstance(v, str) else int(v) for k, v in d.get("this_scan", {}).items()} or None)
 
 
 def _raw_value(a):
@@ -322,6 +343,14 @@ def emit_call(e, spec, base):
     skip = None
     if spec.this_mode == "zero":
         e.raw("31FF")                                           # xor edi,edi
+    elif spec.this_mode == "scan":
+        # Objekt bei JEDEM Spielstart selbst finden: gemeinsame Unterroutine durchsucht GObjects nach der vtable und merkt sich
+        # die Adresse in einer Zelle.  Nicht gefunden (z. B. Hauptmenue) -> Aufruf wird uebersprungen, ProcessEvent laeuft weiter.
+        skip = e.uniq("skip")
+        e.scan_call(spec.scan_key())
+        e.raw("4885FF")                                         # test rdi,rdi
+        e.raw("0F84")                                           # jz skip
+        e.rel32(skip)
     elif spec.this_mode == "abs":
         # feste Adresse des Objekts (nur fuer DIESE Spielsitzung).  Nur aufrufen, wenn dort noch das erwartete Objekt steht
         # (vtable stimmt) - nach einem Neustart des Spiels liegt dort etwas anderes -> Aufruf wird uebersprungen.
@@ -452,6 +481,11 @@ def build_row(alias, impl_rva, params, ret, sdk, this, id_value=None, count_valu
                 fname = bytes(val)
         mode = "ref" if n.lower() in byref_set or n.split(".")[0].lower() in byref_set else "val"
         args.append({"name": n, "kind": k, "size": a["size"], "signed": a["signed"], "value": val, "mode": mode})
+    if this[0] == "scan":                # ("scan", vtable, {gobjects_rva, objs_off, num_off, item_size[, flags_off]})
+        spec = CallSpec(impl_rva, args, "scan", 0, function, None, 0, int(this[1]), dict(this[2]))
+        for a in spec.args:
+            _raw_value(a)
+        return CallRow(alias, spec, fname, int(amount) if isinstance(amount, (int, float)) and amount >= 1 else 1)
     mode, off, path = _this_spec(this)
     if mode == "abs":
         spec = CallSpec(impl_rva, args, mode, 0, function, None, off, path[0])
