@@ -45,7 +45,7 @@ class Base(unittest.TestCase):
         struct.pack_into("<Q", self.img.mem[0x7000000000], 0x100 + 0x300, BAG)                     # PC -> ItemBag
         self._old = CG.find_impl, IT.hook_targets
         CG.find_impl = lambda read, base, thunk: self.img.impl
-        IT.hook_targets = lambda sdk, live, read, base: (self.img.pe, [self.img.slot], [])
+        IT.hook_targets = lambda sdk, live, read, base, wide=False: (self.img.pe, [self.img.slot], [])
         self.addCleanup(self._restore)
         self.names = {1: "Item_A", 2: "Item_B", 3: "Item_C"}
         self.live = FakeLive(self.names)
@@ -124,7 +124,7 @@ class Preflight(Base):
         self.assertIn("liest this nie", rep.text())
 
     def test_hook_slots_missing_blocks(self):
-        IT.hook_targets = lambda sdk, live, read, base: (self.img.pe, [], ["vtable 0x1: Slot 77 zeigt woandershin"])
+        IT.hook_targets = lambda sdk, live, read, base, wide=False: (self.img.pe, [], ["vtable 0x1: Slot 77 zeigt woandershin"])
         rep = self.pre()
         self.assertTrue(rep.blocking)
         self.assertIn("Haken", rep.text())
@@ -168,6 +168,55 @@ class SubsystemObject(Base):
         self.assertEqual([c.name for c in rep.checks if c.status == IC.WARN], ["Objekt (this)"])
 
 
+class WideHooks(Base):
+    """Haken auch an Pawn/HUD ...: nur wenn kein Eintrag `this` vom PlayerController braucht."""
+
+    PAWN = 0x7000000200
+
+    def setUp(self):
+        super().setUp()
+        IT.hook_targets = self._old[1]                                      # die echte Funktion pruefen
+        self.vt1 = self.img.slot - 8 * 77
+        self.vt2 = self.img.slot + 0x400 - 8 * 77
+        self.img.write(self.img.slot + 0x400, struct.pack("<Q", self.img.pe))
+        self.img.write(PC, struct.pack("<Q", self.vt1))
+        self.img.write(self.PAWN, struct.pack("<Q", self.vt2))
+        self.live.instances = lambda cls: {"APlayerController": [{"addr": PC, "name": "PC_0"}],
+                                           "APawn": [{"addr": self.PAWN, "name": "Pawn_0"}]}.get(cls, [])
+
+    def test_wide_adds_the_pawn_vtable(self):
+        _pe, slots, _n = IT.hook_targets(self.sdk, self.live, self.img.read, self.img.BASE)
+        self.assertEqual(slots, [self.img.slot])
+        _pe, slots, _n = IT.hook_targets(self.sdk, self.live, self.img.read, self.img.BASE, wide=True)
+        self.assertEqual(slots, [self.img.slot, self.img.slot + 0x400])
+
+    def test_needs_controller_only_for_hooked_and_member_rows(self):
+        class N:
+            def __init__(self, **k): self.__dict__.update(k)
+        opt = lambda mode: N(rows=[N(spec=N(this_mode=mode))])  # noqa: E731
+        self.assertTrue(IT.needs_controller([opt("hooked")]))
+        self.assertTrue(IT.needs_controller([opt("zero"), opt("member")]))
+        self.assertFalse(IT.needs_controller([opt("zero"), opt("abs")]))
+
+    def test_give_via_cave_hooks_wide_only_for_objects_the_controller_is_not_needed_for(self):
+        seen = []
+        real = IT.hook_targets
+        IT.hook_targets = lambda sdk, live, read, base, wide=False: seen.append(wide) or real(sdk, live, read, base, wide)
+        self.addCleanup(setattr, IT, "hook_targets", self._old[1])
+        IC.give_via_cave(self.its, self.func, self.sdk, self.live, self.img.read, self.img.write, self.img.BASE, self.img.maps,
+                         5, log=lambda _m: None, wait=0.2)
+        self.assertEqual(seen, [False])                                     # GAME_C: this kommt vom PlayerController
+        cs = CG.choose_this
+        CG.choose_this = lambda sdk, owner, hooked="APlayerController", static=False, this_unused=None: ("zero", 0, "x")
+        self.addCleanup(setattr, CG, "choose_this", cs)
+        old_lo = IT.live_object
+        IT.live_object = lambda live, read, owner: (BAG, 0x4141_0000)
+        self.addCleanup(setattr, IT, "live_object", old_lo)
+        IC.give_via_cave(self.its, self.func, self.sdk, self.live, self.img.read, self.img.write, self.img.BASE, self.img.maps,
+                         5, log=lambda _m: None, wait=0.2)
+        self.assertEqual(seen, [False, True])
+
+
 class Probe(Base):
     def game(self):
         """Simuliert den Spiel-Thread: die Cave setzt gesetzte Schalter (Bytes == 1 am Ende der Daten-Region) auf 0."""
@@ -190,6 +239,18 @@ class Probe(Base):
         self.assertEqual([r.label for r in rep.results], ["✔ läuft"] * 3)
         self.assertEqual(struct.unpack("<Q", self.img.read(self.img.slot, 8))[0], self.img.pe)      # Haken weg
         self.assertEqual(self.img.read(self.img.BASE + 0x16000 - 0x100, 0x100), bytes(0x100))        # Schalter 0
+
+    def test_after_the_first_miss_the_rest_is_not_waited_for_one_by_one(self):
+        sets, real = [], self.img.write
+        self.img.write = lambda a, d: (sets.append(a) if d == b"\x01" else None, real(a, d))[1]
+        rep, n = self.go(tick=None)
+        self.assertEqual(len(sets), 1)                                       # nur der erste Schalter wurde gesetzt und abgewartet
+        self.assertEqual([r.ran for r in rep.results], [False] * 3)
+
+    def test_nothing_given_says_what_to_do(self):
+        res = self.give(tick=None)
+        self.assertEqual(res["given"], 0)
+        self.assertIn("Kamera bewegen", res["error"])
 
     def test_cave_that_never_runs_is_reported_and_cleaned_up(self):
         rep, n = self.go(tick=None)

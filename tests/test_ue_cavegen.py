@@ -192,6 +192,26 @@ class NativeCalls(unittest.TestCase):
         self.fire(1)                                                                # naechster Eintrag funktioniert weiter
         self.assertEqual([c[1] for c in self.calls()], [4])
 
+    def test_many_rows_of_one_entry_all_run_in_the_real_item_call_shape(self):
+        """Wie ein Trainer-Eintrag fuer AddItemToWarehouse(FName ItemId, int32 Add, FName WorkId): 14 Zeilen, jede mit anderem Item,
+        feste Objektadresse - JEDE Zeile muss laufen, mit ihrem Item und ihrer Menge."""
+        tgt = self.base + OBJ2_OFF
+        struct.pack_into("<Q", self.mm, OBJ2_OFF, 0xBEEF0001)
+        specs = []
+        for k in range(14):
+            fn = struct.pack("<II", 0x100 + k, 0)
+            specs.append(C.CallSpec(0, [arg("ItemId", "fname", fn, 8), arg("Add", "int", 99, 4, True),
+                                        arg("WorkId", "fname", bytes(8), 8)], "abs", 0, "", None, tgt, 0xBEEF0001))
+        self.install([self.opt("A", *specs)])
+        self.fire(0)
+        got = self.calls()
+        self.assertEqual(len(got), 14)
+        self.assertEqual([c[0] for c in got], [tgt] * 14)                                  # this
+        self.assertEqual([c[1] & 0xFFFFFFFF for c in got], [0x100 + k for k in range(14)])   # jedes Item
+        self.assertEqual({c[2] for c in got}, {99})                                          # Menge
+        self.assertEqual({c[3] for c in got}, {0})                                           # WorkId leer
+        self.assertEqual(self.mm[FLAG_OFF], 0)
+
     def test_mixed_stellar_blade_row_and_call_row(self):
         sb = T.Row("Item_Gold", bytes.fromhex("0a00000000000000"), 77)
         cr = C.CallRow("x", spec([arg("n", "int", 5)]), None, 1)

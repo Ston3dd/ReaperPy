@@ -1,0 +1,5281 @@
+{
+  "format": "reaperpy-item-trainer",
+  "version": 1,
+  "game": "PPSA06929",
+  "title_id": "",
+  "image_base": "0x400000",
+  "impl_rva": "0x14fc440",
+  "process_event_rva": "0x4090090",
+  "slot_rvas": [
+    "0x83e0298",
+    "0x8414238",
+    "0x84154b8",
+    "0x8496af8",
+    "0x84a7310",
+    "0x84cd9d8",
+    "0x8a85ca8"
+  ],
+  "cave_rva": "0x64a5ee0",
+  "cave_size": 8476,
+  "flag_rva": "0x91bfff0",
+  "flag_size": 16,
+  "anchors": {
+    "item_function": {
+      "rva": "0x14fc440",
+      "aob": "55 48 89 E5 41 57 41 56 41 55 41 54 53 48 83 EC 38 49 89 CC 89 D3 49 89"
+    },
+    "process_event": {
+      "rva": "0x4090090",
+      "aob": "55 48 89 E5 41 57 41 56 41 54 53 F6 86 ?? ?? ??"
+    }
+  },
+  "options": [
+    {
+      "name": "MTL 4",
+      "rows": [
+        {
+          "alias": "ITEM_MTL_3052",
+          "fname": "a06a0300ed0b0000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300ed0b0000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_3061",
+          "fname": "a06a0300f60b0000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300f60b0000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_3062",
+          "fname": "a06a0300f70b0000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300f70b0000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_3071",
+          "fname": "a06a0300000c0000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300000c0000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_3072",
+          "fname": "a06a0300010c0000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300010c0000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_4001",
+          "fname": "a06a0300a20f0000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300a20f0000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_4011",
+          "fname": "a06a0300ac0f0000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300ac0f0000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1050",
+          "fname": "a06a03001b040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a03001b040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1060",
+          "fname": "a06a030025040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a030025040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1100",
+          "fname": "a06a03004d040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a03004d040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5001",
+          "fname": "a06a03008a130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a03008a130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5002",
+          "fname": "a06a03008b130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a03008b130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1110",
+          "fname": "a06a030057040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a030057040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5011",
+          "fname": "a06a030094130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a030094130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        }
+      ]
+    },
+    {
+      "name": "MTL 5",
+      "rows": [
+        {
+          "alias": "ITEM_MTL_5012",
+          "fname": "a06a030095130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a030095130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5021",
+          "fname": "a06a03009e130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a03009e130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5022",
+          "fname": "a06a03009f130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a03009f130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1120",
+          "fname": "a06a030061040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a030061040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5031",
+          "fname": "a06a0300a8130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300a8130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5032",
+          "fname": "a06a0300a9130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300a9130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1130",
+          "fname": "a06a03006b040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a03006b040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5041",
+          "fname": "a06a0300b2130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300b2130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5042",
+          "fname": "a06a0300b3130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300b3130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5051",
+          "fname": "a06a0300bc130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300bc130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5052",
+          "fname": "a06a0300bd130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300bd130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1140",
+          "fname": "a06a030075040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a030075040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5061",
+          "fname": "a06a0300c6130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300c6130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5062",
+          "fname": "a06a0300c7130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300c7130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        }
+      ]
+    },
+    {
+      "name": "MTL 6",
+      "rows": [
+        {
+          "alias": "ITEM_MTL_1150",
+          "fname": "a06a03007f040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a03007f040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5072",
+          "fname": "a06a0300d1130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300d1130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1160",
+          "fname": "a06a030089040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a030089040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_5082",
+          "fname": "a06a0300db130000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300db130000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_6000",
+          "fname": "a06a030071170000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a030071170000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_6010",
+          "fname": "a06a03007b170000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a03007b170000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1170",
+          "fname": "a06a030093040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a030093040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1180",
+          "fname": "a06a03009d040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a03009d040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1190",
+          "fname": "a06a0300a7040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300a7040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1200",
+          "fname": "a06a0300b1040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300b1040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1201",
+          "fname": "a06a0300b2040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300b2040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1202",
+          "fname": "a06a0300b3040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300b3040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_1203",
+          "fname": "a06a0300b4040000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300b4040000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2000",
+          "fname": "a06a0300d1070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300d1070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        }
+      ]
+    },
+    {
+      "name": "MTL 7",
+      "rows": [
+        {
+          "alias": "ITEM_MTL_2001",
+          "fname": "a06a0300d2070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300d2070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2002",
+          "fname": "a06a0300d3070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300d3070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2010",
+          "fname": "a06a0300db070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300db070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2011",
+          "fname": "a06a0300dc070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300dc070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2012",
+          "fname": "a06a0300dd070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300dd070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2020",
+          "fname": "a06a0300e5070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300e5070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2021",
+          "fname": "a06a0300e6070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300e6070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2022",
+          "fname": "a06a0300e7070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300e7070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2031",
+          "fname": "a06a0300f0070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300f0070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2032",
+          "fname": "a06a0300f1070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300f1070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2033",
+          "fname": "a06a0300f2070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300f2070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2041",
+          "fname": "a06a0300fa070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300fa070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2042",
+          "fname": "a06a0300fb070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300fb070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2043",
+          "fname": "a06a0300fc070000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a0300fc070000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        }
+      ]
+    },
+    {
+      "name": "MTL 8",
+      "rows": [
+        {
+          "alias": "ITEM_MTL_2051",
+          "fname": "a06a030004080000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a030004080000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2052",
+          "fname": "a06a030005080000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a030005080000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_MTL_2053",
+          "fname": "a06a030006080000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a06a030006080000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        }
+      ]
+    },
+    {
+      "name": "PUT 1",
+      "rows": [
+        {
+          "alias": "ITEM_PUT_0001",
+          "fname": "e080380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "e080380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0011",
+          "fname": "f880380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "f880380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0002",
+          "fname": "ce87380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "ce87380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0003",
+          "fname": "e880380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "e880380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0021",
+          "fname": "0081380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0081380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0022",
+          "fname": "0881380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0881380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0023",
+          "fname": "1081380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "1081380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0004",
+          "fname": "f080380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "f080380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0031",
+          "fname": "1881380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "1881380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0032",
+          "fname": "2081380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "2081380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0005",
+          "fname": "d687380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "d687380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0041",
+          "fname": "2881380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "2881380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0042",
+          "fname": "3081380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "3081380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0051",
+          "fname": "3881380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "3881380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        }
+      ]
+    },
+    {
+      "name": "PUT 2",
+      "rows": [
+        {
+          "alias": "ITEM_PUT_0052",
+          "fname": "4081380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "4081380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0053",
+          "fname": "4881380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "4881380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0061",
+          "fname": "5081380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "5081380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0062",
+          "fname": "5881380000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "5881380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0006",
+          "fname": "e669030000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "e669030000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0007",
+          "fname": "ee69030000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "ee69030000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0008",
+          "fname": "f669030000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "f669030000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_PUT_0009",
+          "fname": "fe69030000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "fe69030000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        }
+      ]
+    },
+    {
+      "name": "RLD",
+      "rows": [
+        {
+          "alias": "ITEM_RLD_0003",
+          "fname": "f8cf040000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "f8cf040000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_RLD_0001",
+          "fname": "f0cf040000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "f0cf040000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_RLD_0005",
+          "fname": "00d0040000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "00d0040000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_RLD_0002",
+          "fname": "08d0040000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "08d0040000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_RLD_0004",
+          "fname": "10d0040000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "10d0040000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_RLD_0006",
+          "fname": "18d0040000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "18d0040000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_RLD_0010",
+          "fname": "9b6b240000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "9b6b240000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_RLD_0020",
+          "fname": "4b6c240000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "4b6c240000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_RLD_0030",
+          "fname": "a36b240000000000",
+          "amount": 99,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "a36b240000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 99,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        }
+      ]
+    },
+    {
+      "name": "TAW",
+      "rows": [
+        {
+          "alias": "ITEM_TAW_0001",
+          "fname": "de87380000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "de87380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_TAW_0011",
+          "fname": "54d0040000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "54d0040000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_TAW_0012",
+          "fname": "e687380000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "e687380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_TAW_0013",
+          "fname": "ee87380000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "ee87380000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_TAW_0002",
+          "fname": "76d6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "76d6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_TAW_0021",
+          "fname": "e38d240000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "e38d240000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_TAW_0022",
+          "fname": "eb8d240000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "eb8d240000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_TAW_0023",
+          "fname": "f38d240000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "f38d240000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_TAW_0003",
+          "fname": "db8d240000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "db8d240000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_TAW_0031",
+          "fname": "7ed6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "7ed6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_TAW_0032",
+          "fname": "b2d1040000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "b2d1040000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_TAW_0033",
+          "fname": "bad1040000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "bad1040000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        }
+      ]
+    },
+    {
+      "name": "WEP 1",
+      "rows": [
+        {
+          "alias": "ITEM_WEP_0030",
+          "fname": "c6d6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "c6d6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0031",
+          "fname": "ced6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "ced6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0032",
+          "fname": "d6d6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "d6d6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0001",
+          "fname": "86d6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "86d6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0002",
+          "fname": "8ed6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "8ed6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0003",
+          "fname": "96d6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "96d6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0061",
+          "fname": "06d7230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "06d7230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0062",
+          "fname": "0ed7230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0ed7230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0020",
+          "fname": "666a030000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "666a030000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0021",
+          "fname": "b6d6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "b6d6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0022",
+          "fname": "bed6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "bed6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0040",
+          "fname": "ded6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "ded6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0041",
+          "fname": "e6d6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "e6d6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0042",
+          "fname": "eed6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "eed6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        }
+      ]
+    },
+    {
+      "name": "WEP 2",
+      "rows": [
+        {
+          "alias": "ITEM_WEP_0051",
+          "fname": "f6d6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "f6d6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0052",
+          "fname": "fed6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "fed6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0071",
+          "fname": "16d7230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "16d7230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0072",
+          "fname": "1ed7230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "1ed7230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0120",
+          "fname": "3ed7230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "3ed7230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0121",
+          "fname": "46d7230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "46d7230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0122",
+          "fname": "4ed7230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "4ed7230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0221",
+          "fname": "56d7230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "56d7230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0222",
+          "fname": "5ed7230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "5ed7230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0300",
+          "fname": "66d7230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "66d7230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_1002",
+          "fname": "fb8d2400eb030000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "fb8d2400eb030000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_1012",
+          "fname": "fb8d2400f5030000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "fb8d2400f5030000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_1022",
+          "fname": "fb8d2400ff030000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "fb8d2400ff030000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0010",
+          "fname": "aed6230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "aed6230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        }
+      ]
+    },
+    {
+      "name": "WEP 3",
+      "rows": [
+        {
+          "alias": "ITEM_WEP_0090",
+          "fname": "2ed7230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "2ed7230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0043",
+          "fname": "5e6a030000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "5e6a030000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        },
+        {
+          "alias": "ITEM_WEP_0073",
+          "fname": "26d7230000000000",
+          "amount": 1,
+          "call": {
+            "function": "UDMXInventorySubsystem.AddItemToWarehouse",
+            "impl_rva": "0x14fc440",
+            "this": "abs",
+            "this_off": "0x0",
+            "args": [
+              {
+                "name": "ItemId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "26d7230000000000",
+                "mode": "val"
+              },
+              {
+                "name": "Add",
+                "kind": "int",
+                "size": 4,
+                "signed": true,
+                "value": 1,
+                "mode": "val"
+              },
+              {
+                "name": "WorkId",
+                "kind": "fname",
+                "size": 8,
+                "signed": false,
+                "value": "0000000000000000",
+                "mode": "val"
+              }
+            ],
+            "this_abs": "0x105f996d00",
+            "this_vt": "0x88a7a60"
+          }
+        }
+      ]
+    }
+  ]
+}

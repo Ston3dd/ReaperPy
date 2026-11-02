@@ -1,0 +1,16 @@
+{
+  "name": "03 CSM 2",
+  "author": "",
+  "ImageBase": "0x400000",
+  "Verify": true,
+  "OneShot": true,
+  "Info": "Schalter-Byte 2 (base+0x91bfff2); Cave setzt es nach dem Geben zurueck. ITEM_CSM_0005 x99, ITEM_CSM_0100 x99, ITEM_CSM_0101 x99 ...",
+  "Variables": [
+    {
+      "label": "OriginSource",
+      "offset": "0x91bfff2",
+      "defaultValue": "00",
+      "newValue": "01"
+    }
+  ]
+}

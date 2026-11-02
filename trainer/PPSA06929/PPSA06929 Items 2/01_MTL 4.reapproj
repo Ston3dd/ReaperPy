@@ -1,0 +1,16 @@
+{
+  "name": "01 MTL 4",
+  "author": "",
+  "ImageBase": "0x400000",
+  "Verify": true,
+  "OneShot": true,
+  "Info": "Schalter-Byte 0 (base+0x91bfff0); Cave setzt es nach dem Geben zurueck. ITEM_MTL_3052 x99, ITEM_MTL_3061 x99, ITEM_MTL_3062 x99 ...",
+  "Variables": [
+    {
+      "label": "OriginSource",
+      "offset": "0x91bfff0",
+      "defaultValue": "00",
+      "newValue": "01"
+    }
+  ]
+}

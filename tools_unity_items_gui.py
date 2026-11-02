@@ -449,7 +449,7 @@ class UnityItemsTab(BaseTab):
             call = U.make_call(give, hook)
             options, skipped = U.make_options(pkgs, call, amount, log=self._ilog)
             groups = U.fit_options(options, cap["code"])
-            dirs = U.project_dirs(self._base_dir(), len(groups))
+            dirs = U.project_dirs(self._base_dir(), len(groups), os.path.basename(self._base_dir()) + " Items")   # Spiel-ID + Items 1 ...
             self._ilog(f"Platz für die Cave: {cap['code']} Byte -> {len(groups)} Projekt(e)")
             made = []
             for d, opts in zip(dirs, groups):                    # nur planen (lesend) - noch nichts schreiben

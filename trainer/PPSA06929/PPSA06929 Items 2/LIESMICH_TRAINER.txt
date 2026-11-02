@@ -1,0 +1,44 @@
+ReaperPy Item-Trainer: PPSA06929 Items 2
+=======================================
+
+BENUTZUNG
+  1. Spiel starten, Spielstand LADEN, in ReaperPy verbinden, diesen Ordner als Projekt waehlen.
+  2. '00 BASIS - Item-Cave' EINMAL aktivieren (schreibt die Cave und biegt den ProcessEvent-Zeiger um).
+  3. Danach ein Eintrag = ein Klick: Er setzt sein Schalter-Byte auf 1, das Spiel legt beim naechsten
+     ProcessEvent die Items ins Inventar und setzt den Schalter selbst zurueck. Im Spiel bleiben (nicht
+     pausieren), Inventar danach neu oeffnen. Zeigt die Karte noch 'AN': einmal aus- und wieder anklicken.
+  4. Zum Beenden BASIS deaktivieren (stellt den Zeiger und die Padding-Bytes zurueck).
+  5. BASIS und der Spiel-Thread-Haken des Tools (ITEMS EINFACH -> GEBEN) schliessen sich aus: fuer GEBEN im
+     Tool vorher BASIS deaktivieren (der Export entfernt den Haken des Tools selbst).
+
+EINTRAEGE
+  01 MTL 4: ITEM_MTL_3052 x99, ITEM_MTL_3061 x99, ITEM_MTL_3062 x99, ITEM_MTL_3071 x99, ITEM_MTL_3072 x99, ITEM_MTL_4001 x99 ... (+8)
+  02 MTL 5: ITEM_MTL_5012 x99, ITEM_MTL_5021 x99, ITEM_MTL_5022 x99, ITEM_MTL_1120 x99, ITEM_MTL_5031 x99, ITEM_MTL_5032 x99 ... (+8)
+  03 MTL 6: ITEM_MTL_1150 x99, ITEM_MTL_5072 x99, ITEM_MTL_1160 x99, ITEM_MTL_5082 x99, ITEM_MTL_6000 x99, ITEM_MTL_6010 x99 ... (+8)
+  04 MTL 7: ITEM_MTL_2001 x99, ITEM_MTL_2002 x99, ITEM_MTL_2010 x99, ITEM_MTL_2011 x99, ITEM_MTL_2012 x99, ITEM_MTL_2020 x99 ... (+8)
+  05 MTL 8: ITEM_MTL_2051 x99, ITEM_MTL_2052 x99, ITEM_MTL_2053 x99
+  06 PUT 1: ITEM_PUT_0001 x99, ITEM_PUT_0011 x99, ITEM_PUT_0002 x99, ITEM_PUT_0003 x99, ITEM_PUT_0021 x99, ITEM_PUT_0022 x99 ... (+8)
+  07 PUT 2: ITEM_PUT_0052 x99, ITEM_PUT_0053 x99, ITEM_PUT_0061 x99, ITEM_PUT_0062 x99, ITEM_PUT_0006 x99, ITEM_PUT_0007 x99 ... (+2)
+  08 RLD: ITEM_RLD_0003 x99, ITEM_RLD_0001 x99, ITEM_RLD_0005 x99, ITEM_RLD_0002 x99, ITEM_RLD_0004 x99, ITEM_RLD_0006 x99 ... (+3)
+  09 TAW: ITEM_TAW_0001 x1, ITEM_TAW_0011 x1, ITEM_TAW_0012 x1, ITEM_TAW_0013 x1, ITEM_TAW_0002 x1, ITEM_TAW_0021 x1 ... (+6)
+  10 WEP 1: ITEM_WEP_0030 x1, ITEM_WEP_0031 x1, ITEM_WEP_0032 x1, ITEM_WEP_0001 x1, ITEM_WEP_0002 x1, ITEM_WEP_0003 x1 ... (+8)
+  11 WEP 2: ITEM_WEP_0051 x1, ITEM_WEP_0052 x1, ITEM_WEP_0071 x1, ITEM_WEP_0072 x1, ITEM_WEP_0120 x1, ITEM_WEP_0121 x1 ... (+8)
+  12 WEP 3: ITEM_WEP_0090 x1, ITEM_WEP_0043 x1, ITEM_WEP_0073 x1
+
+TECHNIK (Offsets = RVA, Basis 0x400000)
+  Cave        base+0x64a5ee0  (8476 Byte, Code-Padding am Region-Ende)
+  Schalter    base+0x91bfff0  (16 Byte, 1 Byte je Eintrag, Reihenfolge wie oben)
+  Haken       vtable-Slot(s): base+0x83e0298, base+0x8414238, base+0x84154b8, base+0x8496af8, base+0x84a7310, base+0x84cd9d8, base+0x8a85ca8
+  Item-Funktion base+0x14fc440   ProcessEvent base+0x4090090
+
+WICHTIG / NICHT GETESTET
+  * Nur fuer diese Spielversion (Patch). Nach einem Spiel-Update neu exportieren.
+  * FName-Werte muessen bei jedem Spielstart gleich sein. Spiel NEU STARTEN und im Tool 'FNAMES PRUEFEN'
+    druecken. Meldet es Abweichungen, tun die betroffenen Eintraege nach dem Neustart das Falsche.
+  * Am echten Spiel/PS5 nicht getestet. Die Cave wurde auf einem x86-64-Prozessor ausgefuehrt (Register,
+    Stack, Schalter, Weiterleitung), aber nicht im Spiel. Vorher speichern.
+  * Schalter-Bereich = Null-Stueck am Ende der letzten beschreibbaren Image-Region (Heuristik).
+  * GoldHEN/etaHEN: Die Dateien sind einfache Hex-Patches; der vorhandene Export 'alle geladenen Patches ->
+    GoldHEN-JSON' wandelt sie um (BASIS + Eintraege als Checkboxen).
+  * Schalter @ base+0x91bfff0 (16 Byte): Null-Stueck am Ende einer beschreibbaren Image-Region (Heuristik, mehrere Sekunden lang unveraendert gelesen)
+  * Die Cave liegt auf den Resten einer frueheren ReaperPy-Cave (Trainer war auf dieser Konsole schon einmal aktiv / ueber GoldHEN geladen). Zuerst die alte BASIS bzw. den GoldHEN-Cheat AUSschalten.

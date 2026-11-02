@@ -1,0 +1,16 @@
+{
+  "name": "04 EXT",
+  "author": "",
+  "ImageBase": "0x400000",
+  "Verify": true,
+  "OneShot": true,
+  "Info": "Schalter-Byte 3 (base+0x91bfff3); Cave setzt es nach dem Geben zurueck. ITEM_EXT_0000 x1, ITEM_EXT_0001 x1, ITEM_EXT_0002 x1 ...",
+  "Variables": [
+    {
+      "label": "OriginSource",
+      "offset": "0x91bfff3",
+      "defaultValue": "00",
+      "newValue": "01"
+    }
+  ]
+}

@@ -29,3 +29,9 @@ dumps/
 # Archive gehoeren nicht ins Repo (Releases laufen ueber GitHub Actions)
 *.zip
 *.rar
+
+# Self-update leftovers
+.update_tmp/
+.update_backup/
+.update_pending.json
+*.update_new

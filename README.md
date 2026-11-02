@@ -91,8 +91,10 @@ A Windows folder build (no Python needed) is created with `build_exe.bat` (PyIns
 profiles and logs stay next to the EXE).
 
 **Ready-made Windows build.** Download `ReaperPy_v<version>_win64.zip` from the GitHub **Releases** page, check it against the
-`.sha256` file next to it, unpack it and start `ReaperPy.exe`. Releases from 5.9.1 on update themselves (see **Auto-update**
-below); 5.9.0 and older have to be replaced by hand once.
+`.sha256` file next to it, unpack it and start `ReaperPy.exe`. Releases from 5.9.1 on can update themselves (see **Auto-update**
+below); 5.9.0 and older have to be replaced by hand once. The updater of 5.9.1 cannot replace files that the running program has
+open - if the update from 5.9.1 ends with `[WinError 32]` and "rolled back" (nothing changed), unpack the 6.0.0 zip over the folder
+once; from 6.0.0 on files in use are applied when ReaperPy has closed.
 
 ## Quick start
 
@@ -131,7 +133,7 @@ the registers when it stops, **STEP** / **STEP OVER** / **STEP OUT**, **CONTINUE
 - **CONNECT** - connects to the payload, with a watchdog that reconnects when the console drops (optional). A notification on the PS5 confirms the connection.
 - **DE / EN** - language switch (also switches all tool tabs).
 - **Notes per game** - free text that is shown again when you open the same game.
-- **Auto-update** - checks GitHub Releases on start; a newer release is offered with its notes, downloaded, unpacked into the program folder and you are asked to restart. Your config, profiles and logs are kept. Off: `"auto_update_check": false`; other repo: `"update_repo": "owner/name"`. A git checkout is never overwritten (use `git pull`).
+- **Auto-update** - checks GitHub Releases on start; a newer release is offered with its notes, downloaded, unpacked into the program folder and you are asked to restart (files that are still in use are put in place by a small helper while ReaperPy restarts). Your config, profiles and logs are kept. Off: `"auto_update_check": false`; other repo: `"update_repo": "owner/name"`. A git checkout is never overwritten (use `git pull`).
 
 ## The Tools window - every tab explained
 
@@ -268,9 +270,10 @@ menu).
 | **TEST 1 ITEM** | Gives ONE item through the chosen function and asks whether it arrived. The answer is remembered for this game: tested functions are ranked up and marked "tested", failed ones are ranked down. |
 | **GIVE NOW** | Gives all ticked items immediately (no trainer, no BASIS). The items arrive like picked-up ones; save in the game to keep them. |
 | **TEST CHECKED ITEMS** | Checks the trainer *before* you save it: image base, give function, native code, object, hook, free cave space, and every item's name against the game. Optionally (asks first) triggers each item once in the running game. Failed items are unticked. |
-| **INVENTORY TO MAX** | Only shown if the game has an inventory-expansion function (found in the SDK, for example `DevExpansionEnableSlotByMaxLevel`). Runs it once; close and reopen the inventory afterwards. |
+| **INVENTORY TO MAX** | Only shown if the game has an inventory-expansion function (found in the SDK, for example `DevExpansionEnableSlotByMaxLevel`). Runs it once; close and reopen the inventory afterwards. GIVE NOW and SAVE TRAINER do **not** unlock slots on their own - click this button yourself if you need more room. |
 
-**Backpack full?** Items land where the give function puts them - usually the backpack, which has a limit. ReaperPy cuts the amount to
+**Only the first item arrives / backpack full?** The game refuses an item that has no free slot, and every different item needs its own
+slot. Run **INVENTORY TO MAX** before you give items if you need more room. Items land where the give function puts them - usually the backpack, which has a limit. ReaperPy cuts the amount to
 that limit; for more room use **INVENTORY TO MAX**, or choose the warehouse function (`...ToWarehouse`) under *Change the choice
 myself*, or give fewer items / categories at a time.
 

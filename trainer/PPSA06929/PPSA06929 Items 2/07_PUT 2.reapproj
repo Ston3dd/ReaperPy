@@ -1,0 +1,16 @@
+{
+  "name": "07 PUT 2",
+  "author": "",
+  "ImageBase": "0x400000",
+  "Verify": true,
+  "OneShot": true,
+  "Info": "Schalter-Byte 6 (base+0x91bfff6); Cave setzt es nach dem Geben zurueck. ITEM_PUT_0052 x99, ITEM_PUT_0053 x99, ITEM_PUT_0061 x99 ...",
+  "Variables": [
+    {
+      "label": "OriginSource",
+      "offset": "0x91bfff6",
+      "defaultValue": "00",
+      "newValue": "01"
+    }
+  ]
+}

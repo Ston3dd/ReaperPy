@@ -1,0 +1,16 @@
+{
+  "name": "08 RLD",
+  "author": "",
+  "ImageBase": "0x400000",
+  "Verify": true,
+  "OneShot": true,
+  "Info": "Schalter-Byte 7 (base+0x91bfff7); Cave setzt es nach dem Geben zurueck. ITEM_RLD_0003 x99, ITEM_RLD_0001 x99, ITEM_RLD_0005 x99 ...",
+  "Variables": [
+    {
+      "label": "OriginSource",
+      "offset": "0x91bfff7",
+      "defaultValue": "00",
+      "newValue": "01"
+    }
+  ]
+}

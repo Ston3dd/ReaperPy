@@ -11,6 +11,9 @@ Safety rules
   * the archive is unpacked into a staging folder FIRST; live files are only touched after that worked
   * replaced files are moved to a backup folder and restored if anything fails (rollback)
   * a running Windows EXE can be renamed but not overwritten - moving it to the backup folder handles that
+  * a file that is still open in the running program (e.g. `_internal/base_library.zip`) cannot even be renamed: it is
+    retried a few times (virus scanner, OneDrive), then the new file is stored next to it as `<name>.update_new` and put
+    in place by a small helper script after ReaperPy has closed (or at the next start) - see apply_pending()
   * user data (config, profiles, logs, library ...) is never overwritten
   * a git checkout is never overwritten (that is a developer copy: use `git pull`)
 """
@@ -22,7 +25,9 @@ import queue
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -45,6 +50,11 @@ MAX_UNPACKED = 1200 << 20           # 1.2 GB unpacked
 MAX_FILES = 20000
 STAGING = ".update_tmp"
 BACKUP = ".update_backup"
+PENDING_SUFFIX = ".update_new"           # new version of a file that was locked while updating
+PENDING_FILE = ".update_pending.json"    # {"files": [relative path, ...], "tries": n}
+LOCK_RETRIES = 5                          # a locked file is tried this many times ...
+LOCK_DELAY = 0.4                          # ... with this many seconds in between
+MAX_APPLY_TRIES = 3                       # then the pending files are given up (old version stays)
 
 # never overwritten if they exist (data files)
 KEEP_FILES = {"reaperpy_config.json", "applied.json", "scan_filter.json"}
@@ -292,8 +302,88 @@ def _plan(root, target):
     return sorted(out)
 
 
+def _locked(e):
+    """True for 'file is in use' / 'access denied' (Windows: WinError 32 / 5)."""
+    return isinstance(e, PermissionError) or getattr(e, "winerror", 0) in (5, 32)
+
+
+def _move_aside(dst, bak):
+    """dst -> bak.  A file that is only briefly locked (virus scanner, OneDrive sync) is retried a few times;
+    raises the last OSError if it stays locked."""
+    for n in range(max(1, LOCK_RETRIES)):
+        try:
+            os.replace(dst, bak)
+            return
+        except OSError as e:
+            if not _locked(e) or n == max(1, LOCK_RETRIES) - 1:
+                raise
+            time.sleep(LOCK_DELAY)
+
+
+def _pending_path(target):
+    return os.path.join(target, PENDING_FILE)
+
+
+def pending(target):
+    """Relative paths whose new version is waiting as `<name>.update_new` (empty list if none)."""
+    try:
+        with open(_pending_path(target), encoding="utf-8") as f:
+            data = json.load(f)
+        names = [str(x) for x in data.get("files", [])]
+    except (OSError, ValueError, AttributeError):
+        return []
+    return [r for r in names if os.path.isfile(os.path.join(target, r + PENDING_SUFFIX)) and _inside(target, os.path.join(target, r))]
+
+
+def _save_pending(target, files, tries=0):
+    p = _pending_path(target)
+    if not files:
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+        return
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump({"files": sorted(files), "tries": int(tries)}, f)
+
+
+def _pending_tries(target):
+    try:
+        with open(_pending_path(target), encoding="utf-8") as f:
+            return int(json.load(f).get("tries", 0))
+    except (OSError, ValueError, AttributeError, TypeError):
+        return 0
+
+
+def apply_pending(target, log=None):
+    """Put every `<name>.update_new` in place of `<name>`.  Works when the file is no longer locked (program closed).
+    -> relative paths that are still waiting."""
+    log = log or (lambda m: None)
+    left = []
+    for rel in pending(target):
+        dst = os.path.join(target, rel)
+        try:
+            os.replace(dst + PENDING_SUFFIX, dst)
+        except OSError as e:
+            left.append(rel)
+            log(f"[update] {rel} is still in use ({e})")
+    _save_pending(target, left, _pending_tries(target))
+    return left
+
+
+def discard_pending(target):
+    """Give up: remove the waiting files (the old version of those files stays)."""
+    for rel in pending(target):
+        try:
+            os.remove(os.path.join(target, rel + PENDING_SUFFIX))
+        except OSError:
+            pass
+    _save_pending(target, [])
+
+
 def install(root, target, log=None):
     """Copy the staged package over `target`.  Returns the list of installed relative paths.
+    Files that stay locked by the running program are stored as `<name>.update_new` (see pending()/apply_pending()).
     Any failure restores every file replaced so far."""
     log = log or (lambda m: None)
     files = _plan(root, target)
@@ -302,6 +392,7 @@ def install(root, target, log=None):
     backup = os.path.join(target, BACKUP)
     shutil.rmtree(backup, ignore_errors=True)
     done = []                                   # (rel, had_old)
+    waiting = []                                # locked files: new version stored as <name>.update_new
     try:
         for rel in files:
             src, dst = os.path.join(root, rel), os.path.join(target, rel)
@@ -310,11 +401,26 @@ def install(root, target, log=None):
             if had:
                 bak = os.path.join(backup, rel)
                 os.makedirs(os.path.dirname(bak), exist_ok=True)
-                os.replace(dst, bak)            # also works for a running EXE on Windows
+                try:
+                    _move_aside(dst, bak)       # also works for a running EXE on Windows
+                except OSError as e:
+                    if not _locked(e):
+                        raise
+                    shutil.copy2(src, dst + PENDING_SUFFIX)      # in use by the running program: apply after it closed
+                    waiting.append(rel)
+                    log(f"[update] {rel} is in use - the new version is applied when ReaperPy has closed")
+                    continue
             done.append((rel, had))
             shutil.copy2(src, dst)
+        if waiting:
+            _save_pending(target, waiting)
     except Exception as e:  # noqa: BLE001 - roll back, then report
         log(f"[update] error ({e}) - restoring previous files")
+        for rel in waiting:
+            try:
+                os.remove(os.path.join(target, rel + PENDING_SUFFIX))
+            except OSError:
+                pass
         for rel, had in reversed(done):
             dst = os.path.join(target, rel)
             try:
@@ -406,9 +512,102 @@ def restart_command(frozen=None, executable=None, argv=None):
     return [exe, script] + argv[1:]
 
 
-def restart(cmd=None, cwd=None):
-    """Start the new process; the caller closes the old one afterwards."""
-    kw = {"cwd": cwd or target_dir(), "close_fds": True}
+# Windows batch that waits until the old program has ended, moves the waiting files in place and starts the program.
+# Paths come from ENVIRONMENT VARIABLES (never pasted into the script text), so &, ^, % or spaces in a folder name are harmless.
+HELPER_SCRIPT = r"""@echo off
+chcp 65001 >nul
+set /a TRIES=0
+:wait
+tasklist /NH /FI "PID eq %RP_PID%" 2>nul | find "%RP_PID%" >nul
+if not errorlevel 1 (
+  set /a TRIES+=1
+  if %TRIES% GTR 120 goto done
+  ping -n 2 127.0.0.1 >nul
+  goto wait
+)
+set /a TRIES=0
+:apply
+set LEFT=0
+for /f "usebackq delims=" %%R in ("%RP_LIST%") do (
+  if exist "%RP_TARGET%\%%R%RP_SUFFIX%" (
+    move /Y "%RP_TARGET%\%%R%RP_SUFFIX%" "%RP_TARGET%\%%R" >nul 2>nul
+    if exist "%RP_TARGET%\%%R%RP_SUFFIX%" set LEFT=1
+  )
+)
+if "%LEFT%"=="1" (
+  set /a TRIES+=1
+  if %TRIES% LSS 10 (
+    ping -n 2 127.0.0.1 >nul
+    goto apply
+  )
+)
+:done
+del "%RP_LIST%" >nul 2>nul
+start "" /D "%RP_TARGET%" "%RP_EXE%"
+(goto) 2>nul & del "%~f0"
+"""
+
+
+def _helper_env(target, exe, files, pid=None):
+    """Write the file list and return (script path, environment) for HELPER_SCRIPT."""
+    fd, lst = tempfile.mkstemp(prefix="reaperpy_update_", suffix=".lst")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write("\n".join(files) + "\n")
+    fd, script = tempfile.mkstemp(prefix="reaperpy_update_", suffix=".cmd")
+    with os.fdopen(fd, "w", encoding="ascii", newline="\r\n") as f:
+        f.write(HELPER_SCRIPT)
+    env = dict(os.environ, RP_PID=str(pid or os.getpid()), RP_LIST=lst, RP_TARGET=target, RP_EXE=exe,
+               RP_SUFFIX=PENDING_SUFFIX)
+    return script, env
+
+
+def start_helper(target, exe=None, files=None, popen=None):
+    """Windows: start the batch that applies the waiting files after THIS process ended and then starts `exe`.
+    The caller must close the program right after this."""
+    files = pending(target) if files is None else files
+    exe = exe or sys.executable
+    script, env = _helper_env(target, exe, files)
+    flags = (getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+    (popen or subprocess.Popen)(["cmd.exe", "/c", script], env=env, cwd=tempfile.gettempdir(), close_fds=True,
+                                creationflags=flags)
+    return script
+
+
+def finish_pending(target, frozen=None, log=None, helper=None, windows=None):
+    """Call at program start.  Applies files left over from an update that were locked.  -> True if a helper was started
+    that restarts the program (the caller must exit at once), else False."""
+    if not pending(target):
+        _save_pending(target, [])
+        return False
+    log = log or (lambda m: None)
+    if not apply_pending(target, log):
+        return False
+    frozen = bool(getattr(sys, "frozen", False)) if frozen is None else frozen
+    windows = (os.name == "nt") if windows is None else windows
+    tries = _pending_tries(target) + 1
+    if tries > MAX_APPLY_TRIES or not frozen or not windows:
+        discard_pending(target)                           # give up: the old files of those entries stay in use
+        log("[update] some files could not be replaced - please unpack the release over the folder by hand")
+        return False
+    _save_pending(target, pending(target), tries)
+    try:
+        (helper or start_helper)(target)
+    except Exception as e:  # noqa: BLE001
+        log(f"[update] helper could not be started ({e})")
+        return False
+    return True
+
+
+def restart(cmd=None, cwd=None, helper=None, windows=None):
+    """Start the new process; the caller closes the old one afterwards.  If files of the update are still waiting
+    (they were in use), a helper applies them after this program ended and starts the program."""
+    target = cwd or target_dir()
+    windows = (os.name == "nt") if windows is None else windows
+    if windows and pending(target):
+        exe = (cmd or restart_command())[0]
+        (helper or start_helper)(target, exe)
+        return
+    kw = {"cwd": target, "close_fds": True}
     if os.name == "nt":
         kw["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     subprocess.Popen(cmd or restart_command(), **kw)

@@ -1,0 +1,16 @@
+{
+  "name": "10 WEP 1",
+  "author": "",
+  "ImageBase": "0x400000",
+  "Verify": true,
+  "OneShot": true,
+  "Info": "Schalter-Byte 9 (base+0x91bfff9); Cave setzt es nach dem Geben zurueck. ITEM_WEP_0030 x1, ITEM_WEP_0031 x1, ITEM_WEP_0032 x1 ...",
+  "Variables": [
+    {
+      "label": "OriginSource",
+      "offset": "0x91bfff9",
+      "defaultValue": "00",
+      "newValue": "01"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "08 FOD 2",
+  "author": "",
+  "ImageBase": "0x400000",
+  "Verify": true,
+  "OneShot": true,
+  "Info": "Schalter-Byte 7 (base+0x91bfff7); Cave setzt es nach dem Geben zurueck. ITEM_FOD_0007 x99, ITEM_FOD_0009 x99, ITEM_FOD_0011 x99 ...",
+  "Variables": [
+    {
+      "label": "OriginSource",
+      "offset": "0x91bfff7",
+      "defaultValue": "00",
+      "newValue": "01"
+    }
+  ]
+}

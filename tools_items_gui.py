@@ -60,6 +60,7 @@ class ItemsTab(BaseTab):
         self.v_all = tk.BooleanVar(value=False)           # auch unpassende Tabellen/Funktionen zeigen
         self.v_level = tk.StringVar(value=IT.DEFAULT_LEVEL)   # Filter: streng | normal | aus
         self.v_merge = tk.BooleanVar(value=True)          # ALLE Item-Listen zusammen lesen (nicht nur die erste)
+        self.v_fresh = tk.BooleanVar(value=False)         # Haken an: NUR die angehakten Items, schon gespeicherte nicht uebernehmen
         self.v_cleanup = tk.BooleanVar(value=True)        # nicht bestandene Items nach dem Test automatisch abhaken
         self.tables_used = []                             # Namen der gelesenen Item-Listen
         self.report = None                                # item_check.Report des letzten Tests
@@ -176,6 +177,8 @@ class ItemsTab(BaseTab):
         e = entry(row, self.v_amount, 8)
         e.pack(side="left", padx=(6, 12))
         e.bind("<KeyRelease>", lambda _e: self.update_summary())
+        self.chk_fresh = _check(row, "Neu beginnen (nichts Gespeichertes übernehmen)", self.v_fresh)
+        self.chk_fresh.pack(side="left", padx=(0, 12))
         self.lbl_plan = tk.Label(row, text="", bg=BG_CARD, fg=TEXT, font=FONT_LABEL, anchor="w")
         self.lbl_plan.pack(side="left", fill="x", expand=True)
         self.b_save = pbtn(row, "💾  TRAINER SPEICHERN", self.save, primary=True)
@@ -1003,6 +1006,7 @@ class ItemsTab(BaseTab):
             self.lbl_done.configure(text="Abgebrochen - es wurde nichts geschrieben.", fg=WARN)
             return
         pkgs, _preview = self._projects()
+        keep = not self.v_fresh.get()                       # Standard: alles landet im selben Ordner (selbe Cave, selbe Haken)
         func, sdk, base, game = self.func, proj.sdk, self.base, getattr(proj, "title", "") or getattr(proj, "name", "")
         self._busy = True
         self.lbl_done.configure(text="Baue den Trainer … (nur Lesen im Spiel, es wird noch nichts verändert)", fg=WARN)
@@ -1010,30 +1014,67 @@ class ItemsTab(BaseTab):
         def job():
             read = client.read_memory
             options, skipped = IT.make_options(pkgs, func, sdk, live, read, base, amount, log=self._ilog)
-            pe, slots, notes = IT.hook_targets(sdk, live, read, base)
+            # schon gespeicherte Eintraege dieses Spiels uebernehmen - es geht nichts verloren
+            base_dir = self._base_dir()
+            stem_name = os.path.basename(base_dir) + " Items"
+            old_dirs = IT.existing_project_dirs(base_dir, stem_name)
+            old_dirs += [d for d in IT.existing_project_dirs(base_dir, "Items") if d not in old_dirs]   # aeltere Ordner ohne ID
+            old_opts, no_merge = [], []
+            for d in (old_dirs if keep else []):
+                spec = TR._load_spec_raw(d) or {}
+                try:
+                    same = int(str(spec.get("image_base", "0x0")), 16) == base
+                except ValueError:
+                    same = False
+                if same:
+                    old_opts += TR.load_options(d)
+                else:
+                    no_merge.append(d)                                        # andere Spielversion: nicht mischen, nur sichern
+            n_old = sum(len(o.rows) for o in old_opts)
+            if old_opts:
+                options = IT.merge_into_existing(old_opts, options)
+                self._ilog(f"{n_old} vorhandene Items aus {len(old_dirs) - len(no_merge)} Ordner(n) werden übernommen")
+            elif not keep and old_dirs:
+                self._ilog("Neu beginnen: es werden nur die angehakten Items gespeichert, der alte Stand wird gesichert")
+            pe, slots, notes = IT.hook_targets(sdk, live, read, base, wide=not IT.needs_controller(options))
             for n in notes:
                 self._ilog("Haken: " + n)
             maps = [(m[0], m[1], m[2]) for m in client.get_maps()]
             cap = TR.capacity(read, maps, base, log=self._ilog)               # echter freier Platz in diesem Spiel
             groups = TR.fit_options(options, cap["code"])                     # Projekte so gross, wie die Cave passt
-            dirs = IT.project_dirs(self._base_dir(), len(groups))
+            dirs = IT.project_dirs(base_dir, len(groups), stem_name)          # Spiel-ID + Items 1 ...
+            if keep:
+                stale = [d for d in old_dirs if d not in dirs or d in no_merge]   # nicht mehr gebraucht / andere Spielversion
+            else:
+                stale = list(old_dirs)                                            # neu beginnen: den alten Stand sichern
             self._ilog(f"Platz fuer die Cave: {cap['code']} Byte -> {len(groups)} Projekt(e)")
             made = []
             for d, opts in zip(dirs, groups):                               # nur planen (lesend) - noch nichts schreiben
                 p = TR.plan(read, maps, base, opts, None, pe, slots, log=self._ilog, client=client)
                 made.append((d, len(opts), sum(len(o.rows) for o in opts), p))
-            return made, skipped, maps
+            return made, skipped, maps, (n_old, stale, base_dir)
 
         def ok(res):
-            made, skipped, maps = res
-            lines = []
+            made, skipped, maps, (n_old, stale, base_dir) = res
+            lines = ([f"Schon gespeicherte Items ({n_old}) werden übernommen - nichts geht verloren."] if n_old else [])
             for m in made:
                 lines += ([f"{m[0]}:"] if len(made) > 1 else []) + ["  " + x for x in TR.preview_lines(TR.preview(m[3], maps))]
             if not self._ask_preview("\n".join(lines)):
                 self._busy = False
                 self.lbl_done.configure(text="Abgebrochen - es wurde nichts geschrieben.", fg=WARN)
                 return
+            backup = ""
             try:
+                if stale:                                                    # alte Ordner sichern statt loeschen
+                    import shutil
+                    import time
+                    backup = os.path.join(base_dir, "_alt")                     # ein einziger Sicherungsordner, kein neuer je Speichern
+                    os.makedirs(backup, exist_ok=True)
+                    for d in stale:
+                        target = os.path.join(backup, os.path.basename(d))
+                        if os.path.isdir(target):
+                            shutil.rmtree(target)                                # nur die vorige Sicherung dieses Ordners
+                        shutil.move(d, target)
                 for d, _n, _r, p in made:
                     TR.write_project(d, p, game=str(game))
             except Exception as e:  # noqa: BLE001
@@ -1045,6 +1086,10 @@ class ItemsTab(BaseTab):
             msg += [f"      {m[0]}" for m in made]
             if skipped:
                 msg.append(f"   ({skipped} Items ohne Zahlen-ID übersprungen)")
+            if n_old:
+                msg.append(f"   ({n_old} schon gespeicherte Items wurden übernommen)")
+            if backup:
+                msg.append(f"   (Alte Ordner gesichert in: {backup})")
             msg.append("So benutzt du ihn: In ReaperPy diesen Ordner als Projekt wählen → '00 BASIS' EINMAL aktivieren → "
                        "dann Einträge anklicken (im Spiel bleiben, Inventar danach neu öffnen).")
             if len(made) > 1:
@@ -1199,7 +1244,7 @@ class ItemsTab(BaseTab):
             n_moved = 0
             if moved:
                 new, n_moved = TR.remap_options(new, moved)
-            pe, slots, _notes = IT.hook_targets(sdk, live, read, base)
+            pe, slots, _notes = IT.hook_targets(sdk, live, read, base, wide=not IT.needs_controller(new))
             maps = [(m[0], m[1], m[2]) for m in client.get_maps()]
             cap = TR.capacity(read, maps, base, log=self._ilog)
             if len(TR.fit_options(new, cap["code"])) != 1:

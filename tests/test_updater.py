@@ -254,6 +254,161 @@ class Environment(unittest.TestCase):
             self.assertEqual(sorted(os.listdir(d)), ["profiles"])
 
 
+class LockedFiles(unittest.TestCase):
+    """Windows: a file the running program has open cannot be renamed (WinError 32) - the update must not fail because of it."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.t = os.path.join(self.tmp.name, "app")
+        self.s = os.path.join(self.tmp.name, "new")
+        for base, files in ((self.t, {"gui.py": "OLD", "lib/base_library.zip": "OLD", "other.py": "OLD"}),
+                            (self.s, {"gui.py": "NEW", "lib/base_library.zip": "NEW", "other.py": "NEW", "added.py": "NEW"})):
+            for n, c in files.items():
+                p = os.path.join(base, *n.split("/"))
+                os.makedirs(os.path.dirname(p), exist_ok=True)
+                with open(p, "w", encoding="utf-8") as f:
+                    f.write(c)
+        self.old = (U.LOCK_RETRIES, U.LOCK_DELAY)
+        U.LOCK_RETRIES, U.LOCK_DELAY = 3, 0
+        self.addCleanup(lambda: setattr(U, "LOCK_RETRIES", self.old[0]) or setattr(U, "LOCK_DELAY", self.old[1]))
+        self.real = os.replace
+        self.addCleanup(lambda: setattr(U.os, "replace", self.real))
+        self.calls = {}
+
+    def rd(self, *p):
+        with open(os.path.join(self.t, *p), encoding="utf-8") as f:
+            return f.read()
+
+    def lock(self, name, times=None):
+        """os.replace fails for files called `name` (times=None: always, else that many times)."""
+        def fake(src, dst, *a, **k):
+            if os.path.basename(dst if src.endswith(U.PENDING_SUFFIX) else src) == name and "update_backup" not in src:
+                n = self.calls[name] = self.calls.get(name, 0) + 1
+                if times is None or n <= times:
+                    e = PermissionError(13, "in use")
+                    e.winerror = 32
+                    raise e
+            return self.real(src, dst, *a, **k)
+        U.os.replace = fake
+
+    def test_locked_file_is_stored_aside_and_everything_else_is_installed(self):
+        self.lock("base_library.zip")
+        logs = []
+        U.install(self.s, self.t, log=logs.append)
+        self.assertEqual(self.rd("gui.py"), "NEW")
+        self.assertEqual(self.rd("added.py"), "NEW")
+        self.assertEqual(self.rd("lib", "base_library.zip"), "OLD")                      # still the old one ...
+        self.assertEqual(self.rd("lib", "base_library.zip" + U.PENDING_SUFFIX), "NEW")   # ... the new one waits next to it
+        self.assertEqual(U.pending(self.t), [os.path.join("lib", "base_library.zip")])
+        self.assertEqual(self.calls["base_library.zip"], 3)                              # retried before giving up
+        self.assertTrue(any("in use" in m for m in logs))
+
+    def test_a_briefly_locked_file_is_just_retried(self):
+        self.lock("gui.py", times=2)
+        U.install(self.s, self.t)
+        self.assertEqual(self.rd("gui.py"), "NEW")
+        self.assertEqual(U.pending(self.t), [])
+        self.assertFalse(os.path.exists(os.path.join(self.t, U.PENDING_FILE)))
+
+    def test_pending_files_are_applied_once_the_lock_is_gone(self):
+        self.lock("base_library.zip")
+        U.install(self.s, self.t)
+        U.os.replace = self.real                                                         # the program has closed
+        self.assertEqual(U.apply_pending(self.t), [])
+        self.assertEqual(self.rd("lib", "base_library.zip"), "NEW")
+        self.assertFalse(os.path.exists(os.path.join(self.t, "lib", "base_library.zip" + U.PENDING_SUFFIX)))
+        self.assertFalse(os.path.exists(os.path.join(self.t, U.PENDING_FILE)))
+
+    def test_rollback_also_removes_the_waiting_files(self):
+        self.lock("base_library.zip")
+        real = U.shutil.copy2
+
+        def flaky(src, dst, *a, **k):
+            if os.path.basename(dst) == "other.py":
+                raise OSError("disk full")
+            return real(src, dst, *a, **k)
+        U.shutil.copy2 = flaky
+        try:
+            with self.assertRaises(U.UpdateError):
+                U.install(self.s, self.t)
+        finally:
+            U.shutil.copy2 = real
+        self.assertEqual(self.rd("gui.py"), "OLD")
+        self.assertFalse(os.path.exists(os.path.join(self.t, "lib", "base_library.zip" + U.PENDING_SUFFIX)))
+        self.assertEqual(U.pending(self.t), [])
+
+    def test_other_errors_still_roll_back(self):
+        def fake(src, dst, *a, **k):
+            raise OSError(5, "disk error")        # not 'in use'
+        U.os.replace = fake
+        with self.assertRaises(U.UpdateError):
+            U.install(self.s, self.t)
+        self.assertEqual(self.rd("gui.py"), "OLD")
+
+    def test_manifest_with_foreign_paths_is_ignored(self):
+        with open(os.path.join(self.t, U.PENDING_FILE), "w", encoding="utf-8") as f:
+            f.write('{"files": ["../evil.py", "gui.py"]}')
+        for n in ("../evil.py" + U.PENDING_SUFFIX, "gui.py" + U.PENDING_SUFFIX):
+            with open(os.path.join(self.t, n), "w", encoding="utf-8") as f:
+                f.write("X")
+        self.assertEqual(U.pending(self.t), ["gui.py"])
+
+    def test_start_applies_what_it_can_without_a_restart(self):
+        self.lock("base_library.zip")
+        U.install(self.s, self.t)
+        U.os.replace = self.real
+        self.assertFalse(U.finish_pending(self.t, frozen=True, windows=True, helper=lambda *a: self.fail("no helper needed")))
+        self.assertEqual(self.rd("lib", "base_library.zip"), "NEW")
+
+    def test_start_hands_over_to_the_helper_when_the_file_stays_locked(self):
+        self.lock("base_library.zip")
+        U.install(self.s, self.t)
+        started = []
+        self.assertTrue(U.finish_pending(self.t, frozen=True, windows=True, helper=lambda target: started.append(target)))
+        self.assertEqual(started, [self.t])
+        self.assertEqual(U._pending_tries(self.t), 1)
+        self.assertEqual(self.rd("lib", "base_library.zip"), "OLD")
+
+    def test_after_three_attempts_the_pending_files_are_given_up(self):
+        self.lock("base_library.zip")
+        U.install(self.s, self.t)
+        for _ in range(U.MAX_APPLY_TRIES):
+            self.assertTrue(U.finish_pending(self.t, frozen=True, windows=True, helper=lambda target: None))
+        self.assertFalse(U.finish_pending(self.t, frozen=True, windows=True, helper=lambda target: self.fail("loop")))
+        self.assertEqual(U.pending(self.t), [])
+        self.assertEqual(self.rd("lib", "base_library.zip"), "OLD")                      # old version stays, nothing broken
+
+    def test_not_a_windows_exe_never_starts_a_helper(self):
+        self.lock("base_library.zip")
+        U.install(self.s, self.t)
+        self.assertFalse(U.finish_pending(self.t, frozen=False, windows=True, helper=lambda target: self.fail("helper")))
+        self.assertFalse(U.finish_pending(self.t, frozen=True, windows=False, helper=lambda target: self.fail("helper")))
+
+    def test_restart_uses_the_helper_while_files_are_waiting(self):
+        self.lock("base_library.zip")
+        U.install(self.s, self.t)
+        got = []
+        U.restart(cmd=["C:/R/ReaperPy.exe"], cwd=self.t, helper=lambda target, exe: got.append((target, exe)), windows=True)
+        self.assertEqual(got, [(self.t, "C:/R/ReaperPy.exe")])
+
+    def test_helper_script_gets_paths_only_through_the_environment(self):
+        weird = os.path.join(self.tmp.name, "My & Games %PATH% ^x")
+        os.makedirs(weird)
+        script, env = U._helper_env(weird, os.path.join(weird, "ReaperPy.exe"), ["_internal/base_library.zip", "a.dll"], pid=4242)
+        self.addCleanup(lambda: [os.remove(env["RP_LIST"]), os.remove(script)])
+        self.assertEqual(env["RP_TARGET"], weird)
+        self.assertEqual(env["RP_PID"], "4242")
+        self.assertEqual(env["RP_SUFFIX"], U.PENDING_SUFFIX)
+        with open(script, "rb") as f:
+            text = f.read().decode("ascii")
+        self.assertNotIn("My & Games", text)                      # nothing from the path is pasted into the script
+        self.assertIn("\r\n", text)
+        self.assertIn("%RP_TARGET%", text)
+        with open(env["RP_LIST"], encoding="utf-8") as f:
+            self.assertEqual(f.read().split(), ["_internal/base_library.zip", "a.dll"])
+
+
 class Job(unittest.TestCase):
     def drain(self, job):
         job.thread.join(5)

@@ -85,6 +85,31 @@ class Packages(unittest.TestCase):
         self.assertEqual([os.path.basename(d) for d in IT.project_dirs("/x", 1)], ["Items"])
         self.assertEqual([os.path.basename(d) for d in IT.project_dirs("/x", 3)], ["Items 1", "Items 2", "Items 3"])
 
+    def test_merge_into_existing_keeps_old_rows_and_replaces_same_items(self):
+        class R:
+            def __init__(self, alias, amount):
+                self.alias, self.amount = alias, amount
+        old = [TR.Option("Waffen 1", [R(f"w{i}", 1) for i in range(14)]), TR.Option("Waffen 2", [R("w14", 1)]),
+               TR.Option("Heilung", [R("h0", 1)])]
+        new = [TR.Option("Waffen", [R("w3", 99), R("neu", 99)])]
+        out = IT.merge_into_existing(old, new)
+        names = [o.name for o in out]
+        self.assertEqual(names, ["Waffen 1", "Waffen 2", "Heilung"])
+        rows = {r.alias: r.amount for o in out for r in o.rows}
+        self.assertEqual(len(rows), 17)                              # 15 alte + 1 neues + 1 Heilung - 0 doppelt
+        self.assertEqual((rows["w3"], rows["neu"], rows["w4"]), (99, 99, 1))
+
+    def test_existing_project_dirs_finds_single_and_numbered(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            for n in ("G Items", "G Items 2", "G Items 10", "Anderes"):
+                os.makedirs(os.path.join(tmp, n))
+                with open(os.path.join(tmp, n, TR.SPEC_FILE), "w") as f:
+                    f.write("{}")
+            os.makedirs(os.path.join(tmp, "G Items 3"))                  # ohne Spec: kein Trainer
+            self.assertEqual([os.path.basename(d) for d in IT.existing_project_dirs(tmp, "G Items")],
+                             ["G Items", "G Items 2", "G Items 10"])
+
     def test_usable_number_ids(self):
         its = [{"id": 5}, {"id": None}]
         self.assertEqual(IT.usable(its, "int"), ([{"id": 5}], [{"id": None}]))

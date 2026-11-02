@@ -665,8 +665,20 @@ def usable(items, id_kind):
     return ok, [i for i in items if i["id"] is None]
 
 
-def hook_targets(sdk, live, read, base):
-    """Nur LESEN: ProcessEvent-Adresse + vtable-Slots der PlayerController -> (pe, slots, notizen)."""
+WIDE_HOOK_CLASSES = ("APawn", "AHUD", "APlayerState", "AGameStateBase", "AGameModeBase")
+WIDE_PER_CLASS = 3                              # so viele Objekte je Klasse (die meisten teilen sich ohnehin einen vtable)
+
+
+def needs_controller(options):
+    """True, wenn eine Zeile `this` vom gehakten Objekt nimmt (hooked/member): dann muss der Haken am PlayerController sitzen."""
+    return any(getattr(getattr(r, "spec", None), "this_mode", "") in ("hooked", "member") for o in options for r in o.rows)
+
+
+def hook_targets(sdk, live, read, base, wide=False):
+    """Nur LESEN: ProcessEvent-Adresse + vtable-Slots der PlayerController -> (pe, slots, notizen).
+    wide: zusaetzlich die vtables von Pawn/HUD/PlayerState/GameState/GameMode.  Nur sinnvoll, wenn kein Eintrag `this` vom
+    PlayerController braucht (needs_controller) - die Cave laeuft dann beim ersten ProcessEvent EINES dieser Objekte,
+    also viel oefter (ein PlayerController ruft ProcessEvent in manchen Spielen kaum auf)."""
     import ue_call
     import ue_hook as HK
     pidx = sdk.offset("process_event_index", "processeventindex", default=77)
@@ -679,6 +691,12 @@ def hook_targets(sdk, live, read, base):
     if not objs:
         raise ValueError("Kein PlayerController gefunden - Spielstand laden (nicht im Hauptmenue)")
     pe = ue_call.process_event_addr(read, objs[0], pidx, fallback=(base + prva) if prva else None)
+    if wide:
+        for cname in WIDE_HOOK_CLASSES:
+            try:
+                objs += [i["addr"] for i in live.instances(cname) if "Default__" not in i["name"]][:WIDE_PER_CLASS]
+            except Exception:  # noqa: BLE001
+                pass
     slots, notes = HK.find_slots(read, objs, pidx, pe)
     return pe, slots, notes
 
@@ -794,6 +812,48 @@ def project_dirs(base_dir, n, name="Items"):
     if n <= 1:
         return [os.path.join(base_dir, name)]
     return [os.path.join(base_dir, f"{name} {k + 1}") for k in range(n)]
+
+
+def existing_project_dirs(base_dir, name="Items"):
+    """Schon gespeicherte Trainer-Ordner dieses Spiels: '<name>' und '<name> 1', '<name> 2' ... (nur mit _trainer_spec.json)."""
+    import os
+    out = []
+    single = os.path.join(base_dir, name)
+    if os.path.isfile(os.path.join(single, TR.SPEC_FILE)):
+        out.append(single)
+    try:
+        entries = os.listdir(base_dir)
+    except OSError:
+        return out
+    pat = re.compile(re.escape(name) + r" (\d+)$")
+    nums = []
+    for e in entries:
+        m = pat.match(e)
+        if m and os.path.isfile(os.path.join(base_dir, e, TR.SPEC_FILE)):
+            nums.append((int(m.group(1)), os.path.join(base_dir, e)))
+    return out + [d for _k, d in sorted(nums)]
+
+
+def merge_into_existing(old_options, new_options):
+    """Neue Eintraege zu den schon gespeicherten dazu, ohne etwas zu verlieren.  Eintraege einer Kategorie ('Waffen',
+    'Waffen 1', 'Waffen 2' ...) werden zusammengelegt: gleiches Item (gleicher Name) -> die neue Zeile ersetzt die alte,
+    alles andere bleibt; danach wieder in 14er-Pakete geteilt.  -> [Option]"""
+    def stem(n):
+        return re.sub(r" \d+$", "", n)
+
+    groups = OrderedDict()
+    for opt in list(old_options) + list(new_options):
+        g = groups.setdefault(stem(opt.name).lower(), {"stem": stem(opt.name), "names": [], "rows": OrderedDict()})
+        if opt.name not in g["names"]:
+            g["names"].append(opt.name)
+        for r in opt.rows:
+            g["rows"][str(getattr(r, "alias", "") or id(r)).lower()] = r
+    out = []
+    for g in groups.values():
+        rows = list(g["rows"].values())
+        name = g["names"][0] if len(g["names"]) == 1 and len(rows) <= TR.PACK_SIZE else g["stem"]
+        out += TR.split_package(name, rows)
+    return out
 
 
 def give_many(live, client, sdk, func, items, base, amount, progress=None, caller=None):

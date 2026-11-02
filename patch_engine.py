@@ -196,14 +196,24 @@ def _is_in_exec_region(backend, addr):
     return False
 
 
-def _verify_write(backend, addr, expected, label="write"):
-    """Liest zurück und vergleicht. Gibt True bei Erfolg."""
+def _is_oneshot(reapatch):
+    """Item-Trainer-Eintrag: ein Schalter-Byte, das die Cave nach dem Geben selbst auf den Ausgangswert zuruecksetzt."""
+    raw = getattr(reapatch, "raw", None) or {}
+    return bool(raw.get("OneShot")) or (bool(raw.get("Verify")) and str(raw.get("Info", "")).startswith("Schalter-Byte"))
+
+
+def _verify_write(backend, addr, expected, label="write", also=()):
+    """Liest zurück und vergleicht. Gibt True bei Erfolg.  `also`: weitere Inhalte, die als Erfolg zaehlen
+    (einmalige Schalter: die Cave hat das Byte schon verbraucht und zurueckgesetzt)."""
     try:
         actual = backend.read(addr, len(expected))
     except Exception as e:
         print(f"[verify] {label} @ {addr:#x} konnte nicht gelesen werden: {e}")
         return False
     if bytes(actual) == bytes(expected):
+        return True
+    if bytes(actual) in [bytes(a) for a in also]:
+        print(f"[verify] {label} @ {addr:#x}: Schalter wurde schon vom Spiel verbraucht - in Ordnung")
         return True
     print(f"[verify] {label} @ {addr:#x} STIMMT NICHT ÜBEREIN!")
     print(f"[verify]   Erwartet: {fmt_bytes(expected)}")
@@ -454,7 +464,8 @@ def _apply_simple(backend, reapatch, hook_addr):
             site = {"addr": addr, "size": size,
                     "original_bytes": original, "new_bytes": new_bytes}
             done.append(site)
-            if not _verify_write(backend, addr, new_bytes, "Patch"):
+            consumed = (original, default_bytes) if _is_oneshot(reapatch) else ()
+            if not _verify_write(backend, addr, new_bytes, "Patch", also=[c for c in consumed if c and len(c) == size]):
                 raise RuntimeError(f"Patch-Write fehlgeschlagen @ {addr:#x}!")
     except Exception:
         # Bereits geschriebene Stellen zurückrollen

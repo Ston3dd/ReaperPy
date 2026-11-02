@@ -190,7 +190,7 @@ class SaveAfterFailedTest(Setup):
         self.t.save()
         self.assertEqual(self.asked[0][1], "Der Test ist gescheitert")
         self.assertIn("nichts geschrieben", self.t.lbl_done._text)
-        self.assertFalse(os.path.isdir(os.path.join(self.tmp, "Spiel", "Items")))
+        self.assertFalse(os.path.isdir(os.path.join(self.tmp, "Spiel", "Spiel Items")))
         self.live.function_entry = lambda owner, name: (0x1234, None)
         self.answers["askyesno"] = True
         self.t._ask_preview = lambda text: True

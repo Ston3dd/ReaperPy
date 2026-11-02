@@ -778,7 +778,7 @@ def base_patch(p, author=""):
 def option_patch(p, i, author=""):
     opt = p.options[i]
     what = ", ".join(f"{r.alias} x{r.amount}" for r in opt.rows[:3]) + (" ..." if len(opt.rows) > 3 else "")
-    return {"name": f"{i + 1:02d} {opt.name}", "author": author, "ImageBase": hex(p.base), "Verify": True,
+    return {"name": f"{i + 1:02d} {opt.name}", "author": author, "ImageBase": hex(p.base), "Verify": True, "OneShot": True,
             "Info": f"Schalter-Byte {i} (base+{p.flag_addr + i - p.base:#x}); Cave setzt es nach dem Geben zurueck. {what}",
             "Variables": [_var("OriginSource", p.rva(p.flag_addr + i), "00", "01")]}
 

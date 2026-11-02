@@ -1892,6 +1892,8 @@ def main():
     try:                                             # Reste eines frueheren Updates (Backup der alten EXE) entfernen
         import updater
         updater.cleanup(updater.target_dir())
+        if updater.finish_pending(updater.target_dir()):      # Dateien eines Updates, die noch gesperrt waren: Helfer startet neu
+            return
     except Exception:
         pass
     root = tk.Tk()

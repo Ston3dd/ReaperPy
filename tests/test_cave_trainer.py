@@ -495,6 +495,34 @@ class ProjectTests(unittest.TestCase):
         PE.deactivate_patch(be, base, state)
         self.assertEqual({a: img.read(a, 16) for a in (self.p.cave, self.img.slot)}, before)
 
+    def test_entry_already_consumed_by_the_game_is_not_an_error(self):
+        """ALLE AN: die Cave setzt das Schalter-Byte schon zurueck, bevor das Tool es zur Kontrolle liest -> kein Rot."""
+        import patch_engine as PE
+        import reapatch
+        T.write_project(self.dir, self.p, "X")
+        img = self.img
+
+        class Backend:
+            def read(self, a, n):
+                return img.read(a, n)
+
+            def write(self, a, d):
+                img.write(a, bytes(d))
+                if a == img.BASE + 0 or a == self.flag:
+                    img.write(a, b"\x00" * len(d))               # das Spiel hat den Schalter sofort verbraucht
+
+            def get_maps(self, force=False):
+                return img.maps
+
+            def assemble(self, *_a, **_k):
+                raise AssertionError("kein Assembler noetig")
+
+        be = Backend()
+        be.flag = self.p.flag_addr
+        gold = reapatch.ReapPatch.load(os.path.join(self.dir, "01_Gold.reapproj"))
+        PE.apply_patch(be, gold, img.BASE + gold.origin_source[0])          # darf nicht werfen
+        self.assertEqual(img.read(self.p.flag_addr, 1), b"\x00")
+
     def test_goldhen_export_of_the_project(self):
         """Der vorhandene GoldHEN-Export versteht die Dateien (BASIS + Eintraege als Checkboxen)."""
         import export_goldhen as E

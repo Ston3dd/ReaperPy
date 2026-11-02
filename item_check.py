@@ -325,14 +325,21 @@ def live_probe(items, results, func, sdk, live, read, write, base, maps, amount,
     options, _skipped = IT.make_options(pkgs, func, sdk, live, read, base, amount, log=log)
     if len(options) != len(idx):
         raise TR.TrainerError("Für einige Items ließ sich keine Test-Zeile bauen (ID fehlt).")
-    pe, slots, _notes = IT.hook_targets(sdk, live, read, base)
+    pe, slots = _hook_slots(options, sdk, live, read, base, log)
     cap = TR.capacity(read, maps, base, log=log)
     groups = TR.fit_options(options, cap["code"], max_options=TR.MAX_OPTIONS)
     done, pos = 0, 0
     for g in groups:
         sub = idx[pos:pos + len(g)]
         pos += len(g)
-        done += _probe_group(g, sub, results, read, write, base, maps, pe, slots, log, wait, tick, progress)
+        ran = _probe_group(g, sub, results, read, write, base, maps, pe, slots, log, wait, tick, progress)
+        done += ran
+        if ran < len(g):                                  # das Spiel ruft ProcessEvent nicht auf: Rest nicht einzeln abwarten
+            for i in idx[pos:]:
+                results[i].ran = False
+                results[i].add(WARN, "Die Cave wurde nicht ausgeführt (Spiel ruft ProcessEvent gerade nicht auf - "
+                                     "im Spiel bewegen/Menü schließen und erneut testen)")
+            break
     return done
 
 
@@ -381,6 +388,8 @@ def _run_options(options, read, write, base, maps, pe, slots, log, wait, tick, p
             out.append(consumed)
             if not consumed:
                 write(p.flag_addr + k, b"\x00")
+                out.extend([False] * (len(options) - k - 1))              # das Spiel ruft ProcessEvent nicht auf: nicht jeden Rest einzeln abwarten
+                break
             time.sleep(0.15)                                              # der Aufruf soll fertig sein, bevor der naechste kommt
     finally:
         for s in hooked:                                                  # IMMER: Haken zurueck auf das echte ProcessEvent
@@ -412,7 +421,7 @@ def give_via_cave(items, func, sdk, live, read, write, base, maps, amount, log=l
     options, _skipped = IT.make_options(pkgs, func, sdk, live, read, base, amount, log=log)
     if len(options) != len(pkgs):
         raise TR.TrainerError("Für einige Items ließ sich keine Zeile bauen (ID fehlt).")
-    pe, slots, _notes = IT.hook_targets(sdk, live, read, base)
+    pe, slots = _hook_slots(options, sdk, live, read, base, log)
     cap = TR.capacity(read, maps, base, log=log)
     groups = TR.fit_options(options, cap["code"], max_options=TR.MAX_OPTIONS)
     res = {"total": len(items), "given": 0, "rejected": [], "skipped": [i["name"] for i in bad], "error": None,
@@ -428,20 +437,39 @@ def give_via_cave(items, func, sdk, live, read, write, base, maps, amount, log=l
                 raise                                               # nichts veraendert -> Aufrufer darf es anders versuchen
             res["error"] = str(e) or e.__class__.__name__
             break
+        missed = False
         for ok_, (_name, its) in zip(consumed, pk):
             if ok_:
                 res["given"] += len(its)
             else:
+                missed = True
                 res["error"] = ("Die Cave wurde für einen Teil der Items nicht ausgeführt (das Spiel ruft ProcessEvent gerade "
                                 "nicht auf) - im Spiel bewegen / Menü schließen und die übrigen noch einmal geben.")
+                if not res["given"]:
+                    res["error"] = ("Die Cave wurde nicht ausgeführt: das Spiel ruft ProcessEvent auf den gehakten Objekten gerade "
+                                    "nicht auf. Im Spiel laufen und die Kamera bewegen (nicht im Menü, nicht bei geöffnetem "
+                                    "Inventar), dann sofort erneut klicken.")
+        if missed:
+            break                                                   # die weiteren Pakete wuerden genauso ins Leere laufen
     return res
+
+
+def _hook_slots(options, sdk, live, read, base, log=lambda _m: None):
+    """ProcessEvent + Haken-Slots fuer diese Eintraege.  Braucht keine Zeile `this` vom PlayerController, dann wird auch an
+    Pawn/HUD/PlayerState/GameState/GameMode gehakt - die Cave laeuft dadurch viel zuverlaessiger an."""
+    wide = not IT.needs_controller(options)
+    pe, slots, notes = IT.hook_targets(sdk, live, read, base, wide=wide)
+    for n in notes:
+        log("Haken: " + n)
+    log(f"Haken: {len(slots)} vtable-Slot(s)" + (" (PlayerController, Pawn, HUD ...)" if wide else " (PlayerController)"))
+    return pe, slots
 
 
 def run_expand(func, sdk, live, read, write, base, maps, log=lambda _m: None, wait=PROBE_WAIT, tick=None):
     """Parameterlose Erweiterungs-Funktion (Inventar/Slots auf Max) EINMAL auf dem Spiel-Thread ausfuehren (kurze Cave, Haken
     wird danach entfernt).  -> True, wenn die Cave gelaufen ist.  Wirft TrainerError/ValueError, wenn das nicht moeglich ist."""
     option = IT.make_expand_option(func, sdk, live, read, base, log)
-    pe, slots, _notes = IT.hook_targets(sdk, live, read, base)
+    pe, slots = _hook_slots([option], sdk, live, read, base, log)
     return bool(_run_options([option], read, write, base, maps, pe, slots, log, wait, tick, None)[0])
 
 

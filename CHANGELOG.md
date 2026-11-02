@@ -8,7 +8,9 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 tables, FNames or functions; items can now be given **right away** (no trainer needed), the amount respects the game's
 inventory limits, and there is a one-click **INVENTORY TO MAX** for games that offer it. Unity (IL2CPP) games get their own
 ITEMS tab. Release notes for GitHub: [`docs/history/RELEASE_NOTES_v6.0.0.md`](docs/history/RELEASE_NOTES_v6.0.0.md).
-Self-update from 5.9.1 works as before (config, profiles, logs, library and `applied.json` are kept).
+**Updating from 5.9.1:** the updater of 5.9.1 cannot replace files that are open in the running program (`WinError 32`,
+e.g. `_internal\base_library.zip`). It then rolls back and says "Your previous version was not changed" - if you see this, unpack
+the 6.0.0 zip over the folder once by hand. From 6.0.0 on the updater copes with such files (see *Fixed*).
 
 ### Highlights
 - **Unreal ITEMS tab shows only what matters.** Every table of the game is rated; only item lists are offered, the best give
@@ -50,6 +52,17 @@ Self-update from 5.9.1 works as before (config, profiles, logs, library and `app
 - **INVENTORY TO MAX** - runs a parameterless inventory-expansion function of the game once (found in the SDK by name, e.g.
   `UDMXInventorySubsystem.DevExpansionEnableSlotByMaxLevel`) through the cave. The button is shown only when the game has such a
   function.
+- **One folder per game, saving adds to it.** SAVE TRAINER now adds the ticked items to what is already saved for the game
+  (same item = replaced, everything else kept, categories rejoined and re-split), so everything stays in one project with one
+  cave and one set of hooks as long as it fits. The checkbox **Neu beginnen** saves only the ticked items; the old state is
+  then backed up in a single `<game>/_alt/` folder (no new folder per save).
+- **Fixed: entries turning red on ALL ON.** A trainer entry sets a one-shot switch byte that the cave resets right away; the
+  read-back check could see the reset byte and report a failed write. A byte already consumed by the game now counts as success.
+- **Saved trainer folders carry the game ID** (`PPSA06929 Items 1`, `PPSA06929 Items 2` ...) so projects of different games
+  no longer share the same folder name and the wrong game's codes are not loaded any more.
+- **No automatic slot unlock when giving items.** GIVE NOW no longer runs the inventory expansion first, SAVE TRAINER no longer
+  adds an **Inventar erweitern** entry, and the checkbox *Expand inventory first* is gone. **INVENTORY TO MAX** stays as a manual
+  button. Note: a game refuses an item that has no free slot, so with a small warehouse only the first item(s) arrive.
 - **Objects the trainer cannot reach through the PlayerController** (e.g. a game-instance subsystem like
   `UDMXInventorySubsystem`) are called through their fixed address (`this` mode `abs`: address plus vtable check, skipped when the
   object is gone). This is valid only until the game is closed: after every game start load a save, FIND ITEMS and SAVE TRAINER
@@ -76,9 +89,14 @@ Self-update from 5.9.1 works as before (config, profiles, logs, library and `app
   slot index). Pick `AddItemToWarehouse` under "Change the choice myself" to fill the warehouse instead.
 - Give functions are rated higher when the trainer can reach their object (hooked +3, member +2.5, fixed address +1) and lower
   when it cannot (-5); a name or class that does not fit (remove, preview, display actor) costs points.
-- Test suite: 912 tests (CI: Linux Python 3.10 / 3.12, Windows Python 3.12; `ruff check .` clean).
+- Test suite: 932 tests (CI: Linux Python 3.10 / 3.12, Windows Python 3.12; `ruff check .` clean).
 
 ### Fixed
+- **"The cave was not executed (the game does not call ProcessEvent right now)" - nothing arrives.** The hook sat only in the
+  PlayerController's vtable, and some games hardly call ProcessEvent on it. When no entry needs the PlayerController as `this`
+  (fixed-address and `this`-less functions), the hook now also goes into the vtables of Pawn, HUD, PlayerState, GameState and
+  GameMode, so the cave runs at the next ProcessEvent of any of them. After the first missed pack the rest is no longer waited for
+  one by one, and the message says what to do (walk around, no menu).
 - **Items were given but landed in a full backpack / the amount was refused.** The amount is now cut to the game's limit (see
   Added) and the warehouse and the expansion function are available as alternatives.
 - **GIVE NOW and TEST 1 ITEM no longer hang after 1-2 items ("Giving aborted: timed out") or freeze the game.** They called the
@@ -111,6 +129,14 @@ Self-update from 5.9.1 works as before (config, profiles, logs, library and `app
   matching items) and lists every change in the log (`[fname]`).
 - The leftover-cave fix also covers the Unity cave: it is recognised by its code signature, the space is reused, the base patch
   gets `VerifyAlso`, a free space of `0 bytes` is explained.
+
+- **Self-update: "installation failed and was rolled back: [WinError 32] ... base_library.zip".** A file that the running
+  program has open cannot be renamed on Windows (and OneDrive or a virus scanner can hold files for a moment). The updater now
+  retries such a file a few times, then stores the new version next to it (`<name>.update_new`) and finishes the job when ReaperPy
+  has closed: **Restart now** starts a small helper that waits until the program has ended, moves the waiting files into place and starts
+  ReaperPy again; if you close the program yourself, the next start does the same (at most 3 attempts, then the waiting files are
+  dropped and the old ones stay). Folder names with `&`, `%` or spaces are safe (paths go through environment variables, never
+  into the script). Everything else is still installed with backup and rollback. Tests: `tests/test_updater.py` (`LockedFiles`).
 
 ### Known limits
 - **Unity ITEMS is not tested on a real game or console yet.** It needs an item-ID parameter that is a number or enum; methods that

@@ -41,7 +41,7 @@ class T(unittest.TestCase):
         self.t._base_dir = lambda: os.path.join(self.tmp, "Spiel")
         self.patch(Q, "connect_live", lambda client, proj, log=print, cached=None: self.live)
         self.patch(CG, "find_impl", lambda read, base, thunk: self.img.impl)
-        self.patch(IT, "hook_targets", lambda sdk, live, read, base: (self.img.pe, [self.img.slot], []))
+        self.patch(IT, "hook_targets", lambda sdk, live, read, base, wide=False: (self.img.pe, [self.img.slot], []))
         self.live.function_entry = lambda owner, name: (0x1234, None)
         self.live.build_index = lambda: None
         import item_check as IC
@@ -215,11 +215,61 @@ class T(unittest.TestCase):
         self.t.save()
         self.assertEqual([m for k, m in self.w.logs if k == "err"], [])
         self.assertIn("Fertig", self.t.lbl_done._text)
-        d = os.path.join(self.tmp, "Spiel", "Items")
+        d = os.path.join(self.tmp, "Spiel", "Spiel Items")
         self.assertTrue(os.path.isdir(d))
         opts = TR.load_options(d)
         self.assertEqual(sum(len(o.rows) for o in opts), 3)
         self.assertEqual(opts[0].rows[0].amount, 99)      # auf die Obergrenze der Tabelle (z. B. MaxStack 99) gekuerzt
+
+    def test_start_fresh_saves_only_ticked_items_and_keeps_one_backup(self):
+        self.t.find_items()
+        self.t.v_amount.set("500")
+        self.t.save()
+        d = os.path.join(self.tmp, "Spiel", "Spiel Items")
+        self.assertEqual(sum(len(o.rows) for o in TR.load_options(d)), 3)
+        self.t.set_visible(False)                                   # jetzt nur EIN Item anhaken und erneut speichern
+        self.t.tv.sel = ("0",)
+        self.t.set_selected(True)
+        self.assertFalse(self.t.v_fresh.get())                                     # Standard: hinzufuegen
+        self.t.v_fresh.set(True)
+        self.t.save()
+        self.assertEqual([m for k, m in self.w.logs if k == "err"], [])
+        self.assertEqual(sum(len(o.rows) for o in TR.load_options(d)), 1)          # nur das Angehakte
+        alt = os.path.join(self.tmp, "Spiel", "_alt")
+        self.assertEqual(os.listdir(alt), ["Spiel Items"])                         # der alte Stand ist gesichert
+        self.t.save()                                                              # nochmal: keine weitere Sicherung je Speichern
+        self.assertEqual(os.listdir(alt), ["Spiel Items"])
+
+    def test_default_save_adds_to_the_same_folder_without_alt_folders(self):
+        self.t.find_items()
+        self.t.v_amount.set("500")
+        for k in range(3):                                          # drei Einzel-Speicherungen nacheinander
+            self.t.set_visible(False)
+            self.t.tv.sel = (str(k),)
+            self.t.set_selected(True)
+            self.t.save()
+        d = os.path.join(self.tmp, "Spiel", "Spiel Items")
+        self.assertEqual(sum(len(o.rows) for o in TR.load_options(d)), 3)          # alles in EINEM Ordner
+        self.assertEqual(sorted(os.listdir(os.path.join(self.tmp, "Spiel"))), ["Spiel Items"])   # kein _alt, kein Items 1/2
+
+    def test_saving_single_items_keeps_the_codes_already_saved(self):
+        self.t.find_items()
+        self.t.v_amount.set("500")
+        self.t.save()
+        d = os.path.join(self.tmp, "Spiel", "Spiel Items")
+        self.assertEqual(sum(len(o.rows) for o in TR.load_options(d)), 3)
+        self.t.set_visible(False)                                   # jetzt nur EIN Item anhaken und erneut speichern
+        self.t.tv.sel = ("0",)
+        self.t.set_selected(True)
+        self.assertEqual(len(self.t._chosen()), 1)
+        self.t.v_amount.set("5")
+        self.t.save()
+        self.assertEqual([m for k, m in self.w.logs if k == "err"], [])
+        opts = TR.load_options(d)
+        rows = [r for o in opts for r in o.rows]
+        self.assertEqual(len(rows), 3)                              # nichts verloren
+        self.assertIn(5, [r.amount for r in rows])                  # das neu gespeicherte Item hat die neue Menge
+        self.assertIn("übernommen", self.t.lbl_done._text)
 
     def test_save_validation_messages(self):
         self.t.find_items()
@@ -237,8 +287,8 @@ class T(unittest.TestCase):
         self.t.set_items(rows, [])
         self.t.save()
         self.assertIn("mehrere Projekte", self.t.lbl_done._text)
-        self.assertTrue(os.path.isdir(os.path.join(self.tmp, "Spiel", "Items 1")))
-        self.assertTrue(os.path.isdir(os.path.join(self.tmp, "Spiel", "Items 2")))
+        self.assertTrue(os.path.isdir(os.path.join(self.tmp, "Spiel", "Spiel Items 1")))
+        self.assertTrue(os.path.isdir(os.path.join(self.tmp, "Spiel", "Spiel Items 2")))
 
 
 class ViaCave(unittest.TestCase):
@@ -299,7 +349,7 @@ class BaseCheck(T):
         self.assertIn("0x410000", self.t.lbl_found._text)
         self.t.save()
         self.assertIn("BASIS ÜBERNEHMEN", self.t.lbl_done._text)
-        self.assertFalse(os.path.isdir(os.path.join(self.tmp, "Spiel", "Items")))
+        self.assertFalse(os.path.isdir(os.path.join(self.tmp, "Spiel", "Spiel Items")))
         self.t.adopt_base()
         self.assertEqual(applied, ["0x410000", "apply"])
         self.assertEqual(self.t.basecheck.status, "ok")
@@ -314,11 +364,11 @@ class BaseCheck(T):
         self.assertIn("Region 0x400000-0x410000 (r-x)", seen[0])
         self.assertIn("Cave:", seen[0])
         self.assertIn("nichts geschrieben", self.t.lbl_done._text)
-        self.assertFalse(os.path.isdir(os.path.join(self.tmp, "Spiel", "Items")))
+        self.assertFalse(os.path.isdir(os.path.join(self.tmp, "Spiel", "Spiel Items")))
         self.assertFalse(self.t._busy)
         self.t._ask_preview = lambda text: True
         self.t.save()
-        self.assertTrue(os.path.isfile(os.path.join(self.tmp, "Spiel", "Items", "_trainer_spec.json")))
+        self.assertTrue(os.path.isfile(os.path.join(self.tmp, "Spiel", "Spiel Items", "_trainer_spec.json")))
         self.assertIn("Fertig", self.t.lbl_done._text)
 
 
@@ -328,7 +378,7 @@ class Portability(T):
     def build(self):
         self.t.find_items()
         self.t.save()
-        return os.path.join(self.tmp, "Spiel", "Items")
+        return os.path.join(self.tmp, "Spiel", "Spiel Items")
 
     def test_check_passes_for_own_trainer(self):
         d = self.build()
@@ -451,6 +501,32 @@ class ExpandButton(unittest.TestCase):
         self.t.expand_inventory()
         self.assertEqual(self.ran, ["UInv.DevExpansionEnableSlotByMaxLevel"])
         self.assertIn("✔", self.t.lbl_found._text)
+
+    def fake_expand(self):
+        fake = IT.P._sug("expand_function", "UInv.DevExpansionEnableSlotByMaxLevel", 9, "()", [],
+                         {"owner": "UInv", "name": "DevExpansionEnableSlotByMaxLevel", "params": [], "ret": "void",
+                          "flags": 0, "native": 1})
+        self.patch(IT, "find_expand", lambda sdk: [fake])
+
+    def test_give_now_never_unlocks_slots(self):
+        self.fake_expand()
+        gave = []
+        self.patch(self.IC, "give_via_cave", lambda items, *a, **k: gave.append(len(items)) or
+                   {"total": len(items), "given": len(items), "rejected": [], "skipped": [], "error": None, "reach": "unused"})
+        self.t.find_items()
+        self.t.give_live()
+        self.assertEqual((self.ran, len(gave)), ([], 1))                        # Items gegeben, Slots nicht angefasst
+
+    def test_saved_trainer_has_no_expand_entry(self):
+        self.fake_expand()
+        self.t.find_items()
+        self.t.v_amount.set("5")
+        self.t.save()
+        self.assertEqual([m for k, m in self.w.logs if k == "err"], [])
+        d = os.path.join(self.tmp, "Spiel", "Spiel Items")
+        opts = TR.load_options(d)
+        self.assertNotIn("Inventar erweitern", [o.name for o in opts])
+        self.assertNotIn("ZUERST", self.t.lbl_done._text)
 
     def test_declined_confirmation_does_nothing(self):
         fake = IT.P._sug("expand_function", "UInv.ExpandAll", 9, "()", [], {"owner": "UInv", "name": "ExpandAll", "params": [],

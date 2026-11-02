@@ -1,0 +1,16 @@
+{
+  "name": "05 FCL 1",
+  "author": "",
+  "ImageBase": "0x400000",
+  "Verify": true,
+  "OneShot": true,
+  "Info": "Schalter-Byte 4 (base+0x91bfff4); Cave setzt es nach dem Geben zurueck. ITEM_FCL_0001 x1, ITEM_FCL_0002 x1, ITEM_FCL_0003 x1 ...",
+  "Variables": [
+    {
+      "label": "OriginSource",
+      "offset": "0x91bfff4",
+      "defaultValue": "00",
+      "newValue": "01"
+    }
+  ]
+}
