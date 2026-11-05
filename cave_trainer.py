@@ -182,10 +182,6 @@ class _Emit:
         self.fix8.append((len(self.buf), target))
         self.buf += b"\0"
 
-    def rel8(self, target):
-        self.fix8.append((len(self.buf), target))
-        self.buf += b"\0"
-
     def label(self, name):
         self.labels[name] = len(self.buf)
 
