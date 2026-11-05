@@ -52,6 +52,8 @@ LIMIT = 0x7F000000              # rel32-Reichweite (mit Sicherheitsabstand)
 FILL_BYTES = (0x00, 0xCC)       # Padding, das als Cave-Platz taugt
 TAIL_SCAN = 0x8000              # so viel vom Ende jeder Exec-Region wird zuerst geprueft
 MIN_RUN = 0x20
+MAX_ENTRY = 512                 # Byte je memory-Eintrag; etaHEN blendet Schalter mit groesseren Eintraegen (getestet: ab 2048 Byte) still aus
+MAX_ENTRIES = 100               # memory-Eintraege je Schalter (getestet: 128 gehen); mehr werden auf mehrere Schalter verteilt
 
 
 class ExportError(Exception):
@@ -101,6 +103,11 @@ class CaveAllocator:
         self._warned_writable = False
         self.used_writable = False      # Cave in beschreibbarer (rwx) Region (Fallback)
         self.last_region = None         # (start, end, prot) der zuletzt vergebenen Cave
+        self.reserved = []              # [(start, ende)]: schon belegt (z. B. Cave der Item-Trainer-BASIS, ein einfacher Patch)
+
+    def reserve(self, addr, size):
+        """Diesen Bereich nie als freien Platz vergeben (wird in _find auf die Luecken angewendet)."""
+        self.reserved.append((addr, addr + size))
 
     # -- Scannen ---------------------------------------------------------
     def _regions(self, scope="image"):
@@ -184,6 +191,9 @@ class CaveAllocator:
                     for r in pool:
                         if bool(r.prot & 2) != writable:
                             continue
+                        for a, b in self.reserved:                 # belegten Bereich samt allem dahinter abschneiden
+                            if r.start < b and a < r.end:
+                                r.end = max(r.start, a & ~0xF)
                         cave = (r.end - need) & ~0xF
                         if cave < r.start:
                             continue
@@ -350,10 +360,65 @@ def _build_cave(backend, alloc, rp, hook, target_base, warnings):
     ], {"cave": cave_addr, "cave_size": len(code), "hook": hook, "region": alloc.last_region}
 
 
+def split_entries(memory, limit=MAX_ENTRY):
+    """Teilt zu grosse memory-Eintraege in Stuecke von hoechstens `limit` Byte (gleiche Reihenfolge, gleiche Bytes)."""
+    out = []
+    for e in memory:
+        on, off = e.get("on", ""), e.get("off", "")
+        n = len(on) // 2
+        if n <= limit or len(on) != len(off):
+            out.append(e)
+            continue
+        base = int(e["offset"], 16)
+        for o in range(0, n, limit):
+            part = dict(e)
+            part["offset"] = "%X" % (base + o)
+            part["on"], part["off"] = on[o * 2:(o + limit) * 2], off[o * 2:(o + limit) * 2]
+            out.append(part)
+    return out
+
+
+def split_mods(mods, report=None):
+    """Wendet split_entries auf alle Schalter an; sehr viele Eintraege werden auf mehrere Schalter ('Teil i/n') verteilt."""
+    res = []
+    for m in mods:
+        mem = split_entries(m["memory"])
+        if len(mem) != len(m["memory"]) and report is not None:
+            report.append(f"'{m['name']}': grosse Eintraege in Stuecke zu je {MAX_ENTRY} Byte geteilt "
+                          f"({len(m['memory'])} -> {len(mem)} Eintraege), sonst blendet etaHEN den Schalter aus")
+        if len(mem) <= MAX_ENTRIES:
+            res.append({**m, "memory": mem})
+            continue
+        parts = [mem[i:i + MAX_ENTRIES] for i in range(0, len(mem), MAX_ENTRIES)]
+        for k, chunk in enumerate(parts, 1):
+            res.append({**m, "name": f"{m['name']} (Teil {k}/{len(parts)})", "memory": chunk})
+        if report is not None:
+            report.append(f"'{m['name']}': auf {len(parts)} Schalter verteilt - der Reihe nach einschalten")
+    return res
+
+
+def _is_item_base(rp, memory):
+    """Item-Trainer-BASIS von ReaperPy: eine Cave (OriginSource) + vtable-Haken ('Haken n (vtable)')."""
+    vs = (getattr(rp, "raw", None) or {}).get("Variables") or []
+    labels = [str(v.get("label", "")) for v in vs if isinstance(v, dict)]
+    return (len(labels) >= 2 and labels[0] == "OriginSource" and all(x.startswith("Haken") for x in labels[1:])
+            and len(memory) == len(labels))
+
+
 def build_mods(backend, patches, image_base, target_base=TARGET_BASE, log=print):
     """-> (mods, report).  report: [{name, status: ok|skip|error, kind, msg, warnings}]"""
     alloc = CaveAllocator(backend, log, image_base=image_base)
     mods, report, hooks = [], [], {}
+    for rp in patches:                                  # Cave der Item-Trainer-BASIS zuerst als belegt melden
+        try:
+            vs = (getattr(rp, "raw", None) or {}).get("Variables") or []
+            if rp.origin_source and vs and str(vs[0].get("label")) == "OriginSource" and len(vs) > 1 \
+                    and all(str(v.get("label", "")).startswith("Haken") for v in vs[1:]):
+                h = AOB.resolve_hook(backend, rp, image_base, log=log)
+                first = PE._plan_sites(backend, rp, h)[0]
+                alloc.reserve(first["addr"], len(PE.asm_to_bytes(backend, first["new_asm"], first["addr"])))
+        except Exception:                               # noqa: BLE001 - nur Vorsorge, der eigentliche Export meldet Fehler
+            pass
     for rp in patches:
         name = _mod_name(rp)
         rep = {"name": name, "file": os.path.basename(rp.path), "status": "ok",
@@ -380,6 +445,17 @@ def build_mods(backend, patches, image_base, target_base=TARGET_BASE, log=print)
         if hook in hooks:
             rep["warnings"].append(f"gleiche Hook-Adresse wie '{hooks[hook]}' - nicht gleichzeitig aktivieren")
         hooks.setdefault(hook, name)
+        if rep["kind"] == "Patch" and _is_item_base(rp, memory):
+            # GoldHEN/etaHEN setzt alle Eintraege eines Schalters ohne Pause und beim Ausschalten in DERSELBEN Reihenfolge:
+            # Zeigt ein Haken schon auf die Cave, bevor sie geschrieben ist (oder wird die Cave vor den Haken auf Null
+            # zurueckgesetzt), laeuft das Spiel in leeren Speicher und stuerzt ab.  Darum zwei Schalter: erst die Cave
+            # (Haken immer zuerst ausschalten), dann die Haken.
+            cave = dict(memory[0])                      # "Aus" bleibt der Originalzustand: etaHEN blendet Schalter mit on == off aus
+            mods.append({"name": "00a BASIS 1 - Cave (ZUERST)", "type": "checkbox", "memory": [cave]})
+            mods.append({"name": "00b BASIS 2 - Haken (DANACH)", "type": "checkbox", "memory": memory[1:]})
+            rep["warnings"].append("BASIS ist im Export in ZWEI Schalter geteilt: erst '00a BASIS 1' einschalten, dann '00b BASIS 2'. "
+                                   "Ausschalten: erst '00b', dann '00a'.")
+            continue
         mods.append({"name": name, "type": "checkbox", "memory": memory})
     if alloc.used_inner:
         for r in report:
@@ -394,6 +470,14 @@ def build_mods(backend, patches, image_base, target_base=TARGET_BASE, log=print)
             if r["kind"] == "Cave" and r["status"] == "ok":
                 r["warnings"].append("Cave liegt AUSSERHALB des zusammenhaengenden Spiel-Images (Fallback) - vor dem "
                                      "Einsatz pruefen")
+    notes = []
+    mods = split_mods(mods, notes)
+    if notes:
+        log("[goldhen] " + " | ".join(notes))
+        for r in report:
+            if r.get("status") == "ok":
+                r.setdefault("warnings", []).extend(notes)
+                break
     return mods, report
 
 
@@ -427,6 +511,9 @@ def validate(doc):
             on, off = e.get("on", ""), e.get("off", "")
             if len(on) != len(off):
                 issues.append(f"'{m['name']}' @ {e.get('offset')}: on/off verschieden lang")
+            if len(on) // 2 > 1024:
+                issues.append(f"'{m['name']}' @ {e.get('offset')}: Eintrag mit {len(on) // 2} Byte - etaHEN blendet den Schalter "
+                              f"ab 2048 Byte aus (maximal {MAX_ENTRY} empfohlen)")
             if len(on) % 2 or not re.fullmatch(r"[0-9A-F]*", on + off):
                 issues.append(f"'{m['name']}' @ {e.get('offset')}: on/off kein gueltiges Hex")
     return issues

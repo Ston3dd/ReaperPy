@@ -1028,7 +1028,10 @@ class ItemsTab(BaseTab):
                 except ValueError:
                     same = False
                 if same:
-                    old_opts += TR.load_options(d)
+                    got, notes = TR.sync_options(d)                           # Namen/Dateien wie im Ordner, nicht wie in der JSON
+                    old_opts += got
+                    for n in notes:
+                        self._ilog(f"{os.path.basename(d)}: {n}")
                 else:
                     no_merge.append(d)                                        # andere Spielversion: nicht mischen, nur sichern
             n_old = sum(len(o.rows) for o in old_opts)
@@ -1241,7 +1244,10 @@ class ItemsTab(BaseTab):
 
         def job():
             read = client.read_memory
-            new, changed, missing = TR.refresh_fnames(TR.load_options(d), names) if names else (TR.load_options(d), [], [])
+            cur, notes = TR.sync_options(d)                                  # die Dateien im Ordner gelten, nicht die alte JSON
+            for n in notes:
+                self._ilog(n)
+            new, changed, missing = TR.refresh_fnames(cur, names) if names else (cur, [], [])
             n_moved = 0
             if moved:
                 new, n_moved = TR.remap_options(new, moved)

@@ -546,10 +546,14 @@ class ProjectTests(unittest.TestCase):
                 if f.endswith(".reapproj")]
         mods, report = E.build_mods(Backend(), pats, img.BASE, log=lambda _m: None)
         self.assertEqual([r["status"] for r in report], ["ok"] * 4, report)
-        self.assertEqual(len(mods), 4)
-        base_mod = next(m for m in mods if m["name"].startswith("00"))
-        self.assertEqual(len(base_mod["memory"]), 2)
-        self.assertEqual(base_mod["memory"][1]["on"], struct.pack("<Q", self.p.cave).hex().upper())
+        self.assertEqual(len(mods), 5)                      # BASIS ist in "1/2 Cave" und "2/2 Haken" geteilt
+        cave_mod = next(m for m in mods if m["name"].startswith("00a"))
+        hook_mod = next(m for m in mods if m["name"].startswith("00b"))
+        self.assertGreaterEqual(len(cave_mod["memory"]), 1)
+        self.assertTrue(all(len(e["on"]) // 2 <= E.MAX_ENTRY for e in cave_mod["memory"]))
+        self.assertTrue(all(e["off"] != e["on"] for e in cave_mod["memory"]))   # etaHEN blendet Schalter mit on == off aus
+        self.assertEqual(len(hook_mod["memory"]), 1)
+        self.assertEqual(hook_mod["memory"][0]["on"], struct.pack("<Q", self.p.cave).hex().upper())
         gold = next(m for m in mods if "Gold" in m["name"])
         self.assertEqual(gold["memory"], [{"offset": f"{self.p.flag_addr - img.BASE:X}", "on": "01", "off": "00"}])
 

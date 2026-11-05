@@ -26,7 +26,9 @@ INT_REGS = [  # (mov r32,imm32 | movabs r64,imm64 | lea r64,[rip+disp32])
     ("41B8", "49B8", "4C8D05"),   # r8
     ("41B9", "49B9", "4C8D0D"),   # r9
 ]
+XOR_REGS = {"BE": "31F6", "BA": "31D2", "B9": "31C9", "41B8": "4531C0", "41B9": "4531C9"}   # xor r32,r32 je mov32-Opcode
 MAX_FLOAT_REGS = 8
+ARG_MAX = 15                         # laengster Befehl je Parameter (movq-Paar fuer double) - Grenze fuer kurze Spruenge
 SIZES = {"bool": 1, "int8": 1, "uint8": 1, "int16": 2, "uint16": 2, "int32": 4, "uint32": 4, "int": 4, "int64": 8,
          "uint64": 8, "int8_t": 1, "uint8_t": 1, "int16_t": 2, "uint16_t": 2, "int32_t": 4, "uint32_t": 4,
          "int64_t": 8, "uint64_t": 8}
@@ -349,8 +351,12 @@ def emit_call(e, spec, base):
         skip = e.uniq("skip")
         e.scan_call(spec.scan_key())
         e.raw("4885FF")                                         # test rdi,rdi
-        e.raw("0F84")                                           # jz skip
-        e.rel32(skip)
+        if len(spec.args) * ARG_MAX + 5 <= 120:                 # bis zum Label liegen nur Parameter + call: kurzer Sprung
+            e.raw("74")                                         # jz skip (rel8)
+            e.rel8(skip)
+        else:
+            e.raw("0F84")                                       # jz skip
+            e.rel32(skip)
     elif spec.this_mode == "abs":
         # feste Adresse des Objekts (nur fuer DIESE Spielsitzung).  Nur aufrufen, wenn dort noch das erwartete Objekt steht
         # (vtable stimmt) - nach einem Neustart des Spiels liegt dort etwas anderes -> Aufruf wird uebersprungen.
@@ -391,7 +397,14 @@ def emit_call(e, spec, base):
             e.raw(lea)                                          # lea reg,[rip+pool]
             e.rel32(lab)
         elif a["size"] == 8 or k in ("fname", "ptr"):
-            e.raw(mov64 + raw.ljust(8, b"\0").hex())            # movabs reg,imm64
+            q = raw.ljust(8, b"\0")
+            iv = int.from_bytes(q, "little")
+            if iv == 0:
+                e.raw(XOR_REGS[mov32])                          # xor r32,r32 (loescht auch die oberen 32 Bit)
+            elif iv <= 0xFFFFFFFF:
+                e.raw(mov32 + struct.pack("<I", iv).hex())      # mov r32,imm32 (Null-Erweiterung auf 64 Bit)
+            else:
+                e.raw(mov64 + q.hex())                          # movabs reg,imm64
         else:
             iv = int.from_bytes(raw, "little")
             e.raw(mov32 + struct.pack("<I", iv & 0xFFFFFFFF).hex())   # mov reg32,imm32 (Null-Erweiterung)

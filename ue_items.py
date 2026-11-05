@@ -859,23 +859,61 @@ def existing_project_dirs(base_dir, name="Items"):
 
 def merge_into_existing(old_options, new_options):
     """Neue Eintraege zu den schon gespeicherten dazu, ohne etwas zu verlieren.  Eintraege einer Kategorie ('Waffen',
-    'Waffen 1', 'Waffen 2' ...) werden zusammengelegt: gleiches Item (gleicher Name) -> die neue Zeile ersetzt die alte,
-    alles andere bleibt; danach wieder in 14er-Pakete geteilt.  -> [Option]"""
+    'Waffen 1', 'Waffen 2' ...) gehoeren zusammen: gleiches Item (gleicher Name) -> die neue Zeile ersetzt die alte AN
+    ihrer Stelle; neue Items kommen in den ersten Eintrag mit Platz (14 Zeilen je Eintrag), sonst in einen neuen Eintrag
+    'Waffen <n+1>'.  Vorhandene Eintraege behalten Namen, Reihenfolge und Dateinamen - auch wenn der Nutzer sie umbenannt
+    hat.  Eine ganz neue Kategorie wird wie bisher in 14er-Pakete geteilt.  -> [Option]"""
     def stem(n):
         return re.sub(r" \d+$", "", n)
 
     groups = OrderedDict()
-    for opt in list(old_options) + list(new_options):
-        g = groups.setdefault(stem(opt.name).lower(), {"stem": stem(opt.name), "names": [], "rows": OrderedDict()})
-        if opt.name not in g["names"]:
-            g["names"].append(opt.name)
-        for r in opt.rows:
-            g["rows"][str(getattr(r, "alias", "") or id(r)).lower()] = r
+    for kind, opts in (("old", old_options), ("new", new_options)):
+        for opt in opts:
+            cat = stem(getattr(opt, "origin", None) or opt.name)           # Kategorie ('FOD'), auch wenn der Nutzer umbenannt hat
+            g = groups.setdefault(cat.lower(), {"stem": stem(opt.name), "cat": cat, "old": [], "new": []})
+            if kind == "old" and not g["old"]:
+                g["stem"] = stem(opt.name)                                 # Namensschema des Nutzers ('Food Item')
+            g[kind].append(opt)
     out = []
     for g in groups.values():
-        rows = list(g["rows"].values())
-        name = g["names"][0] if len(g["names"]) == 1 and len(rows) <= TR.PACK_SIZE else g["stem"]
-        out += TR.split_package(name, rows)
+        if not g["old"]:                                          # neue Kategorie
+            rows = OrderedDict()
+            for opt in g["new"]:
+                for r in opt.rows:
+                    rows[str(getattr(r, "alias", "") or id(r)).lower()] = r
+            names = []
+            for opt in g["new"]:
+                if opt.name not in names:
+                    names.append(opt.name)
+            rows = list(rows.values())
+            name = names[0] if len(names) == 1 and len(rows) <= TR.PACK_SIZE else g["stem"]
+            out += TR.split_package(name, rows)
+            continue
+        kept = [TR.Option(o.name, o.rows, getattr(o, "file", None), getattr(o, "origin", None)) for o in g["old"]]
+        where = {}
+        for o in kept:
+            for k, r in enumerate(o.rows):
+                where[str(getattr(r, "alias", "") or id(r)).lower()] = (o, k)
+        pending = []
+        for opt in g["new"]:
+            for r in opt.rows:
+                key = str(getattr(r, "alias", "") or id(r)).lower()
+                if key in where:
+                    o, k = where[key]
+                    o.rows[k] = r                                  # gleiches Item: an Ort und Stelle ersetzen
+                else:
+                    where[key] = (None, 0)
+                    pending.append(r)
+        for r in pending:
+            target = next((o for o in kept if len(o.rows) < TR.PACK_SIZE), None)
+            if target is None:
+                nums = [int(m.group(1)) for m in (re.search(r" (\d+)$", o.name) for o in kept) if m]
+                target = TR.Option(f"{g['stem']} {max(nums + [1]) + 1}", [r], None,
+                                   g["cat"] if g["cat"].lower() != g["stem"].lower() else None)
+                kept.append(target)
+            else:
+                target.rows.append(r)
+        out += kept
     return out
 
 

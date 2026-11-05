@@ -50,6 +50,8 @@ ANCHOR_LEN = 16                     # so viele Byte je Funktionsanfang fuer die 
 PACK_SIZE = 14                      # so viele Items hoechstens in einem Paket-Eintrag
 PAD_WINDOW = 0x10000                # so viel vom Region-Ende wird nach freien Null-/CC-Stuecken durchsucht (nicht nur ganz am Ende)
 PAD_MIN_RUN = 0x40
+MAIN_REGION_MIN = 0x100000          # ausfuehrbare Region ab dieser Groesse = der Spielcode; kleinere (z. B. "(aux)") sind Zusatzregionen
+MAIN_USEFUL = 0x800                 # so viel freier Platz im Spielcode genuegt, um Zusatzregionen gar nicht erst anzufassen
 _PAD_RUN = re.compile(b"\\x00{%d,}|\\xcc{%d,}" % (PAD_MIN_RUN, PAD_MIN_RUN))
 REMNANT_SCAN = 0x20000              # so viel vom Region-Ende wird nach Resten einer frueheren ReaperPy-Cave durchsucht
 _FILL_RUN = re.compile(b"[\x00\xcc]{32,}")
@@ -102,18 +104,25 @@ class Row:
 class Option:
     """Ein Trainer-Eintrag (= eine Datei im Projekt): Name + 1..n Zeilen."""
 
-    def __init__(self, name, rows):
+    def __init__(self, name, rows, file=None, origin=None):
         self.name = clean_name(name)
         self.rows = list(rows)
+        self.file = file or None            # Dateiname, den der Nutzer vergeben hat (None = der Trainer vergibt ihn selbst)
+        self.origin = origin or None        # urspruengliche Kategorie ('FOD 4'), wenn der Nutzer den Eintrag umbenannt hat
         if not self.rows:
             raise TrainerError(f"Eintrag '{name}' hat keine Zeilen")
 
     def to_json(self):
-        return {"name": self.name, "rows": [r.to_json() for r in self.rows]}
+        d = {"name": self.name, "rows": [r.to_json() for r in self.rows]}
+        if self.file:
+            d["file"] = self.file
+        if self.origin:
+            d["origin"] = self.origin
+        return d
 
     @classmethod
     def from_json(cls, d):
-        return cls(d["name"], [Row.from_json(r) for r in d["rows"]])
+        return cls(d["name"], [Row.from_json(r) for r in d["rows"]], d.get("file"), d.get("origin"))
 
 
 def split_package(name, rows, size=PACK_SIZE):
@@ -142,6 +151,7 @@ class _Emit:
         self.buf = bytearray()
         self.labels = {}
         self.fix = []                   # (Position des disp32, Ziel: int absolut | str Label)
+        self.fix8 = []                  # (Position des disp8, Label) - kurze Spruenge (-128..127)
         self.pools = []                 # [(Label, Bytes)] Konstanten hinter dem Code (read-only genuegt)
         self.n = 0                      # Zaehler fuer eindeutige Label
         self.scans = {}                 # Objekt-Suche: Schluessel -> Label der gemeinsamen Unterroutine
@@ -167,6 +177,14 @@ class _Emit:
     def rel32(self, target):
         self.fix.append((len(self.buf), target))
         self.buf += b"\0\0\0\0"
+
+    def rel8(self, target):
+        self.fix8.append((len(self.buf), target))
+        self.buf += b"\0"
+
+    def rel8(self, target):
+        self.fix8.append((len(self.buf), target))
+        self.buf += b"\0"
 
     def label(self, name):
         self.labels[name] = len(self.buf)
@@ -260,6 +278,11 @@ class _Emit:
             if not -2**31 <= rel < 2**31:
                 raise TrainerError(f"Ziel {dest:#x} ist zu weit von der Cave {self.base:#x} entfernt (rel32)")
             self.buf[pos:pos + 4] = struct.pack("<i", rel)
+        for pos, tgt in self.fix8:
+            rel = self.labels[tgt] - (pos + 1)
+            if not -128 <= rel <= 127:
+                raise TrainerError(f"Kurzer Sprung zu '{tgt}' ist zu weit ({rel} Byte) - Programmfehler")
+            self.buf[pos] = rel & 0xFF
         return bytes(self.buf)
 
 
@@ -573,11 +596,35 @@ class Slots:
         free = len(rest) - len(rest.rstrip(b"\x00"))
         return (64 + free, 64) if free + 64 >= FLAG_MIN_RUN else None
 
+    def _is_main(self, r):
+        """Liegt die Luecke in der grossen Code-Region des Spiels (nicht in einer kleinen Zusatzregion wie '(aux)')?"""
+        return any(s <= r[0] < e and e - s >= MAIN_REGION_MIN for s, e, p in self.span if p & 4)
+
+    def _usable_code(self):
+        """Luecken, die fuer eine Cave in Frage kommen: der Spielcode zuerst; Zusatzregionen (dort liegen oft Daten anderer
+        Tools, z. B. der Cave-Pool von Reaper) nur, wenn im Spielcode nicht einmal MAIN_USEFUL Byte frei sind."""
+        main = [r for r in self._code if self._is_main(r)]
+        if max(((r[1] - r[0]) & ~0xF for r in main), default=0) >= MAIN_USEFUL:
+            return main
+        return list(self._code)
+
+    def _is_main(self, r):
+        """Liegt die Luecke in der grossen Code-Region des Spiels (nicht in einer kleinen Zusatzregion wie '(aux)')?"""
+        return any(s <= r[0] < e and e - s >= MAIN_REGION_MIN for s, e, p in self.span if p & 4)
+
+    def _usable_code(self):
+        """Luecken, die fuer eine Cave in Frage kommen: der Spielcode zuerst; Zusatzregionen (dort liegen oft Daten anderer
+        Tools, z. B. der Cave-Pool von Reaper) nur, wenn im Spielcode nicht einmal MAIN_USEFUL Byte frei sind."""
+        main = [r for r in self._code if self._is_main(r)]
+        if max(((r[1] - r[0]) & ~0xF for r in main), default=0) >= MAIN_USEFUL:
+            return main
+        return list(self._code)
+
     def code_capacity(self):
         """Groesse (Byte) der laengsten freien Code-Luecke - so gross darf eine Cave hoechstens sein."""
         if self._code is None:
             self._code = self._scan_code()
-        return max(((r[1] - r[0]) & ~0xF for r in self._code), default=0)
+        return max(((r[1] - r[0]) & ~0xF for r in self._usable_code()), default=0)
 
     def explain(self, need):
         """Klartext, warum kein Platz gefunden wurde (Zahlen aus dem laufenden Spiel) - fuer Fehlermeldung und Bericht."""
@@ -625,7 +672,7 @@ class Slots:
         if self._code is None:
             self._code = self._scan_code()
         need = (need + 15) & ~15
-        for r in self._code:
+        for r in self._usable_code():
             cave = (r[1] - need) & ~0xF
             if cave < r[0] or not self.reaches(cave, need, near):
                 continue
@@ -857,7 +904,7 @@ def _var(label, offset, default="", new=""):
     return {"label": label, "offset": hex(offset), "defaultValue": default, "newValue": new}
 
 
-def base_patch(p, author=""):
+def base_patch(p, author="", title=None):
     """Cave schreiben, DANN vtable-Slots umbiegen (Reihenfolge = Schreibreihenfolge; Abbau macht patch_engine
     in umgekehrter Reihenfolge)."""
     entry = struct.pack("<Q", p.cave)
@@ -865,7 +912,7 @@ def base_patch(p, author=""):
     variables = [_var("OriginSource", p.rva(p.cave), _spaced(p.cave_orig), _spaced(p.cave_bytes))]
     for k, s in enumerate(p.slots):
         variables.append(_var(f"Haken {k + 1} (vtable)", p.rva(s), _spaced(orig), _spaced(entry)))
-    doc = {"name": "00 BASIS - Item-Cave (zuerst aktivieren)", "author": author,
+    doc = {"name": title or "00 BASIS - Item-Cave (zuerst aktivieren)", "author": author,
            "ImageBase": hex(p.base), "Verify": True, "Variables": variables}
     if p.verify_also:                                    # patch_engine akzeptiert diese Inhalte zusaetzlich zum Original
         doc["VerifyAlso"] = [_spaced(x) for x in p.verify_also]
@@ -875,7 +922,8 @@ def base_patch(p, author=""):
 def option_patch(p, i, author=""):
     opt = p.options[i]
     what = ", ".join(f"{r.alias} x{r.amount}" for r in opt.rows[:3]) + (" ..." if len(opt.rows) > 3 else "")
-    return {"name": f"{i + 1:02d} {opt.name}", "author": author, "ImageBase": hex(p.base), "Verify": True, "OneShot": True,
+    title = os.path.splitext(opt.file)[0] if getattr(opt, "file", None) else f"{i + 1:02d} {opt.name}"   # Nutzername gilt
+    return {"name": title, "author": author, "ImageBase": hex(p.base), "Verify": True, "OneShot": True,
             "Info": f"Schalter-Byte {i} (base+{p.flag_addr + i - p.base:#x}); Cave setzt es nach dem Geben zurueck. {what}",
             "Variables": [_var("OriginSource", p.rva(p.flag_addr + i), "00", "01")]}
 
@@ -951,17 +999,167 @@ def readme_text(p, project_name):
     return "\n".join(lines) + "\n"
 
 
+def _read_patch_json(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def _first_offset(doc):
+    try:
+        return int(str(doc["Variables"][0]["offset"]), 16)
+    except (KeyError, IndexError, TypeError, ValueError):
+        return None
+
+
+def _is_base_doc(doc):
+    """BASIS-Datei: schreibt die Cave und biegt die vtable-Zeiger um (Variablen 'Haken n (vtable)')."""
+    try:
+        return any(str(v.get("label", "")).startswith("Haken ") for v in doc.get("Variables", []))
+    except AttributeError:
+        return False
+
+
+def scan_files(out_dir, spec=None):
+    """Die ECHTEN Dateien des Ordners lesen (nicht die JSON): -> (BASIS-Dateiname oder None, {Schalter-Nummer: Dateiname}).
+    Die Namen darf der Nutzer frei aendern - erkannt werden die Dateien am Inhalt (BASIS: Haken-Variablen; Eintrag: das
+    Schalter-Byte flag_rva + Nummer)."""
+    spec = spec if spec is not None else (_load_spec_raw(out_dir) or {})
+    try:
+        flag_rva = int(str(spec.get("flag_rva", "0x0")), 16)
+        cave_rva = int(str(spec.get("cave_rva", "0x0")), 16)
+    except ValueError:
+        flag_rva = cave_rva = 0
+    base, base_any, files = None, None, {}
+    try:
+        names = sorted(os.listdir(out_dir), key=str.lower)
+    except OSError:
+        return None, {}
+    for f in names:
+        if not f.lower().endswith(".reapproj"):
+            continue
+        doc = _read_patch_json(os.path.join(out_dir, f))
+        if doc is None:
+            continue
+        if _is_base_doc(doc):
+            base_any = base_any or f
+            if base is None and (not cave_rva or _first_offset(doc) == cave_rva):
+                base = f                                 # die BASIS, die zu dieser Spec passt (nicht eine alte Kopie)
+            continue
+        off = _first_offset(doc)
+        if flag_rva and off is not None and doc.get("OneShot") and 0 <= off - flag_rva < 4096:
+            files.setdefault(off - flag_rva, f)
+    return base or base_any, files
+
+
+def is_base_file(path):
+    """Ist das die BASIS eines Item-Trainers?  Auch wenn der Nutzer sie umbenannt hat."""
+    if os.path.basename(path).lower() == BASE_FILE.lower():
+        return True
+    if not path.lower().endswith(".reapproj") or not os.path.isfile(os.path.join(os.path.dirname(path), SPEC_FILE)):
+        return False
+    doc = _read_patch_json(path)
+    return bool(doc) and _is_base_doc(doc)
+
+
+def display_name(path, internal):
+    """Name, der in der Liste steht: hat der Nutzer eine Trainer-Datei umbenannt, gilt sein Dateiname - nicht der alte
+    Name, der noch in der Datei steht.  Unveraenderte Dateien behalten ihren Namen."""
+    try:
+        if not path.lower().endswith(".reapproj") or not os.path.isfile(os.path.join(os.path.dirname(path), SPEC_FILE)):
+            return internal
+    except (OSError, ValueError):
+        return internal
+    stem = os.path.splitext(os.path.basename(path))[0]
+    shown = clean_name(internal or "")
+    generated = {shown.lower(), re.sub(r"^(\d+) ", r"\1_", shown).lower(), os.path.splitext(BASE_FILE)[0].lower()}
+    return internal if stem.lower() in generated else stem
+
+
+def _is_generated(fname, i, opt):
+    return fname.lower() == file_name_for(i, opt).lower()
+
+
+def sync_options(out_dir):
+    """Eintraege eines bestehenden Trainer-Projekts, abgeglichen mit den Dateien im Ordner -> ([Option], [Hinweis]).
+    * Namen und Dateinamen so, wie der Nutzer die Dateien benannt hat (nicht die alten Namen aus der JSON).
+    * Eine Datei, die es nicht mehr gibt, ist auch kein Eintrag mehr.
+    Liegen gar keine Dateien mehr im Ordner, gilt wie frueher die gespeicherte Liste."""
+    d = _load_spec_raw(out_dir)
+    if not d:
+        return [], []
+    opts = [Option.from_json(x) for x in d.get("options", [])]
+    base, files = scan_files(out_dir, d)
+    if not files and not base:
+        return opts, ["Keine Trainer-Dateien im Ordner gefunden - es gilt die gespeicherte Liste."]
+    out, notes = [], []
+    for i, o in enumerate(opts):
+        f = files.get(i)
+        if f is None:
+            notes.append(f"'{o.name}': Datei fehlt im Ordner - der Eintrag wird nicht uebernommen.")
+            continue
+        if _is_generated(f, i, o):
+            o.file = None                                 # unveraendert: der Dateiname richtet sich nach der Nummer
+        else:
+            stem = clean_name(os.path.splitext(f)[0])
+            if stem != o.name:
+                notes.append(f"Name uebernommen: '{o.name}' -> '{stem}' (Datei '{f}').")
+                o.origin = o.origin or o.name                 # die Kategorie merken: neue Items landen weiter in diesem Eintrag
+            o.name, o.file = stem, f
+        out.append(o)
+    return out, notes
+
+
+def load_options(out_dir):
+    """Eintraege eines bestehenden Trainer-Projekts (zum Erweitern) -> [Option]; [] wenn keins da ist.  Abgeglichen mit den
+    Dateien im Ordner (siehe sync_options)."""
+    return sync_options(out_dir)[0]
+
+
+def _unique_names(options):
+    """Dateiname je Eintrag: der vom Nutzer vergebene, sonst '<Nr>_<Name>.reapproj'; nie doppelt (ohne Gross/Klein)."""
+    used = {BASE_FILE.lower()}
+    names = []
+    for i, o in enumerate(options):
+        if getattr(o, "file", None):
+            used.add(o.file.lower())
+    for i, o in enumerate(options):
+        f = o.file if getattr(o, "file", None) else file_name_for(i, o)
+        if not getattr(o, "file", None):
+            stem, k = os.path.splitext(f)[0], 2
+            while f.lower() in used:
+                f, k = f"{stem} ({k}).reapproj", k + 1
+            used.add(f.lower())
+        names.append(f)
+    return names
+
+
 def write_project(out_dir, p, project_name=None, game="", title_id="", author="", set_image_base=None):
-    """Schreibt Projekt-Ordner.  Entfernt alte Eintrag-Dateien dieses Trainers (anhand der Spec), damit nichts
-    Veraltetes (falsche Schalter-Nummern) liegen bleibt.  -> Liste der geschriebenen Dateien."""
+    """Schreibt Projekt-Ordner und AKTUALISIERT dabei alle Dateien dieses Trainers - auch die, die der Nutzer umbenannt hat
+    (sie behalten ihren Namen).  Dateien dieses Trainers, die nicht mehr gebraucht werden, werden entfernt, damit nichts
+    Veraltetes (falsche Schalter-Nummern, alte Cave-Adresse) liegen bleibt.  Eigene Dateien des Nutzers bleiben unberuehrt.
+    -> Liste der geschriebenen Dateien."""
     os.makedirs(out_dir, exist_ok=True)
     project_name = project_name or os.path.basename(os.path.normpath(out_dir))
     old = _load_spec_raw(out_dir)
+    old_base, old_files = scan_files(out_dir, old) if old else (None, {})
+    base_name = old_base or BASE_FILE
+    names = _unique_names(p.options)
+    keep = set(names) | {base_name}                       # genau so geschrieben (Gross/Klein zaehlt: alte Schreibweise weg)
     if old:
+        stale = set(old_files.values())
+        if old_base:
+            stale.add(old_base)
         for i, o in enumerate(Option.from_json(x) for x in old.get("options", [])):
-            f = os.path.join(out_dir, file_name_for(i, o))
-            if os.path.isfile(f):
-                os.remove(f)
+            stale.add(file_name_for(i, o))
+        stale.add(BASE_FILE)
+        for f in stale:
+            path = os.path.join(out_dir, f)
+            if f not in keep and os.path.isfile(path):
+                os.remove(path)
     written = []
 
     def put(name, doc):
@@ -971,9 +1169,10 @@ def write_project(out_dir, p, project_name=None, game="", title_id="", author=""
             f.write("\n")
         written.append(path)
 
-    put(BASE_FILE, base_patch(p, author))
+    base_title = os.path.splitext(base_name)[0] if base_name != BASE_FILE else None
+    put(base_name, base_patch(p, author, base_title))
     for i, o in enumerate(p.options):
-        put(file_name_for(i, o), option_patch(p, i, author))
+        put(names[i], option_patch(p, i, author))
     put(SPEC_FILE, spec_document(p, game, title_id))
     path = os.path.join(out_dir, README_FILE)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -994,12 +1193,6 @@ def _load_spec_raw(out_dir):
         return d if d.get("format") == "reaperpy-item-trainer" else None
     except (OSError, ValueError):
         return None
-
-
-def load_options(out_dir):
-    """Eintraege eines bestehenden Trainer-Projekts (zum Erweitern) -> [Option]; [] wenn keins da ist."""
-    d = _load_spec_raw(out_dir)
-    return [Option.from_json(x) for x in d.get("options", [])] if d else []
 
 
 def merge_options(old, new):
@@ -1156,7 +1349,7 @@ def refresh_fnames(options, live_by_alias):
                 rows.append(ue_cavegen.CallRow.from_json(d))
             else:
                 rows.append(Row(r.alias, new, r.amount))
-        out.append(Option(o.name, rows))
+        out.append(Option(o.name, rows, getattr(o, "file", None), getattr(o, "origin", None)))
     return out, changed, missing
 
 
@@ -1220,7 +1413,7 @@ def remap_options(options, rva_map):
                 n += 1
             else:
                 rows.append(r)
-        out.append(Option(o.name, rows))
+        out.append(Option(o.name, rows, getattr(o, "file", None), getattr(o, "origin", None)))
     return out, n
 # ======================================================================
 # Vorschau (Dry-Run): wo wuerde was landen?  Nur Anzeige, nichts wird geschrieben

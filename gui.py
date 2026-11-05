@@ -1096,7 +1096,7 @@ class App:
         Wirft RuntimeError mit klarem Text statt blind zu schreiben.  Trainer ohne Signaturen werden nicht geprueft."""
         import json as _json
         import cave_trainer as _TR
-        if os.path.basename(card.path) != _TR.BASE_FILE:
+        if not _TR.is_base_file(card.path):
             return
         spec_path = os.path.join(os.path.dirname(card.path), _TR.SPEC_FILE)
         try:
@@ -1158,6 +1158,11 @@ class App:
                 if not rp.origin_source:
                     self.log_msg(self.tr.t("log_patch_noorigin", name=f), "warn")
                     continue
+                import cave_trainer as _TR
+                shown = _TR.display_name(path, rp.name)        # Trainer-Dateien: der Name, den der Nutzer vergeben hat
+                if shown != rp.name:
+                    self.log_msg(f"[trainer] Name aus dem Dateinamen: '{rp.name}' -> '{shown}'", "info")
+                    rp.name = shown
                 self.patches[path] = rp
             except Exception as e:
                 self.log_msg(self.tr.t("log_patch_error", name=f, err=e), "err")

@@ -1269,6 +1269,16 @@ EN.update({
     'keine mc4-Datei (Laenge passt nicht zu AES)': 'not an mc4 file (length does not fit AES)',
     'mc4 laesst sich nicht entschluesseln (falsche Datei?)': 'mc4 cannot be decrypted (wrong file?)',
     "keine GoldHEN/etaHEN-Cheat-JSON (Feld 'mods' fehlt)": "not a GoldHEN/etaHEN cheat JSON (field 'mods' missing)",
+    "00a BASIS 1 - Cave (ZUERST)": "00a BASE 1 - cave (FIRST)",
+    "00b BASIS 2 - Haken (DANACH)": "00b BASE 2 - hooks (SECOND)",
+    " Eintraege), sonst blendet etaHEN den Schalter aus": " entries), otherwise etaHEN hides the switch",
+    ": grosse Eintraege in Stuecke zu je ": ": large entries split into pieces of ",
+    " Byte geteilt (": " bytes (",
+    " Schalter verteilt - der Reihe nach einschalten": " switches - switch them on in order",
+    ": auf ": ": spread over ",
+    ": Eintrag mit ": ": entry of ",
+    " Byte - etaHEN blendet den Schalter ab 2048 Byte aus (maximal ": " bytes - etaHEN hides the switch from 2048 bytes (recommended maximum ",
+    "BASIS ist im Export in ZWEI Schalter geteilt: erst '00a BASIS 1' einschalten, dann '00b BASIS 2'. Ausschalten: erst '00b', dann '00a'.": "BASE is split into TWO switches in the export: switch on '00a BASIS 1' first, then '00b BASIS 2'. Switching off: '00b' first, then '00a'.",
     "' muss CUSA##### oder PPSA##### sein (das Cheat-Menue findet die Datei daran)": "' must be CUSA##### or PPSA##### (the cheat menu finds the file by it)",
     "' muss die App-Version sein, z.B. 01.05 (PS4) oder 01.000.000 (PS5)": "' must be the app version, e.g. 01.05 (PS4) or 01.000.000 (PS5)",
     'keine Mods enthalten': 'no mods contained',
@@ -2040,4 +2050,14 @@ EN.update({
     "this-Modus 'scan' braucht die vtable und die GObjects-Angaben (Adresse, Offsets, Item-Groesse)": "this mode 'scan' needs the vtable and the GObjects details (address, offsets, item size)",
     "this-Modus 'scan': ObjectFlags-Offset oder Item-Groesse unplausibel": "this mode 'scan': ObjectFlags offset or item size implausible",
     'Objekt wird bei jedem Spielstart selbst gefunden': 'Object is found again on every game start',
+})
+
+# Trainer-Ordner: Namen/Dateien wie im Ordner (cave_trainer.sync_options)
+EN.update({
+    "': Datei fehlt im Ordner - der Eintrag wird nicht uebernommen.": "': file is missing in the folder - the entry is not taken over.",
+    "' (Datei '": "' (file '",
+})
+
+EN.update({
+    "[trainer] Name aus dem Dateinamen: '": "[trainer] Name taken from the file name: '",
 })

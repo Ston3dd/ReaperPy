@@ -5,6 +5,27 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 ## Unreleased
 
 ### Fixed
+- **Item trainers: the names you give the files are used, and loading/saving refreshes the files instead of trusting the old
+  `_trainer_spec.json`.** Renaming a trainer file (e.g. `10_FOD 4.reapproj` -> `Food Item 1.reapproj`) only changed the file
+  name; the list kept showing the old name stored inside the file, and "check / adjust" or saving into the same folder wrote
+  fresh files under the generated names next to the renamed ones, so stale copies with the old cave and switch addresses stayed
+  behind (this also happened to a renamed BASIS file). Now:
+  the list shows your file name; entries are matched to their files by content (switch byte), so renaming is safe; a file you
+  deleted is no longer an entry; saving rewrites every file of the trainer under the name you chose (BASIS included), removes
+  only this trainer's superseded files and never touches your own files; new items of a category go into the entry you renamed
+  (`origin` is remembered in the spec) and existing entries keep their name, order and file name. The BASIS preflight also
+  recognises a renamed BASIS file.
+- **GoldHEN/etaHEN export of the item trainer: BASIS is split into two switches** (`1/2` writes the cave and keeps it when
+  switched off, `2/2` sets/removes the vtable hooks). One switch with cave and hooks could point a hook at empty memory
+  (crash with a read-permission violation). Names are now `00a BASIS 1 - Cave (ZUERST)` / `00b BASIS 2 - Haken (DANACH)`.
+- **GoldHEN/etaHEN export: a second cave could overwrite the end of the item trainer's cave** (same free space handed out twice,
+  e.g. `250 Warehouse Slot Unlock` at `0x64A7FC0` inside the BASIS cave). The BASIS cave is now reserved first.
+- **Item trainer crashed the game right after activating BASIS.** On a freshly started game the largest free code gap was the
+  small extra region `(aux)` (e.g. `0x918c000`, 16 KB), which also holds the cave pool of other tools; the 13 KB cave was put
+  there. The cave now goes into the game's own code padding first; extra regions are used only when the game code has less
+  than 2 KB free.
+- **Smaller caves.** Per item the cave uses shorter encodings with the same effect (`xor ecx,ecx` instead of `mov rcx,0`,
+  `mov esi,imm32` for 32-bit values, short `jz`), about 30 % less code, so a big trainer fits in one project.
 - **Item trainers (Unreal) keep working after the game is restarted.** Trainers that call a game object which the cave cannot
   reach on its own (e.g. `UDMXInventorySubsystem.AddItemToWarehouse`) used to store the object's memory address. That address
   changes with every game start, so after a restart the cave found something else there and silently did nothing. The cave now
