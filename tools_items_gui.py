@@ -1071,7 +1071,6 @@ class ItemsTab(BaseTab):
             try:
                 if stale:                                                    # alte Ordner sichern statt loeschen
                     import shutil
-                    import time
                     backup = os.path.join(base_dir, "_alt")                     # ein einziger Sicherungsordner, kein neuer je Speichern
                     os.makedirs(backup, exist_ok=True)
                     for d in stale:
