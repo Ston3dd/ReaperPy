@@ -4,6 +4,10 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 
 ## Unreleased
 
+## 6.0.1 - 2026-11-05
+
+**Item trainer hotfix.** Trainers keep working after a game restart, the GoldHEN/etaHEN export of the item trainer no longer crashes the game, and renamed trainer files are respected. **Trainers saved with an older version still hold fixed addresses - save them once more (ITEMS: FIND ITEMS, SAVE TRAINER).**
+
 ### Fixed
 - **Item trainers: the names you give the files are used, and loading/saving refreshes the files instead of trusting the old
   `_trainer_spec.json`.** Renaming a trainer file (e.g. `10_FOD 4.reapproj` -> `Food Item 1.reapproj`) only changed the file
