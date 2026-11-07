@@ -4,6 +4,10 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 
 ## Unreleased
 
+## 6.0.2 - 2026-11-07
+
+**Richer colours, general item table detection and complete English texts.** Please update if you use the ITEMS tab or the English interface.
+
 ### Added
 - `theme.py`: one central colour palette for the whole interface (main window, tools window, update dialog, splash screen). A test
   fails if a hard-coded colour code sneaks into another interface file.
