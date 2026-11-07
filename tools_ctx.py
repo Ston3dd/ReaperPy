@@ -9,8 +9,10 @@ import io
 import re
 import tkinter as tk
 
+import theme
+
 ADDR_RE = re.compile(r"^(?:base\s*[+-]\s*)?(?:0x)?([0-9A-Fa-f]{5,16})$|^base\s*[+-]\s*0x[0-9A-Fa-f]+$")
-BG_CARD, BG_HVR, TEXT, ACCENT = "#14192b", "#1c2340", "#e8f0ff", "#22e6c4"
+BG_CARD, BG_HVR, TEXT, ACCENT = theme.BG_CARD, theme.BG_CARD_HVR, theme.TEXT, theme.ACCENT
 
 
 def _tr(s):

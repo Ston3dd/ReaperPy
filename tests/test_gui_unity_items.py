@@ -45,12 +45,19 @@ FakeUnity.__name__ = "UnityTab"
 
 class T(unittest.TestCase):
     def setUp(self):
+        import ue_instr
+        try:
+            ue_instr.get_disasm()
+        except Exception:  # noqa: BLE001
+            self.skipTest("kein Disassembler (capstone oder objdump)")
         import tools_unity_items_gui as G
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.game = TU.make_dump(self.tmp)
         self.game.title = "Testspiel"
-        head = TU.asm_bytes("push rbp\nmov rbp, rsp\ncmp byte ptr [rip+0x4000], 0\njne 1f\nnop\n1: pop rbp\nret", self.tmp)
+        # push rbp; mov rbp, rsp; cmp byte ptr [rip+0x4000], 0; jne 1f; nop; 1: pop rbp; ret
+        # (als fertige Bytes: kein Assembler noetig, damit der Test auch unter Windows laeuft)
+        head = bytes.fromhex("55 48 89 e5 80 3d 00 40 00 00 00 75 01 90 5d c3")
         self.w = FakeWin()
         self.w.client = Client(head)
         self.un = FakeUnity(self.game)

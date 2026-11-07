@@ -5,7 +5,7 @@ from tkinter import ttk, messagebox, simpledialog
 
 import ps5_ext as X
 from debugger import DebugSession
-from tools_common import (BG, ACCENT, TEXT_DIM, BaseTab, button, label, entry, tree, with_scroll)
+from tools_common import (BG, ACCENT, ERROR, TEXT_DIM, BaseTab, button, label, entry, tree, with_scroll)
 
 WP_TYPES = {"schreiben": X.WP_WRITE, "lesen/schreiben": X.WP_RDWR, "ausführen": X.WP_EXEC}
 
@@ -135,7 +135,7 @@ class DebugTab(BaseTab):
             self.lbl.configure(text="Verbindung wird neu aufgebaut …", fg=TEXT_DIM)
         elif st == "lost":
             self.win.app.debug_busy = False
-            self.lbl.configure(text="Verbindung verloren - DETACH, dann neu attachen", fg="#ff5555")
+            self.lbl.configure(text="Verbindung verloren - DETACH, dann neu attachen", fg=ERROR)
         elif st == "detached":
             self.win.app.debug_busy = False
 

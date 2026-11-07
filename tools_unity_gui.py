@@ -440,7 +440,7 @@ class UnityTab(BaseTab):
                                fg=ACCENT)
 
         def err(e):
-            self.lbl.configure(text=f"Fehler: {e}", fg="#ff3366")
+            self.lbl.configure(text=f"Fehler: {e}", fg=ERROR)
             self.log(f"UNITY: {e}", "err")
 
         self.bg(job, ok, err)
@@ -527,7 +527,7 @@ class UnityTab(BaseTab):
             self._fill_targets()
             self._update_info()
 
-        self.bg(job, ok, lambda e: (self.lbl.configure(text=f"Fehler beim Scan: {e}", fg="#ff3366"),
+        self.bg(job, ok, lambda e: (self.lbl.configure(text=f"Fehler beim Scan: {e}", fg=ERROR),
                                     self.log(f"UNITY: {e}", "err")))
 
     def _roll_up(self, counts):
@@ -622,7 +622,7 @@ class UnityTab(BaseTab):
                                fg=ACCENT)
             self._update_info()
 
-        self.bg(job, ok, lambda e: (self.lbl.configure(text=f"Fehler: {e}", fg="#ff3366"), self.log(f"UNITY: {e}", "err")))
+        self.bg(job, ok, lambda e: (self.lbl.configure(text=f"Fehler: {e}", fg=ERROR), self.log(f"UNITY: {e}", "err")))
 
     def _ensure_base(self, client):
         """Im Job-Thread: Basis kennen (Feld oder automatisch) und Il2CppLive bereitstellen."""
@@ -688,7 +688,7 @@ class UnityTab(BaseTab):
             else:
                 self.lbl_cur.configure(text=self._why_none(cur, is_static), fg=WARN)
 
-        self.bg(job, ok, lambda e: (self.log(f"UNITY: {e}", "err"), self.lbl_cur.configure(text=f"Fehler: {e}", fg="#ff3366")))
+        self.bg(job, ok, lambda e: (self.log(f"UNITY: {e}", "err"), self.lbl_cur.configure(text=f"Fehler: {e}", fg=ERROR)))
 
     def _why_none(self, t, is_static):
         if is_static:

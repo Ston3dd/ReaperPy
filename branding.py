@@ -15,12 +15,13 @@ except Exception:  # noqa: BLE001
     icon_data = None
 
 import paths
+import theme
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-BG = "#0b1020"
-FG = "#e8f0ff"
-DIM = "#8aa0c8"
-ACCENT = "#22e6c4"
+BG = theme.BG
+FG = theme.TEXT
+DIM = theme.TEXT_DIM
+ACCENT = theme.ACCENT
 
 
 def photo(master, which="PNG_256"):
@@ -85,7 +86,7 @@ class Splash:
                 pass
             sw, sh = w.winfo_screenwidth(), w.winfo_screenheight()
             w.geometry(f"{self.W}x{self.H}+{(sw - self.W) // 2}+{(sh - self.H) // 2}")
-            cv = tk.Canvas(w, width=self.W, height=self.H, bg=BG, highlightthickness=1, highlightbackground="#27406e")
+            cv = tk.Canvas(w, width=self.W, height=self.H, bg=BG, highlightthickness=1, highlightbackground=theme.BORDER_HVR)
             cv.pack(fill="both", expand=True)
             self.cv = cv
             self._img = photo(w, "PNG_256")
@@ -99,7 +100,7 @@ class Splash:
             cv.create_text(self.W // 2, 232, text=subtitle, fill=DIM, font=("Segoe UI", 10))
             if version:
                 cv.create_text(self.W - 10, self.H - 10, text=version, fill=DIM, font=("Segoe UI", 8), anchor="se")
-            cv.create_rectangle(70, 262, self.W - 70, 268, outline="", fill="#16213f")
+            cv.create_rectangle(70, 262, self.W - 70, 268, outline="", fill=theme.BG_CARD)
             self.bar = cv.create_rectangle(70, 262, 70, 268, outline="", fill=ACCENT)
             self.status = cv.create_text(self.W // 2, 288, text="", fill=DIM, font=("Segoe UI", 8))
             w.update()

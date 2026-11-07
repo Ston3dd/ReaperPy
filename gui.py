@@ -12,6 +12,7 @@ from patch_engine import (apply_patch, deactivate_patch, detect_patched, is_cave
                           _asm_or_empty)
 from i18n import Translator
 from ps5_notify import Notifier
+import theme as T
 from tools_common import style_ttk
 import projects
 import imagebase as IMB
@@ -19,22 +20,23 @@ import session
 import aob as AOB
 
 
-BG          = "#06080d"
-BG_BAR      = "#0a0f18"
-BG_CARD     = "#0e1420"
-BG_CARD_HVR = "#161f30"
-BG_CARD_ON  = "#0e2018"
-BORDER      = "#182130"
-BORDER_HVR  = "#2a3950"
-ACCENT      = "#00ffc8"
-ACCENT_DIM  = "#008a6a"
-ACCENT_BG   = "#0e2018"
-TEXT        = "#e6edf3"
-TEXT_DIM    = "#7d8590"
-TEXT_DIM2   = "#4a5567"
-WARN        = "#ffb000"
-ERROR       = "#ff3366"
-OK          = "#00ffc8"
+# Farben: zentral in theme.py (hier unter den bekannten Namen)
+BG          = T.BG
+BG_BAR      = T.BG_BAR
+BG_CARD     = T.BG_CARD
+BG_CARD_HVR = T.BG_CARD_HVR
+BG_CARD_ON  = T.BG_CARD_ON
+BORDER      = T.BORDER
+BORDER_HVR  = T.BORDER_HVR
+ACCENT      = T.ACCENT
+ACCENT_DIM  = T.ACCENT_DIM
+ACCENT_BG   = T.ACCENT_BG
+TEXT        = T.TEXT
+TEXT_DIM    = T.TEXT_DIM
+TEXT_DIM2   = T.TEXT_DIM2
+WARN        = T.WARN
+ERROR       = T.ERROR
+OK          = T.OK
 
 FONT_MONO   = ("Consolas", 10)
 FONT_TITLE  = ("Consolas", 10, "bold")
@@ -98,7 +100,7 @@ class ThinBar(tk.Canvas):
         fill = int(w * self._pct / 100.0)
         if fill > 0:
             self.create_rectangle(0, 0, fill, h, fill=ACCENT, outline="")
-            self.create_rectangle(max(0, fill - 24), 0, fill, h, fill="#7dffe3", outline="")  # Glanzkante
+            self.create_rectangle(max(0, fill - 24), 0, fill, h, fill=T.ACCENT_HI, outline="")  # Glanzkante
 
 
 # ------------------------------------------------------------------
@@ -331,7 +333,7 @@ class InfoDialog(tk.Toplevel):
         tk.Label(body, text=tr.t("info_labels"), bg=BG, fg=TEXT_DIM, font=FONT_SUB,
                  anchor="w").grid(row=len(meta), column=0, sticky="nw", pady=(8, 2))
 
-        box = tk.Text(body, bg="#02040a", fg=TEXT, insertbackground=ACCENT,
+        box = tk.Text(body, bg=T.BG_LOG, fg=TEXT, insertbackground=ACCENT,
                       font=FONT_MONO, relief="flat", highlightthickness=1,
                       highlightbackground=BORDER, height=14, wrap="none")
         box.grid(row=len(meta), column=1, sticky="nsew", pady=(8, 2))
@@ -772,7 +774,7 @@ class App:
                   activebackground=BG_BAR, activeforeground=ERROR,
                   command=self._clear_log).pack(side="right", padx=10)
 
-        self.log = tk.Text(wrap, bg="#02040a", fg=TEXT, insertbackground=ACCENT,
+        self.log = tk.Text(wrap, bg=T.BG_LOG, fg=TEXT, insertbackground=ACCENT,
                            font=("Consolas", 9), relief="flat", bd=0,
                            highlightthickness=0, wrap="none")
         sb = ttk.Scrollbar(wrap, orient="vertical", command=self.log.yview,

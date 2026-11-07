@@ -4,6 +4,28 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 
 ## Unreleased
 
+### Added
+- `theme.py`: one central colour palette for the whole interface (main window, tools window, update dialog, splash screen). A test
+  fails if a hard-coded colour code sneaks into another interface file.
+
+### Changed
+- **Richer colours:** deeper blue surfaces in four steps, clearly visible borders, brighter secondary text, a green OK colour that is
+  no longer the same as the accent, and a strong blue selection colour in lists and drop-downs. Horizontal scroll bars, pane
+  dividers and plain ttk frames are dark now as well.
+- **Item table detection works the same for every game:** run-together or upper-case names (`ITEMPARAM`, `MSTITEM`) are split into
+  known words instead of searching for substrings, so `Software`, `Hardware`, `Toolbar`, `ToolTip` or `Awareness` are no longer
+  taken for item tables. Presentation tables next to an item word (`ItemIcon`, `ItemTooltipText`, `ItemShopUI`) are dropped,
+  render words (`PhysicalMaterial`, `SurfaceMaterial`, `MaterialInstance`) are no item tables, and common abbreviations (`Itm`,
+  `Wpn`, `Eqp`, `Armr`, `Cosmetics`) are recognised.
+
+### Fixed
+- **English mode:** about 110 messages (ITEMS and VALUES tabs, the trainer README, the GoldHEN/etaHEN export, the image base check
+  and more) were only half translated and now have complete English texts. A new test keeps the entries in sync with the code.
+- The Unity ITEMS GUI test no longer needs the GNU assembler (it failed on Windows); it is skipped when no disassembler is found.
+
+### Removed
+- `lager_slots.py`, a stand-alone script for a single game that the program never used, and its English texts.
+
 ## 6.0.1 - 2026-11-05
 
 **Item trainer hotfix.** Trainers keep working after a game restart, the GoldHEN/etaHEN export of the item trainer no longer crashes the game, and renamed trainer files are respected. **Trainers saved with an older version still hold fixed addresses - save them once more (ITEMS: FIND ITEMS, SAVE TRAINER).**

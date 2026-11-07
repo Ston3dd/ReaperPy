@@ -2,7 +2,9 @@
 import tkinter as tk
 from tkinter import ttk
 
-BG = "#06080d"
+import theme
+
+BG = theme.BG
 
 
 class GroupTab(tk.Frame):

@@ -9,6 +9,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 import projects
+import theme
 from library import Library, GameEntry
 from tools_common import (BG, BG_BAR, BG_CARD, BG_CARD_HVR, BORDER, BORDER_HVR, ACCENT, ACCENT_DIM,
                           TEXT, TEXT_DIM, WARN, ERROR, FONT_MONO, FONT_LABEL, FONT_HEAD, style_ttk)
@@ -24,7 +25,7 @@ ICON = 96
 CARD_W = 200
 FONT_NAME = ("Consolas", 10, "bold")
 FONT_SUB = ("Consolas", 8)
-_PALETTE = ("#12353a", "#2a2f55", "#3a2a4d", "#10403a", "#40302a", "#1f3a52", "#3d3a1c", "#2c4a2c")
+_PALETTE = theme.COVER_COLORS
 
 
 def initials(entry):

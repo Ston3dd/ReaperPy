@@ -3,18 +3,28 @@ import re
 import tkinter as tk
 from tkinter import ttk
 
-BG          = "#06080d"
-BG_BAR      = "#0a0f18"
-BG_CARD     = "#0e1420"
-BG_CARD_HVR = "#161f30"
-BORDER      = "#182130"
-BORDER_HVR  = "#2a3950"
-ACCENT      = "#00ffc8"
-ACCENT_DIM  = "#008a6a"
-TEXT        = "#e6edf3"
-TEXT_DIM    = "#7d8590"
-WARN        = "#ffb000"
-ERROR       = "#ff3366"
+import theme as T
+
+# Farben: zentral in theme.py (hier unter den bekannten Namen; die Werkzeug-Tabs importieren sie von hier)
+BG          = T.BG
+BG_BAR      = T.BG_BAR
+BG_CARD     = T.BG_CARD
+BG_CARD_HVR = T.BG_CARD_HVR
+BG_LOG      = T.BG_LOG
+BORDER      = T.BORDER
+BORDER_HVR  = T.BORDER_HVR
+SELECT      = T.SELECT
+BTN_HVR     = T.BTN_HVR
+ACCENT      = T.ACCENT
+ACCENT_DIM  = T.ACCENT_DIM
+ACCENT_HI   = T.ACCENT_HI
+INK_ON_ACCENT = T.INK_ON_ACCENT
+TEXT        = T.TEXT
+TEXT_DIM    = T.TEXT_DIM
+TEXT_DIM2   = T.TEXT_DIM2
+OK          = T.OK
+WARN        = T.WARN
+ERROR       = T.ERROR
 
 FONT_MONO  = ("Consolas", 10)
 FONT_LABEL = ("Consolas", 9)
@@ -37,16 +47,16 @@ def style_ttk(root):
                  padding=(14, 6), font=FONT_LABEL, borderwidth=0, bordercolor=BORDER,
                  lightcolor=BG_CARD, darkcolor=BG_CARD)
     st.map("TNotebook.Tab",
-           background=[("selected", BG_CARD_HVR)],
-           foreground=[("selected", ACCENT)])
+           background=[("selected", BG_CARD_HVR), ("active", BG_BAR)],
+           foreground=[("selected", ACCENT), ("active", TEXT)])
     st.configure("Treeview", background=BG_CARD, fieldbackground=BG_CARD,
                  foreground=TEXT, font=FONT_MONO, rowheight=20, borderwidth=0,
                  bordercolor=BORDER, lightcolor=BG_CARD, darkcolor=BG_CARD)
     st.configure("Treeview.Heading", background=BG_BAR, foreground=ACCENT_DIM,
                  font=FONT_LABEL, borderwidth=0, bordercolor=BORDER,
                  lightcolor=BG_BAR, darkcolor=BG_BAR)
-    st.map("Treeview", background=[("selected", BORDER_HVR)],
-           foreground=[("selected", ACCENT)])
+    st.map("Treeview", background=[("selected", SELECT)],
+           foreground=[("selected", TEXT)])
 
     # --- Combobox -------------------------------------------------------
     # clam malt eine readonly-Combobox mit hellgrauem Feld; mit heller Schrift (TEXT) war der Inhalt
@@ -65,7 +75,7 @@ def style_ttk(root):
            arrowcolor=[("disabled", TEXT_DIM), ("active", ACCENT)])
     # Dropdown-Liste (ein klassisches tk.Listbox)
     for opt, val in (("background", BG_CARD), ("foreground", TEXT),
-                     ("selectBackground", BORDER_HVR), ("selectForeground", ACCENT),
+                     ("selectBackground", SELECT), ("selectForeground", TEXT),
                      ("font", FONT_MONO)):
         root.option_add(f"*TCombobox*Listbox.{opt}", val)
 
@@ -73,6 +83,14 @@ def style_ttk(root):
                  arrowcolor=TEXT_DIM, bordercolor=BG, lightcolor=BG_CARD,
                  darkcolor=BG_CARD, borderwidth=0, relief="flat")
     st.map("Vertical.TScrollbar", background=[("active", BORDER_HVR)])
+    st.configure("Horizontal.TScrollbar", background=BG_CARD, troughcolor=BG,
+                 arrowcolor=TEXT_DIM, bordercolor=BG, lightcolor=BG_CARD,
+                 darkcolor=BG_CARD, borderwidth=0, relief="flat")
+    st.map("Horizontal.TScrollbar", background=[("active", BORDER_HVR)])
+    st.configure("TFrame", background=BG)
+    st.configure("TLabel", background=BG, foreground=TEXT)
+    st.configure("TPanedwindow", background=BORDER)
+    st.configure("Sash", sashthickness=5, background=BORDER, gripcount=0)
     st.configure("Horizontal.TProgressbar", troughcolor=BG_CARD, background=ACCENT,
                  bordercolor=BG, lightcolor=ACCENT, darkcolor=ACCENT_DIM, thickness=6)
     st.configure("Reaper.Horizontal.TProgressbar", troughcolor=BG_BAR, background=ACCENT,
@@ -82,7 +100,8 @@ def style_ttk(root):
 def button(parent, text, cmd, accent=False, **kw):
     return tk.Button(parent, text=text, command=cmd, bg=BG_CARD,
                      fg=ACCENT if accent else TEXT, font=FONT_LABEL, relief="flat",
-                     bd=0, padx=10, pady=4, cursor="hand2", highlightthickness=0,
+                     bd=0, padx=10, pady=4, cursor="hand2", highlightthickness=1,
+                     highlightbackground=BORDER, highlightcolor=ACCENT_DIM,
                      activebackground=BG_CARD_HVR, activeforeground=ACCENT, **kw)
 
 

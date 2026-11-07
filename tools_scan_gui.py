@@ -12,7 +12,8 @@ from tkinter import ttk, messagebox, simpledialog
 
 import scanner as SC
 import pointerscan as PS
-from tools_common import (BG, BG_BAR, BG_CARD, BG_CARD_HVR, BORDER, ACCENT, ACCENT_DIM, TEXT, TEXT_DIM, WARN, ERROR,
+from tools_common import (BG, BG_BAR, BG_CARD, BG_CARD_HVR, BORDER, ACCENT, ACCENT_DIM, ACCENT_HI, BTN_HVR, INK_ON_ACCENT,
+                          TEXT, TEXT_DIM, WARN, ERROR,
                           FONT_LABEL, BaseTab, entry, tree, with_scroll)
 
 SCOPES = {"Daten (rw, ohne Code)": "data", "Alles Schreibbare": "rw", "Alles Lesbare": "all"}
@@ -55,11 +56,11 @@ def clabel(parent, text, dim=True, bg=BG_CARD, **kw):
 
 def pbtn(parent, text, cmd, primary=False, **kw):
     """Knopf im Karten-Stil: primaer = gefuellt in der Akzentfarbe, sonst dezent mit Hover."""
-    bg, fg = (ACCENT, "#04110d") if primary else (BG_CARD_HVR, TEXT)
-    hov = "#5dffe0" if primary else "#1f2b40"
+    bg, fg = (ACCENT, INK_ON_ACCENT) if primary else (BG_CARD_HVR, TEXT)
+    hov = ACCENT_HI if primary else BTN_HVR
     b = tk.Button(parent, text=text, command=cmd, bg=bg, fg=fg, font=FONT_LABEL, relief="flat", bd=0, padx=10,
                   pady=5, cursor="hand2", highlightthickness=0, activebackground=hov,
-                  activeforeground="#04110d" if primary else ACCENT, **kw)
+                  activeforeground=INK_ON_ACCENT if primary else ACCENT, **kw)
     b.bind("<Enter>", lambda _e: b.configure(bg=hov))
     b.bind("<Leave>", lambda _e: b.configure(bg=bg))
     return b

@@ -18,7 +18,7 @@ import cave_trainer as TR
 import ue_cavegen as CG
 import ue_items as IT
 import ue_profile as P
-from tools_common import BG, TEXT_DIM, BaseTab, button, entry, label, tree, with_scroll
+from tools_common import BG, BG_LOG, TEXT, TEXT_DIM, BaseTab, button, entry, label, tree, with_scroll
 
 def _find_impl(read, base, thunk):
     """Native Implementierung hinter dem Exec-Thunk (Disassembler noetig)."""
@@ -79,7 +79,7 @@ class DiscoverTab(BaseTab):
         with_scroll(up, self.tv)
         self.tv.bind("<<TreeviewSelect>>", lambda _e: self.on_select())
         self.tv.bind("<Double-1>", lambda _e: self.on_double())
-        self.txt = tk.Text(mid, height=7, wrap="word", bg="#101010", fg="#d0d0d0", relief="flat")
+        self.txt = tk.Text(mid, height=7, wrap="word", bg=BG_LOG, fg=TEXT, relief="flat")
         mid.add(self.txt, stretch="never")
 
         bar = tk.Frame(self, bg=BG)

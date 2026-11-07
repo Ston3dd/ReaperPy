@@ -10,10 +10,10 @@ from tkinter import ttk
 
 import regionfilter as RF
 import tools_i18n as T
-from tools_common import BG_CARD, BG_CARD_HVR, ACCENT, TEXT, TEXT_DIM, WARN, FONT_LABEL, FONT_MONO, entry
+from tools_common import BG_CARD, BG_CARD_HVR, ACCENT, TEXT, TEXT_DIM, TEXT_DIM2, WARN, FONT_LABEL, FONT_MONO, entry
 
 CHK = {"on": "☑", "off": "☐", "mixed": "▣"}
-DIM_HIDDEN = "#4a525c"
+DIM_HIDDEN = TEXT_DIM2
 
 
 def tr(text):

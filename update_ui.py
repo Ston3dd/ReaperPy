@@ -6,10 +6,11 @@ import queue
 import tkinter as tk
 from tkinter import ttk
 
+import theme
 import updater
 
-BG, BG_BAR, BG_CARD, BG_CARD_HVR = "#06080d", "#0a0f18", "#0e1420", "#161f30"
-ACCENT, TEXT, TEXT_DIM, ERROR = "#00ffc8", "#e6edf3", "#7d8590", "#ff3366"
+BG, BG_BAR, BG_CARD, BG_CARD_HVR = theme.BG, theme.BG_BAR, theme.BG_CARD, theme.BG_CARD_HVR
+ACCENT, TEXT, TEXT_DIM, ERROR = theme.ACCENT, theme.TEXT, theme.TEXT_DIM, theme.ERROR
 FONT_MONO, FONT_HEAD, FONT_LABEL = ("Consolas", 10), ("Consolas", 11, "bold"), ("Consolas", 9)
 
 
@@ -40,8 +41,8 @@ class UpdateDialog(tk.Toplevel):
         body = tk.Frame(self, bg=BG)
         body.pack(fill="both", expand=True, padx=14, pady=10)
         tk.Label(body, text=tr.t("upd_notes"), bg=BG, fg=TEXT_DIM, font=FONT_LABEL, anchor="w").pack(fill="x")
-        box = tk.Text(body, bg="#02040a", fg=TEXT, font=FONT_MONO, relief="flat", height=10, wrap="word",
-                      highlightthickness=1, highlightbackground="#182130")
+        box = tk.Text(body, bg=theme.BG_LOG, fg=TEXT, font=FONT_MONO, relief="flat", height=10, wrap="word",
+                      highlightthickness=1, highlightbackground=theme.BORDER)
         box.pack(fill="both", expand=True, pady=(4, 8))
         box.insert("end", (rel.notes or "").strip() or "-")
         box.configure(state="disabled")

@@ -74,8 +74,8 @@ def table_candidates(prof):
     return sorted(prof.of("table"), key=lambda s: -s.score)
 
 
-ITEM_WORDS = re.compile(r"(?i)item|inventor|loot|weapon|consum|equip|material|resource|gear|armo|tool|food|ingredient|"
-                        r"goods|ware|shop|recipe|craft")
+ITEM_WORDS = re.compile(r"(?i)item|inventor|loot|weapon|consum|equip|material|resource|gear|armo|tool(?!bar|tip)|food|ingredient|"
+                        r"goods|shop|recipe|craft|wpn|eqp|armr")
 TABLE_JUNK = re.compile(r"(?i)enemy|enemies|monster|npc|curve|anim|sound|dialog|dialogue|navmesh|particle|"
                         r"widget|subtitle|levelcurve|expcurve")
 ITEM_GIVE = re.compile(r"(?i)item|inventor|loot|pickup|equip|consum|material|resource|weapon|gear|"
@@ -87,10 +87,11 @@ GIVE_VERB = re.compile(r"(?i)add|give|grant|obtain|acquire|gain|receive|award|re
 # Welche Tabellen / Funktionen sind fuer Items ueberhaupt relevant?  (fuer JEDES Spiel gleich, rein nach Namen + SDK)
 # ----------------------------------------------------------------------------------------------------------------
 # Wort -> Gewicht.  Gewertet werden die CamelCase-Woerter des Tabellennamens ("DT_ItemParam" -> dt, item, param).
-TABLE_PRIMARY = {"item": 6, "weapon": 5, "armor": 5, "armour": 5, "equip": 5, "equipment": 5, "consumable": 5, "goods": 5,
+TABLE_PRIMARY = {"item": 6, "weapon": 5, "armor": 5, "armour": 5, "equip": 5, "equipment": 5, "consumable": 5, "goods": 5, "good": 5,
                  "ingredient": 5, "food": 4, "ammo": 4, "accessory": 4, "gear": 4, "resource": 4, "currency": 4,
                  "inventory": 4, "pickup": 4, "artifact": 4, "relic": 4, "potion": 4, "material": 3, "tool": 3, "money": 3,
-                 "coin": 3, "gold": 3, "outfit": 3, "costume": 3, "gem": 3, "ware": 3}
+                 "coin": 3, "gold": 3, "outfit": 3, "costume": 3, "cosmetic": 3, "gem": 3, "ware": 3,
+                 "itm": 5, "wpn": 5, "eqp": 5, "armr": 5}                  # gaengige Abkuerzungen (Itm_Master, DT_Wpn, DT_Eqp ...)
 TABLE_RELATION = {"loot": 3, "shop": 3, "store": 3, "reward": 3, "recipe": 3, "craft": 3, "treasure": 3, "chest": 3,
                   "merchant": 3, "vendor": 3, "drop": 2.5, "trade": 2, "price": 2}
 # Diese Woerter heissen "ist KEINE Item-Liste" (Effekte, Oberflaeche, Sound, Gegner-KI ...)
@@ -101,7 +102,14 @@ TABLE_NEGATIVE = {"fx", "vfx", "sfx", "effect", "ui", "hud", "sound", "audio", "
                   "sequence", "cutscene", "movie", "tutorial", "achievement", "trophy", "difficulty", "icon", "image",
                   "texture", "font", "style", "widget", "menu", "model", "view", "skill", "talent", "perk", "spell",
                   "build", "curve", "navmesh", "damage", "hit", "physics", "collision", "weather", "sky", "light", "network", "online",
-                  "save", "option", "controller", "gamepad", "haptic", "vibration", "rumble", "tag", "motion", "emote"}
+                  "save", "option", "controller", "gamepad", "haptic", "vibration", "rumble", "tag", "motion", "emote",
+                  "physical", "surface", "shader", "instance", "tooltip", "tip", "mesh", "skeletal", "landscape", "foliage",
+                  "decal", "localisation"}
+# Reine Darstellungs-Woerter: 'DT_ItemIcon', 'DT_ItemTooltipText', 'DT_ItemShopUI' enthalten keine Item-ZEILEN, auch wenn 'Item' im Namen steht.
+TABLE_PRESENTATION = {"ui", "hud", "icon", "image", "texture", "font", "style", "widget", "menu", "text", "string", "locali",
+                      "localization", "localisation", "sound", "audio", "bgm", "voice", "sfx", "fx", "vfx", "particle", "niagara",
+                      "anim", "animation", "tooltip", "tip", "mesh", "camera", "subtitle", "dialog", "dialogue"}
+PRESENTATION_PENALTY = 5.0
 TABLE_FILLER = {"dt", "table", "data", "param", "params", "parameter", "info", "master", "list", "def", "definition",
                 "row", "setting", "settings", "common", "base", "datatable", "tbl", "mst", "cfg", "config", "new"}
 ROLE_BONUS = {"Items": 4, "Waehrung": 3, "Shop/Preise": 1, "Loot/Drops": 1, "Rezepte/Craft": 1, "Charaktere/Gegner": -3,
@@ -112,6 +120,38 @@ REL_MIN = 3.0                       # ab diesem Wert gilt eine Tabelle als "Item
 
 def _tokens(name):
     return [P._stem(w) for w in P.words(name)]
+
+
+def _known_words():
+    return set(TABLE_PRIMARY) | set(TABLE_RELATION) | TABLE_FILLER | TABLE_NEGATIVE
+
+
+def _segment(token, known):
+    """'itemparam' -> ['item', 'param'], 'mstitem' -> ['mst', 'item']; None, wenn sich das Wort nicht RESTLOS in bekannte Woerter
+    zerlegen laesst ('software', 'toolbar', 'itemize', 'awareness' bleiben unzerlegt - frueher fanden Teilstrings darin 'ware',
+    'tool', 'item' ...)."""
+    n = len(token)
+    best = [None] * (n + 1)
+    best[0] = []
+    for i in range(1, n + 1):
+        for j in range(max(0, i - 14), i - 1):                       # laengstes Stueck zuerst, mindestens 2 Zeichen
+            if best[j] is not None and token[j:i] in known:
+                best[i] = best[j] + [token[j:i]]
+                break
+    return best[n]
+
+
+def _split_tokens(name):
+    """Wie _tokens, aber GROSSGESCHRIEBENE / zusammengeschriebene Woerter (\"ITEMPARAM\", \"mstitem\") werden zerlegt."""
+    known = _known_words()
+    out = []
+    for tok in _tokens(name):
+        if tok in known or len(tok) < 6:
+            out.append(tok)
+            continue
+        seg = _segment(tok, known)
+        out.extend(seg if seg and len(seg) > 1 else [tok])
+    return out
 
 
 REL_MIN_NORMAL = 1.5                # Stufe 'normal': Tabelle gilt schon ab hier als Item-Liste
@@ -128,14 +168,11 @@ def table_relevance(name, role="", columns=(), level=LEVEL_STRICT):
     keine spielspezifischen Namen.  'DT_ItemParam' ~ 9, 'DT_FxParam_Player' ~ -8, 'DT_UIMapParam' ~ -8.
     level 'normal': ein Item-Wort im Namen wiegt schwerer als ein Negativwort ('DT_ItemSkill' bleibt drin), die
     Spalten (Preis, Stapel, Gewicht ...) zaehlen staerker."""
-    toks = _tokens(name)
-    low = str(name).lower()
+    toks = _split_tokens(name)                      # auch GROSSGESCHRIEBEN / zusammengeschrieben ("DT_ITEMPARAM", "mstitem")
     prim = [TABLE_PRIMARY[t] for t in toks if t in TABLE_PRIMARY]
-    if not prim:                                    # GROSSGESCHRIEBEN ohne Wortgrenzen ("DT_ITEMPARAM"): Teilwort >= 4 Zeichen
-        prim = [w for k, w in TABLE_PRIMARY.items() if len(k) >= 4 and k in low and not [t for t in toks if t in TABLE_NEGATIVE]]
-        prim = prim[:1]
     rel = [TABLE_RELATION[t] for t in toks if t in TABLE_RELATION]
     neg = sum(1 for t in toks if t in TABLE_NEGATIVE)
+    pres = sum(1 for t in toks if t in TABLE_PRESENTATION)
     score = 0.0
     if prim:
         score += max(prim) + 0.5 * (len(prim) - 1)
@@ -149,7 +186,8 @@ def table_relevance(name, role="", columns=(), level=LEVEL_STRICT):
     if level == LEVEL_STRICT:
         score -= 8 * min(neg, 2)
     elif prim and max(prim) >= 4:
-        score -= NEG_PENALTY_WITH_ITEM_WORD * min(neg, 2)        # klares Item-Wort: Negativwort ist nur ein Hinweis
+        # klares Item-Wort: ein Negativwort ist nur ein Hinweis ('DT_ItemSkill' bleibt), ein reines Darstellungs-Wort nicht
+        score -= NEG_PENALTY_WITH_ITEM_WORD * min(neg - pres, 2) + (PRESENTATION_PENALTY if pres else 0)
     else:
         score -= NEG_PENALTY[LEVEL_NORMAL] * min(neg, 2) if level == LEVEL_NORMAL else 0
     score += ROLE_BONUS.get(role, 0) if level == LEVEL_STRICT else max(ROLE_BONUS.get(role, 0), -1)

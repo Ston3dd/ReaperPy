@@ -15,7 +15,7 @@ import tkinter as tk
 from tkinter import filedialog, simpledialog, ttk
 
 import ue_quick as Q
-from tools_common import ACCENT, BG, FONT_LABEL, TEXT_DIM, WARN, BaseTab, button, entry, label, tree, with_scroll
+from tools_common import ACCENT, BG, ERROR, FONT_LABEL, TEXT_DIM, WARN, BaseTab, button, entry, label, tree, with_scroll
 
 CFG = os.path.join(os.path.expanduser("~"), ".reaperpy_uelive.json")
 TICK_MS = 400
@@ -279,7 +279,7 @@ class UeLiveTab(BaseTab):
                 fg=ACCENT,
             )
 
-        self.bg(job, ok, lambda e: (self.log(f"UE-LIVE: {e}", "err"), self.lbl.configure(text=f"Fehler: {e}", fg="#ff3366")))
+        self.bg(job, ok, lambda e: (self.log(f"UE-LIVE: {e}", "err"), self.lbl.configure(text=f"Fehler: {e}", fg=ERROR)))
 
     def _on_pick(self):
         sel = self.tl.selection()
@@ -412,7 +412,7 @@ class UeLiveTab(BaseTab):
             job,
             ok,
             lambda e: (
-                self.lbl_cur.configure(text=f"{cur.key}  -  Fehler", fg="#ff3366"),
+                self.lbl_cur.configure(text=f"{cur.key}  -  Fehler", fg=ERROR),
                 self.log(f"UE-LIVE: {e}", "err"),
             ),
         )
