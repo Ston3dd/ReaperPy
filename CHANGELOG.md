@@ -4,6 +4,10 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 
 ## Unreleased
 
+## 6.1.0 - 2026-11-08
+
+**How-to guides for beginners, built into the program.** Please update - nothing else changes for existing projects.
+
 ### Added
 - **How-to guides for beginners.** 13 step-by-step guides in German and English (first steps, find a value, edit cheats, assembler for
   beginners, items in Unreal / Unity games, values and live values, export, pointers, debugger, advanced tools, troubleshooting,
