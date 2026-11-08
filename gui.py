@@ -381,6 +381,7 @@ class App:
         self.current_project = None
         self.tools_stash = None      # Cheat-Liste/Pointer, wenn das Werkzeug-Fenster zu ist
         self._tools = None
+        self._howto = None
         self._library = None
         self._saved_entries = {}     # aus applied.json (nur zum Anreichern, nie blind vertraut)
         self._saved_pid = None
@@ -405,6 +406,10 @@ class App:
             tools_i18n.install_var_hook(tk.StringVar)
             tools_i18n.install_combobox_hook(ttk)
             tools_i18n.install_toplevel_hook(tk)
+            try:
+                tools_i18n.install_text_hooks(tk, ttk)
+            except Exception:  # noqa: BLE001 - die Hooks sind nur eine Zugabe, die Uebersetzung laeuft auch ohne
+                pass
             tools_i18n.install_dialog_hooks(messagebox, _sd, filedialog)
             self._i18n_note = tools_i18n.status()
         except Exception:
@@ -502,6 +507,14 @@ class App:
                            command=self.open_goldhen_export)
         btn_gh.pack(side="left", padx=2)
 
+        btn_howto = tk.Button(top, text="ANLEITUNGEN", bg=BG_CARD, fg=ACCENT,
+                              font=FONT_LABEL, relief="flat", bd=0, padx=10, pady=2,
+                              cursor="hand2",
+                              activebackground=BG_CARD_HVR, activeforeground=ACCENT,
+                              command=self.open_howto)
+        btn_howto.pack(side="left", padx=(8, 2))
+        self.tr.bind(btn_howto, "text", "btn_howto")
+
         self.lang_btn_de = tk.Button(top, text="DE", bg=BG_CARD, fg=TEXT_DIM,
                                      font=FONT_LABEL, relief="flat", bd=0,
                                      padx=8, pady=2, cursor="hand2",
@@ -562,6 +575,9 @@ class App:
             w = self._tools
             if w is not None and w.winfo_exists():
                 w.apply_language()                  # offenes Werkzeug-Fenster sofort umschalten
+            h = self._howto
+            if h is not None and h.winfo_exists():
+                h.apply_language()
         except Exception:
             pass
         self.cfg["language"] = lang
@@ -822,6 +838,23 @@ class App:
             except Exception:
                 pass
         self._tools = ToolsWindow(self)
+
+    def open_howto(self, slug=None):
+        """Anleitungen (eigenes Fenster, ohne Verbindung nutzbar); mit slug direkt diese Anleitung."""
+        try:
+            from tools_howto_gui import HowToWindow
+        except Exception as e:
+            messagebox.showerror(self.tr.t("dlg_error"), f"tools_howto_gui: {e}")
+            return
+        w = self._howto
+        if w is not None:
+            try:
+                if w.winfo_exists():
+                    w.show(slug)
+                    return
+            except Exception:
+                pass
+        self._howto = HowToWindow(self, slug)
 
     def open_goldhen_export(self):
         try:

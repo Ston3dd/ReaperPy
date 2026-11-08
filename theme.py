@@ -33,6 +33,9 @@ TEXT = "#f2f7ff"
 TEXT_DIM = "#93a9d3"
 TEXT_DIM2 = "#5b7099"
 
+# Hinweis-Kaesten in den Anleitungen (Tipp = ACCENT_BG, Hinweis = BG_CARD)
+CALLOUT_WARN_BG = "#3a2a08"
+
 # Status
 OK = "#3dff8c"
 WARN = "#ffc21a"

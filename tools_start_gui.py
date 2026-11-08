@@ -26,6 +26,8 @@ STEPS = [
      "ZU CHEATS BEARBEITEN", "t_cheat"),
 ]
 EXTRAS = [
+    ("Anleitungen", "Schritt-für-Schritt-Erklärungen zu allen Werkzeugen - zum Lesen und Suchen, in deiner Sprache.",
+     "ANLEITUNGEN ÖFFNEN", "howto"),
     ("Unreal-Engine-Spiel: Items als Trainer", "Alle Items eines Unreal-Spiels automatisch finden und als fertigen "
      "Trainer speichern - in drei Klicks.", "ZU ITEMS", "items_tab"),
     ("Unity-Spiel: Items als Trainer", "Alle Items eines Unity-Spiels automatisch finden und als fertigen Trainer "
@@ -101,6 +103,9 @@ class StartTab(BaseTab):
                 self.win.app.root.focus_force()
             except Exception:  # noqa: BLE001
                 pass
+            return
+        if target == "howto":
+            self.win.open_howto()
             return
         tab = getattr(self.win, target, None)
         if tab is None:

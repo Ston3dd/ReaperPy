@@ -22,6 +22,7 @@ with export to GoldHEN/etaHEN cheat formats (`.json`, `.shn`, `.mc4`).**
 - [Quick start](#quick-start)
 - [The main window](#the-main-window)
 - [The Tools window - every tab explained](#the-tools-window---every-tab-explained)
+- [How-to guides for beginners](#how-to-guides-for-beginners)
 - [Unreal Engine games](#unreal-engine-games)
 - [Export formats](#export-formats)
 - [Scripting](#scripting)
@@ -51,6 +52,7 @@ with export to GoldHEN/etaHEN cheat formats (`.json`, `.shn`, `.mc4`).**
 | **Python scripting** | A `ps5` object for scripts: pointers, AOB scans, writes with undo, function calls. |
 | **Per-game profiles** | Notes, favourites, groups and hotkeys per game; automatic code detection by title ID. |
 | **Languages** | German and English (switch at runtime, including all tool tabs). |
+| **How-to guides** | Step-by-step guides for beginners inside the program (**HOW TO** button in the main window, **? HELP** button in the tools window) and on GitHub, in German and English, searchable. |
 
 ## Screenshots
 
@@ -153,6 +155,31 @@ static UE-AUTO tools), the tab **★ UNITY** holds ITEMS, QUICK (values) and MAN
 | **UE DISCOVERER** | Analyses the SDK and tells you what is there to find: item structs, item tables, give-functions, stat enums, cheat managers - with a check whether a cave trainer can be built for each ("✔" / "✗ not possible: reason"). |
 | **UNITY** | The same idea for Unity (IL2CPP) games: **ITEMS** (all items as a trainer in three steps), then, from the Il2CppDumper folder, live values, method patches (always true, fixed return value, skip) and enum names (item IDs). See [below](#unity-il2cpp-games). |
 | **CHEAT MENU** | Switches and values for the player character, generated from the SDK. Works in shipping builds without a CheatManager. |
+
+### How-to guides for beginners
+
+The **HOW TO** button (German: **ANLEITUNGEN**) in the top bar of the main window opens a window that explains every tool step by step, in plain words. The language
+follows the **DE / EN** switch: switch it and the open guide is shown in the other language at once. The **? HELP** button in the
+header of the Tools window opens the guide that belongs to the tab you are looking at; the search box finds words in all guides.
+
+| Guide | Covers |
+|---|---|
+| First steps | Connecting, the START tab, which tool for which job, staying safe |
+| Find a value | FIND VALUE: scans, unknown values, memory sections, what to do next |
+| Edit cheats | EDIT CHEATS: NOP or code cave, from a found value to a cheat |
+| Assembler for beginners | Registers, the common instructions, reading a "who writes" line, a first cave line by line |
+| Items in Unreal / Unity games | The three-step item trainers, test and give buttons, what to do when only one item arrives |
+| Values, live values and the cheat menu | VALUES, LIVE, CHEAT MENU, DISCOVERER, EXPERT, Unity QUICK / MANUAL |
+| Export | `.json` / `.shn` / `.mc4`, where the files go on the console, switch order of item trainers |
+| Pointers and game updates | POINTER and AOB / UPDATE |
+| The debugger | Breakpoints, watchpoints, stepping, KERNEL LOG, FUNCTION LOGGER |
+| Advanced tools | MEMORY, CONVERTER, CALL FUNCTION, PYTHON SCRIPT, JOURNAL / UNDO, sessions |
+| Troubleshooting, Glossary | Common problems and plain-language explanations of the terms |
+
+The guides are plain Markdown files in [`docs/howto/en`](docs/howto/en) and [`docs/howto/de`](docs/howto/de) (file name
+`NN-name.md`, `NN` = order), so you can also read them here on GitHub. The program shows the same files. To add a guide, put a file
+with the same name into both folders; tests check that both languages have the same structure, that every link and every button
+name used in a guide really exists in the program, and that every tab has a guide to open.
 
 ### FIND VALUE (the cheat searcher)
 
@@ -455,7 +482,9 @@ and 3.12, Windows with 3.12, with Keystone and Capstone installed); `ruff` runs 
 | Path | Contents |
 |---|---|
 | `gui.py`, `branding.py`, `i18n.py` | Main window, splash screen, main-window texts (DE/EN) |
-| `tools_*.py` | Tools window and its tabs; `tools_i18n*.py` translates them at runtime |
+| `tools_*.py` | Tools window and its tabs; `tools_i18n*.py` translates them at runtime (also texts set later, context menus, headings) |
+| `theme.py` | The one colour palette of the whole interface |
+| `howto.py`, `tools_howto_gui.py`, `docs/howto/` | How-to guides: files, small Markdown parser and search, the HOW TO window |
 | `ps5_client.py`, `ps5_ext.py`, `ps5_more.py`, `ps5_backend.py` | Payload protocol client |
 | `ps5_notify.py` | Notifications on the PS5 screen (connect, cheats, debugger) |
 | `scanner.py`, `pointerscan.py`, `ptrscan_server.py` | Scanner and pointer scan |
@@ -468,7 +497,7 @@ and 3.12, Windows with 3.12, with Keystone and Capstone installed); `ruff` runs 
 | `updater.py`, `update_ui.py`, `version.py` | Self-update from GitHub Releases (download, SHA-256 check, backup + rollback), update dialog, program version |
 | `imagebase.py` | Checks the image base against the console's memory map (never guesses) |
 | `scripts/`, `.github/workflows/` | Changelog / release-note helpers; CI (tests, lint) and the release build |
-| `docs/` | `de/` German notes, `history/` old release notes, `screenshots/` |
+| `docs/` | `howto/` the guides (`de/`, `en/`), `de/` German notes, `history/` old release notes, `screenshots/` |
 | `tests/` | Unit tests |
 
 ## Credits and licenses

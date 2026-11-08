@@ -55,6 +55,11 @@ class Palette(unittest.TestCase):
         self.assertGreaterEqual(contrast(T.BORDER, T.BG), 1.5)
         self.assertGreaterEqual(contrast(T.BORDER_HVR, T.BG_CARD), 2.5)
 
+    def test_how_to_callout_colors_are_readable(self):
+        self.assertGreaterEqual(contrast(T.TEXT, T.ACCENT_BG), 7.0)             # Tipp-Kasten
+        self.assertGreaterEqual(contrast(T.WARN, T.CALLOUT_WARN_BG), 7.0)       # Achtung-Kasten
+        self.assertGreaterEqual(contrast(T.TEXT, T.CALLOUT_WARN_BG), 7.0)
+
     def test_status_colors_are_distinct(self):
         self.assertEqual(len({T.OK, T.WARN, T.ERROR, T.ACCENT}), 4)
 

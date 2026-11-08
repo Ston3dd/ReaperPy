@@ -6,6 +6,8 @@ Die Tabs haben ihre Texte deutsch im Code.  Statt jede Stelle umzubauen, ueberse
   apply_to(root)         Widget-Baum durchgehen: Beschriftungen, Notebook-Reiter, Tabellen-Kopfzeilen, Label-Variablen;
                          merkt sich je Widget den deutschen Originaltext -> Rueckschalten auf DE stellt alles wieder her
   install_var_hook()     StringVar.set uebersetzt Statuszeilen, die der Code nach dem Umschalten setzt
+  install_text_hooks()   configure(text=...), neue Widgets, Rechtsklick-Menues, Tabellen-Kopfzeilen und Reiter werden schon
+                         beim Setzen uebersetzt (sonst stuende der deutsche Text bis zum naechsten 2-s-Durchlauf da)
   install_dialog_hooks() Titel/Text von Meldungs-, Eingabe- und Dateidialogen
 Auf Deutsch (Standard) tun alle Funktionen nichts.
 """
@@ -95,6 +97,8 @@ tr = translate
 TEXT_CLASSES = {"Label", "Button", "Checkbutton", "Radiobutton", "Labelframe", "TLabel", "TButton", "TCheckbutton",
                 "TRadiobutton", "TLabelframe", "Menubutton", "TMenubutton"}
 VAR_CLASSES = {"Label", "TLabel"}
+MENU_LABEL_TYPES = {"command", "cascade", "checkbutton", "radiobutton"}
+_TEXT_WIDGET_NAMES = {"label", "button", "checkbutton", "radiobutton", "labelframe", "menubutton"}    # ohne "ttk::"
 
 
 # Rueckwaerts-Tabelle fuer Auswahllisten: angezeigter englischer Wert -> deutscher Originalwert.
@@ -146,8 +150,20 @@ def _apply_text(w, slot, current, setter):
     store[slot] = (orig, new)
 
 
+_APPLYING = False        # True, solange apply_to selbst Texte setzt (die Hooks duerfen dann nichts aendern oder merken)
+
+
 def apply_to(root):
     """Ganzen Widget-Baum unterhalb von root uebersetzen / zurueckstellen."""
+    global _APPLYING
+    _APPLYING = True
+    try:
+        _apply_to(root)
+    finally:
+        _APPLYING = False
+
+
+def _apply_to(root):
     stack = [root]
     while stack:
         w = stack.pop()
@@ -197,6 +213,14 @@ def apply_to(root):
                             w.setvar(tv, new)
                             if new != de:
                                 _REV.setdefault(new, de)
+            elif cls == "Menu":
+                last = w.index("end")
+                if last is not None:
+                    for i in range(int(last) + 1):
+                        if w.type(i) in MENU_LABEL_TYPES:
+                            cur = w.entrycget(i, "label")
+                            if isinstance(cur, str) and cur:
+                                _apply_text(w, f"menu:{i}", cur, lambda v, w=w, i=i: w.entryconfigure(i, label=v))
             elif cls == "TNotebook":
                 for tab in w.tabs():
                     cur = w.tab(tab, "text")
@@ -298,6 +322,163 @@ def install_combobox_hook(ttk_mod):
         return _REV.get(v, v) if LANG == "en" and isinstance(v, str) else v
     cb.__init__, cb.configure, cb.config, cb.get = init, conf, conf, get
     cb._i18n_hooked = True
+
+
+def _tr_set(w, slot, text):
+    """Text sofort uebersetzen und das deutsche Original merken (damit Rueckschalten auf DE funktioniert).  -> (neuer Text, Original)"""
+    if LANG != "en" or _APPLYING or not isinstance(text, str) or len(text) < MIN_FRAGMENT:
+        return text, None
+    return translate(text), text
+
+
+def install_text_hooks(tk_mod, ttk_mod=None):
+    """Texte werden schon beim Setzen uebersetzt, nicht erst beim naechsten Durchlauf von apply_to:
+       - neue Widgets (Label, Button, ...) und configure(text=...)  -> kein kurzes Aufblitzen von Deutsch nach einer Suche
+       - Rechtsklick-Menues (Menu.add/insert/entryconfigure)         -> Menues werden von apply_to nicht erreicht, solange sie neu entstehen
+       - Tabellen-Kopfzeilen (Treeview.heading) und Reiter (Notebook.add/tab)
+    Jede Aenderung faellt bei einem Fehler auf das unveraenderte Verhalten zurueck.  Idempotent; ohne echtes tkinter (Tests) wirkungslos."""
+    misc = getattr(tk_mod, "Misc", None)
+    base = getattr(tk_mod, "BaseWidget", None)
+    if misc is None or base is None or getattr(misc, "_i18n_text_hooked", False):
+        return
+    orig_conf, orig_init = misc.configure, base.__init__
+
+    def _is_text_widget(w):
+        try:
+            return w.winfo_class() in TEXT_CLASSES
+        except Exception:  # noqa: BLE001
+            return False
+
+    def conf(self, cnf=None, **kw):
+        de = None
+        try:
+            if LANG == "en" and not _APPLYING:
+                src = kw if isinstance(kw.get("text"), str) else (cnf if isinstance(cnf, dict) and isinstance(cnf.get("text"), str) else None)
+                if src is not None and _is_text_widget(self):
+                    en, de = _tr_set(self, "text", src["text"])
+                    if de is not None:
+                        if src is kw:
+                            kw = dict(kw, text=en)
+                        else:
+                            cnf = dict(cnf, text=en)
+        except Exception:  # noqa: BLE001
+            de = None
+        res = orig_conf(self, cnf, **kw)
+        if de is not None:
+            self.__dict__.setdefault("_i18n", {})["text"] = (de, (kw if "text" in kw else cnf)["text"])
+        return res
+
+    def init(self, master, widgetName, cnf={}, kw={}, extra=()):  # noqa: B006 - Signatur wie tkinter.BaseWidget
+        de, new = None, None
+        try:
+            if LANG == "en" and not _APPLYING and str(widgetName).split("::")[-1].lower() in _TEXT_WIDGET_NAMES:
+                for d in (kw, cnf):
+                    if isinstance(d, dict) and isinstance(d.get("text"), str):
+                        new, de = _tr_set(None, "text", d["text"])
+                        if de is not None:
+                            if d is kw:
+                                kw = dict(kw, text=new)
+                            else:
+                                cnf = dict(cnf, text=new)
+                        break
+        except Exception:  # noqa: BLE001
+            de = None
+        orig_init(self, master, widgetName, cnf, kw, extra)
+        if de is not None:
+            self.__dict__.setdefault("_i18n", {})["text"] = (de, new)
+
+    misc.configure = misc.config = conf
+    base.__init__ = init
+
+    menu = getattr(tk_mod, "Menu", None)
+    if menu is not None and not getattr(menu, "_i18n_text_hooked", False):
+        o_add, o_ins, o_cfg = menu.add, menu.insert, menu.entryconfigure
+
+        def _label(d_cnf, kw):
+            """-> (cnf, kw, deutscher Text oder None) mit uebersetztem label."""
+            try:
+                if LANG == "en" and not _APPLYING:
+                    for key in ("kw", "cnf"):
+                        d = kw if key == "kw" else d_cnf
+                        if isinstance(d, dict) and isinstance(d.get("label"), str):
+                            en, de = _tr_set(None, "label", d["label"])
+                            if de is not None:
+                                d = dict(d, label=en)
+                                return (d_cnf, d, de, en) if key == "kw" else (d, kw, de, en)
+                            break
+            except Exception:  # noqa: BLE001
+                pass
+            return d_cnf, kw, None, None
+
+        def add(self, itemType, cnf={}, **kw):  # noqa: B006
+            cnf, kw, de, en = _label(cnf, kw)
+            res = o_add(self, itemType, cnf, **kw)
+            if de is not None:
+                try:
+                    self.__dict__.setdefault("_i18n", {})[f"menu:{int(self.index('end'))}"] = (de, en)
+                except Exception:  # noqa: BLE001
+                    pass
+            return res
+
+        def insert(self, index, itemType, cnf={}, **kw):  # noqa: B006
+            cnf, kw, _de, _en = _label(cnf, kw)
+            return o_ins(self, index, itemType, cnf, **kw)
+
+        def entryconfigure(self, index, cnf=None, **kw):
+            cnf2, kw, de, en = _label(cnf if isinstance(cnf, dict) else {}, kw)
+            if isinstance(cnf, dict):
+                cnf = cnf2
+            res = o_cfg(self, index, cnf, **kw)
+            if de is not None:
+                try:
+                    self.__dict__.setdefault("_i18n", {})[f"menu:{int(self.index(index))}"] = (de, en)
+                except Exception:  # noqa: BLE001
+                    pass
+            return res
+        menu.add, menu.insert, menu.entryconfigure, menu.entryconfig = add, insert, entryconfigure, entryconfigure
+        menu._i18n_text_hooked = True
+
+    tv = getattr(ttk_mod, "Treeview", None) if ttk_mod is not None else None
+    if tv is not None and not getattr(tv, "_i18n_text_hooked", False):
+        o_head = tv.heading
+
+        def heading(self, column, option=None, **kw):
+            de = en = None
+            try:
+                if "text" in kw:
+                    en, de = _tr_set(self, "col", kw["text"])
+                    if de is not None:
+                        kw = dict(kw, text=en)
+            except Exception:  # noqa: BLE001
+                de = None
+            res = o_head(self, column, option, **kw)
+            if de is not None and isinstance(column, str):
+                self.__dict__.setdefault("_i18n", {})[f"col:{column}"] = (de, en)
+            return res
+        tv.heading = heading
+        tv._i18n_text_hooked = True
+
+    nb = getattr(ttk_mod, "Notebook", None) if ttk_mod is not None else None
+    if nb is not None and not getattr(nb, "_i18n_text_hooked", False):
+        o_nadd = nb.add
+
+        def nadd(self, child, **kw):
+            de = en = None
+            try:
+                if "text" in kw:
+                    en, de = _tr_set(self, "tab", kw["text"])
+                    if de is not None:
+                        kw = dict(kw, text=en)
+            except Exception:  # noqa: BLE001
+                de = None
+            res = o_nadd(self, child, **kw)
+            if de is not None:
+                self.__dict__.setdefault("_i18n", {})[f"tab:{child}"] = (de, en)
+            return res
+        nb.add = nadd
+        nb._i18n_text_hooked = True
+
+    misc._i18n_text_hooked = True
 
 
 def install_dialog_hooks(messagebox, simpledialog, filedialog):

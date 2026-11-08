@@ -18,6 +18,7 @@ datas = [(os.path.join(ROOT, 'assets'), 'assets')]
 for doc in ('LICENSE', 'NOTICE', 'README.md'):
     datas.append((os.path.join(ROOT, doc), '.'))
 datas.append((os.path.join(ROOT, 'licenses'), 'licenses'))
+datas.append((os.path.join(ROOT, 'docs', 'howto'), os.path.join('docs', 'howto')))      # Anleitungen (Tab ANLEITUNGEN)
 binaries = []
 for pkg in ('keystone', 'capstone'):
     tmp_ret = collect_all(pkg)

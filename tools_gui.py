@@ -3,6 +3,7 @@ Cheat-Editor, AOB/Update-Scan, Debugger).  Wird aus gui.py über den Button
 "WERKZEUGE" geöffnet und nutzt eine EIGENE Verbindung zur PS5, damit die
 Haupt-Verbindung (Patches an/aus) nie durcheinanderkommt."""
 import tools_i18n
+import howto
 import json
 import os
 import queue
@@ -994,6 +995,7 @@ class ToolsWindow(tk.Toplevel):
         self.lbl_state.pack(side="right", padx=12)
         button(head, "SESSION LADEN…", self.session_load).pack(side="right", padx=2, pady=4)
         button(head, "SESSION SPEICHERN…", self.session_save).pack(side="right", padx=2, pady=4)
+        button(head, "? HILFE", self.open_howto).pack(side="right", padx=(2, 10), pady=4)
 
         self.nb = ttk.Notebook(self); self.nb.pack(fill="both", expand=True, padx=6, pady=6)
         # Anfaenger-Tabs liegen oben, alles Spezielle im Tab FORTGESCHRITTEN (eigenes Notebook)
@@ -1093,9 +1095,12 @@ class ToolsWindow(tk.Toplevel):
                 msg = f"Tab {name} nicht geladen: {e}"
                 self.after(200, lambda msg=msg: self.log(msg, "err"))
         by_name = {name: t for t, name in tabs}
+        for t, name in tabs:                                       # welche Anleitung gehoert zu welchem Tab ("? HILFE")
+            t.howto_topic = howto.topic_for(name)
         try:
             from tools_start_gui import StartTab
             self.start_tab = StartTab(self.nb, self)
+            self.start_tab.howto_topic = howto.topic_for("START")
             self.nb.add(self.start_tab, text="START")
         except Exception as e:
             self.start_tab = None
@@ -1106,12 +1111,14 @@ class ToolsWindow(tk.Toplevel):
                 if inner in by_name:
                     self.groups[name].add(by_name[inner], sub_title)
             by_name[name] = self.groups[name]
+            self.groups[name].howto_topic = howto.topic_for(name)
         for name in self.SIMPLE:
             if name in by_name:
                 self.nb.add(by_name[name], text=name)
         for t, name in tabs:
             if name in self.ADVANCED:
                 self.adv_nb.add(t, text=name)
+        self.adv_frame.howto_topic = howto.topic_for("FORTGESCHRITTEN")
         self.nb.add(self.adv_frame, text="FORTGESCHRITTEN")
         self.easy_tab = by_name.get("★ UE-LIVE")
         if self.start_tab is not None:                             # Einsteiger-Tab zuerst zeigen
@@ -1246,6 +1253,24 @@ class ToolsWindow(tk.Toplevel):
     def ui(self, fn):
         """Thread-sicher etwas im UI-Thread ausführen (z.B. aus dem Debugger-Callback)."""
         self.q.put((lambda _v: fn(), None))
+
+    # ---- Anleitungen ----
+    def current_topic(self):
+        """Anleitung zum gerade offenen Tab (auch in Sammel-Tabs UNREAL / UNITY und in FORTGESCHRITTEN) oder None."""
+        try:
+            w = self.nametowidget(self.nb.select())
+            slug = getattr(w, "howto_topic", None)
+            inner = self.adv_nb if w is self.adv_frame else getattr(w, "nb", None)
+            if inner is not None:
+                sub = self.nametowidget(inner.select())
+                slug = getattr(sub, "howto_topic", None) or slug
+            return slug
+        except Exception:
+            return None
+
+    def open_howto(self, slug=None):
+        """Das Anleitungen-Fenster des Hauptfensters zeigen - ohne slug die Anleitung zum aktuellen Tab."""
+        self.app.open_howto(slug or self.current_topic() or "first-steps")
 
     # ---- Navigation zwischen Tabs ----
     def show_tab(self, tab):
