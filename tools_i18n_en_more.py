@@ -174,4 +174,8 @@ EN_MORE = {
     "WEITER": "CONTINUE",
     "Kein Patch-Dokument (Variables fehlt)": "Not a patch document (Variables missing)",
     "OriginSource fehlt": "OriginSource missing",
+    "Ordner fuer die .ReapPatch-Dateien": "Folder for the .ReapPatch files",
+    " Datei(en) nach ": " file(s) written to ",
+    "Keine Patches vorhanden.": "No patches available.",
+    "ALS REAPPATCH SPEICHERN ...": "SAVE AS REAPPATCH ...",
 }

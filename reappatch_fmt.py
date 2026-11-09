@@ -67,3 +67,46 @@ def convert(doc):
 def dumps(doc):
     """-> .ReapPatch-Bytes (UTF-8 ohne BOM, kompaktes JSON wie Reaper)."""
     return json.dumps(convert(doc), separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def doc_from_patch(rp):
+    """Geladener Patch (reapatch.ReapPatch, egal welches Quellformat) -> ReaperPy-Dokument fuer convert()."""
+    if not rp.origin_source:
+        raise ValueError("OriginSource fehlt")
+    variables = []
+    for i, (off, dv, nv) in enumerate(rp.sites()):
+        v = {"label": "OriginSource", "offset": off, "defaultValue": dv, "newValue": nv}
+        if i == 0 and getattr(rp, "origin_aob", ""):
+            v["aob"], v["aobOffset"] = rp.origin_aob, rp.origin_aob_offset
+        variables.append(v)
+    if rp.labels:
+        variables.append({"label": "OriginReturn", "offset": rp.origin_return_offset})
+        variables += [{"label": name, "defaultValue": code} for name, code in rp.labels]
+    return {"name": rp.name, "author": rp.author, "Variables": variables}
+
+
+def _safe_name(name):
+    s = "".join(c if c.isalnum() or c in " ._-()+" else "_" for c in str(name)).strip(" .")
+    return s or "Patch"
+
+
+def export_patches(patches, dest_dir):
+    """Jeden Patch als <Name>.ReapPatch in dest_dir schreiben (nie etwas ueberschreiben).
+    -> (geschriebene Dateinamen, [(Patch-Name, Fehlertext)])"""
+    import os
+    os.makedirs(dest_dir, exist_ok=True)
+    written, failed = [], []
+    for rp in patches:
+        try:
+            data = dumps(doc_from_patch(rp))
+        except Exception as e:  # noqa: BLE001
+            failed.append((getattr(rp, "name", "?"), str(e)))
+            continue
+        base = _safe_name(rp.name)
+        fn, i = base + ".ReapPatch", 2
+        while os.path.exists(os.path.join(dest_dir, fn)):
+            fn, i = f"{base} ({i}).ReapPatch", i + 1
+        with open(os.path.join(dest_dir, fn), "wb") as f:
+            f.write(data)
+        written.append(fn)
+    return written, failed

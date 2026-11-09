@@ -639,6 +639,10 @@ def _gui_dialog():
                       relief="flat", bd=0, padx=14, pady=4, cursor="hand2",
                       activebackground=BG_CARD_HVR, activeforeground=ACCENT,
                       command=self.do_import).pack(side="left", padx=6)
+            tk.Button(bar, text="ALS REAPPATCH SPEICHERN ...", bg=BG_CARD, fg=ACCENT, font=FONT_LABEL,
+                      relief="flat", bd=0, padx=14, pady=4, cursor="hand2",
+                      activebackground=BG_CARD_HVR, activeforeground=ACCENT,
+                      command=self.save_reappatch).pack(side="left", padx=6)
             tk.Label(bar, text="* = aktuell aktiv (Original-Bytes kommen dann aus defaultValue)",
                      bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(side="left", padx=12)
 
@@ -682,6 +686,22 @@ def _gui_dialog():
             for n in sk:
                 self._say(f"   uebersprungen: {n}", "warn")
             a.load_patches()
+
+        def save_reappatch(self):
+            """Die markierten Patches als .ReapPatch-Dateien (Reaper-Format) in einen Ordner schreiben - ohne Verbindung."""
+            import reappatch_fmt
+            sel = self.lb.curselection() or range(len(self.items))
+            chosen = [self.items[i][1] for i in sel]
+            if not chosen:
+                return self._say("Keine Patches vorhanden.", "err")
+            dest = filedialog.askdirectory(parent=self, title="Ordner fuer die .ReapPatch-Dateien",
+                                           initialdir=self.app.PATCH_DIR or None)
+            if not dest:
+                return
+            written, failed = reappatch_fmt.export_patches(chosen, dest)
+            self._say(f"ReapPatch: {len(written)} Datei(en) nach {dest} geschrieben", "ok")
+            for name, err in failed:
+                self._say(f"   uebersprungen: {name}: {err}", "warn")
 
         def detect_game(self):
             """Titel-ID, Name und Version des Vordergrund-Spiels von der Konsole holen."""

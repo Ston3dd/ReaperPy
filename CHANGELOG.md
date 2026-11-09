@@ -26,6 +26,8 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 
 - **ReapPatch export** for Reaper: **SAVE** in the CHEATS EDITOR (cheat editor) tab now also offers `*.ReapPatch`, written in the exact format Reaper uses
   (byte-identical to a real Reaper file, checked by a test). Reaper turns it into a `.ShnExt` itself. New module `reappatch_fmt.py`.
+  - New button **SAVE AS REAPPATCH ...** in the GoldHEN / etaHEN export window writes the marked patches (any source format) as
+    `.ReapPatch` files into a folder of your choice - no console connection needed, existing files are never overwritten.
 
 ### Fixed
 - Rip-relative operands in caves (`[rip + @hook+N]`) were placed wrongly when a jump to a label further down came before them

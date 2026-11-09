@@ -64,3 +64,33 @@ class T(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Folder(unittest.TestCase):
+    def test_export_patches_from_loaded_files(self):
+        with tempfile.TemporaryDirectory() as d, tempfile.TemporaryDirectory() as out:
+            src = os.path.join(d, "a.reapproj")
+            with open(src, "w", encoding="utf-8") as f:
+                json.dump(DOC, f)
+            plain = os.path.join(d, "b.reapproj")
+            with open(plain, "w", encoding="utf-8") as f:
+                json.dump({"name": "Plain", "Variables": [{"label": "OriginSource", "offset": 16, "defaultValue": "74 05",
+                                                           "newValue": "EB 05"}]}, f)
+            ps = [ReapPatch.load(src), ReapPatch.load(plain), ReapPatch.load(src)]
+            written, failed = R.export_patches(ps, out)
+            self.assertEqual((len(written), failed), (3, []))
+            self.assertEqual(len(set(written)), 3)                # gleiche Namen -> (2), nie ueberschreiben
+            with open(os.path.join(out, "Inf SBA.ReapPatch"), "rb") as fh:
+                first = fh.read().decode("utf-8")
+            self.assertEqual(first, SAMPLE)                       # auch ueber den Umweg ReapPatch.load bytegleich
+            rp = ReapPatch.load(os.path.join(out, "Plain.ReapPatch"))
+            self.assertEqual(rp.origin_source, (16, "74 05", "EB 05"))
+            self.assertEqual(rp.labels, [])
+
+    def test_broken_patch_is_reported_not_fatal(self):
+        class Bad:
+            name = "Kaputt"
+            origin_source = None
+        with tempfile.TemporaryDirectory() as out:
+            written, failed = R.export_patches([Bad()], out)
+        self.assertEqual((written, failed[0][0]), ([], "Kaputt"))
