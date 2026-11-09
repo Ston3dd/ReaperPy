@@ -172,4 +172,6 @@ EN_MORE = {
     "Was soll passieren?": "What should happen?",
     "ZAHL": "NUMBER",
     "WEITER": "CONTINUE",
+    "Kein Patch-Dokument (Variables fehlt)": "Not a patch document (Variables missing)",
+    "OriginSource fehlt": "OriginSource missing",
 }

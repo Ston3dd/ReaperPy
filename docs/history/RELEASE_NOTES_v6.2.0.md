@@ -18,6 +18,9 @@
   - New how-to guide "Player or enemy?" (guides are now 14).
 - New modules `asm_explain.py`, `asm_help.py`, `asm_recipes.py`, `whois.py`, `tools_who_gui.py`, `tools_asm_easy_gui.py`.
 
+- **ReapPatch export** for Reaper: **SAVE** in the cheat editor tab now also offers `*.ReapPatch`, written in the exact format Reaper uses
+  (byte-identical to a real Reaper file, checked by a test). Reaper turns it into a `.ShnExt` itself. New module `reappatch_fmt.py`.
+
 ### Fixed
 - Rip-relative operands in caves (`[rip + @hook+N]`) were placed wrongly when a jump to a label further down came before them
   (the size of an assembled forward jump differs). They are now measured on the finished code.

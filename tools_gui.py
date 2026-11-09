@@ -17,6 +17,7 @@ import aob as AOB
 import asm_explain as AX
 import asm_help as AH
 import asm_recipes as AR
+import reappatch_fmt as RF
 import asm_tools as AT
 import ps5_ext as X
 from ps5_client import PS5DebugClient
@@ -704,11 +705,15 @@ class CheatTab(BaseTab):
         fn = filedialog.asksaveasfilename(
             parent=self, initialdir=folder or None,
             initialfile=f"{data['name']}.reapproj", defaultextension=".reapproj",
-            filetypes=[("ReapProj", "*.reapproj"), ("JSON", "*.json")])
+            filetypes=[("ReapProj", "*.reapproj"), ("ReapPatch (Reaper)", "*.ReapPatch"), ("JSON", "*.json")])
         if not fn:
             return
-        with open(fn, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        if fn.lower().endswith(".reappatch"):
+            with open(fn, "wb") as f:
+                f.write(RF.dumps(data))
+        else:
+            with open(fn, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
         self.log(f"Gespeichert: {fn}", "ok")
         if folder and os.path.abspath(os.path.dirname(fn)) == os.path.abspath(folder):
             self.win.app.load_patches()
