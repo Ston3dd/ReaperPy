@@ -4,6 +4,28 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 
 ## Unreleased
 
+**A guided assistant from a number in the game to a finished cheat, and ReapPatch export.**
+
+### Removed
+- The **SPIELER / GEGNER (PLAYER / ENEMY)** tab and its button in the DISASSEMBLER tab from 6.2.0: too complicated in use. The how-to guide
+  "Player or enemy?" is gone too (guides are now 14 with the new "Cheat in four steps").
+
+### Added
+- **New tab ASSISTANT (first tab)**: four steps without assembler knowledge.
+  1. **Find the value** - type a number from the game (or choose "Number unknown" for bars) and press **SEARCH**.
+  2. **Narrow down** - change the value in the game and press **NARROW DOWN** with the new number, or **DROPPED / ROSE / STAYED THE SAME**
+     when the number is unknown. At 50 hits or fewer the addresses with live values are listed, with advice what to do next.
+  3. **Who changes the value?** - **WATCH** sets a write watchpoint on the chosen hit (attaching the debugger if needed). Every hit is
+     resolved to the instruction that really wrote the value (the one before the reported RIP, chosen by checking its memory operand
+     against the watched address) and resumed at once, so the game keeps running. The table shows the instruction, a plain-words
+     explanation and how often it ran.
+  4. **Create the cheat** - **PRESET...** for the marked instruction, or open it in the disassembler.
+  - New how-to guide "Cheat in four steps". New modules `assist.py`, `tools_assist_gui.py`.
+- **ReapPatch export** for Reaper: **SAVE** in the cheat editor tab now also offers `*.ReapPatch`, written in the exact format Reaper uses
+  (byte-identical to a real Reaper file, checked by a test). Reaper turns it into a `.ShnExt` itself. New module `reappatch_fmt.py`.
+  - New button **SAVE AS REAPPATCH ...** in the GoldHEN / etaHEN export window writes the marked patches (any source format) as
+    `.ReapPatch` files into a folder of your choice - no console connection needed, existing files are never overwritten.
+
 ## 6.2.0 - 2026-11-09
 
 **The assembler is easier for beginners, and the tool can tell the player from enemies.** Please update - nothing else changes for existing projects.
@@ -23,11 +45,6 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
   only to the player (or only to enemies). Red-zone safe, flags preserved. New button **PLAYER / ENEMY...** in the DISASSEMBLER tab.
   - New how-to guide "Player or enemy?" (guides are now 14).
 - New modules `asm_explain.py`, `asm_help.py`, `asm_recipes.py`, `whois.py`, `tools_who_gui.py`, `tools_asm_easy_gui.py`.
-
-- **ReapPatch export** for Reaper: **SAVE** in the CHEATS EDITOR (cheat editor) tab now also offers `*.ReapPatch`, written in the exact format Reaper uses
-  (byte-identical to a real Reaper file, checked by a test). Reaper turns it into a `.ShnExt` itself. New module `reappatch_fmt.py`.
-  - New button **SAVE AS REAPPATCH ...** in the GoldHEN / etaHEN export window writes the marked patches (any source format) as
-    `.ReapPatch` files into a folder of your choice - no console connection needed, existing files are never overwritten.
 
 ### Fixed
 - Rip-relative operands in caves (`[rip + @hook+N]`) were placed wrongly when a jump to a label further down came before them

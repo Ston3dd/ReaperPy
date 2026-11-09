@@ -139,16 +139,15 @@ def _set_line(body_line, value):
     raise ValueError("Dieser Befehl hat kein Ziel, das man setzen koennte")
 
 
-def make_plan(rid, data, addr, value="", guarded=False):
-    """Preset auf den Befehl bei `addr` anwenden (`data` = mindestens 16 Byte ab addr).
-    guarded=True: immer als Cave bauen (damit eine Pruefung 'nur Spieler' davor passt)."""
+def make_plan(rid, data, addr, value=""):
+    """Preset auf den Befehl bei `addr` anwenden (`data` = mindestens 16 Byte ab addr)."""
     recipe(rid)
     ins = _first_insn(data, addr)
     plan = {"id": rid, "addr": addr, "insn": f"{ins['mnemonic']} {ins['op_str']}".strip(), "warnings": []}
-    if rid == "disable" and not guarded:
+    if rid == "disable":
         plan.update(kind="patch", size=ins["size"], new="\n".join(["nop"] * ins["size"]))
         return plan
-    if rid == "return_now" and not guarded:
+    if rid == "return_now":
         plan.update(kind="patch", size=max(ins["size"], 1), new="ret")
         if ins["size"] > 1:
             plan["new"] = "ret\n" + "\n".join(["nop"] * (ins["size"] - 1))
@@ -158,28 +157,15 @@ def make_plan(rid, data, addr, value="", guarded=False):
     info = AT.build_cave_hook(data, addr, 8)
     body = [ln.strip() for ln in info["cave"].splitlines() if ln.strip() and not ln.strip().startswith(";")]
     body = [ln for ln in body if ln != "jmp OriginReturn"]
-    if rid == "disable":
-        cheat = body[1:]                                   # der erste Befehl (der Schreibzugriff) entfaellt
-    elif rid == "return_now":
-        cheat = ["ret"]
-        plan["warnings"].append("Nur am ANFANG einer Funktion sinnvoll")
-    else:
-        cheat = [body[0], _set_line(body[0], value)] + body[1:]
+    cheat = [body[0], _set_line(body[0], value)] + body[1:]
     plan.update(kind="cave", size=info["size"], default=info["default"], body=body,
                 cheat=cheat, warnings=plan["warnings"] + list(info["warnings"]), ret=info["size"])
     return plan
 
 
-def cave_text(plan, guard=None):
-    """Text fuer das Cave-Feld.  guard = Ergebnis von whois.guard_blocks() (nur Spieler / nur Gegner)."""
+def cave_text(plan):
+    """Text fuer das Cave-Feld."""
     if plan["kind"] != "cave":
         raise ValueError("Dieses Preset braucht keine Cave")
-    if guard is None:
-        return ("; Preset: " + plan["id"] + "\n" + "\n".join(plan["cheat"]) + "\njmp OriginReturn\n")
-    head, normal_label = guard["head"], guard["normal_label"]
-    out = ["; Preset: " + plan["id"] + " - nur wenn die Pruefung zutrifft"]
-    out += head
-    out += guard["on_match"] + plan["cheat"] + ["jmp OriginReturn", f"{normal_label}:"]
-    out += guard["on_normal"] + plan["body"] + ["jmp OriginReturn"]
-    return "\n".join(out) + "\n"
+    return "; Preset: " + plan["id"] + "\n" + "\n".join(plan["cheat"]) + "\njmp OriginReturn\n"
 

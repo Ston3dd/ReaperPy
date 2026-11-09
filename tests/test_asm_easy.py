@@ -82,19 +82,15 @@ class Help(unittest.TestCase):
 
 
 class Recipes(unittest.TestCase):
-    def plan(self, rid, insns, value="", guarded=False):
+    def plan(self, rid, insns, value=""):
         with mock.patch.object(AT, "disassemble_lines", fake_lines(*insns)):
-            return AR.make_plan(rid, bytes(32), 0x1000, value, guarded)
+            return AR.make_plan(rid, bytes(32), 0x1000, value)
 
     SUB = [("sub", "dword ptr [rbx + 0x10], 1", 4), ("mov", "eax, 7", 5)]
 
     def test_disable_is_a_nop_patch(self):
         p = self.plan("disable", self.SUB)
         self.assertEqual((p["kind"], p["size"], p["new"].split()), ("patch", 4, ["nop"] * 4))
-
-    def test_disable_guarded_skips_only_the_first_instruction_in_a_cave(self):
-        p = self.plan("disable", self.SUB, guarded=True)
-        self.assertEqual((p["kind"], p["cheat"], p["size"]), ("cave", ["mov eax, 7"], 9))
 
     def test_set_value_writes_after_the_original_instruction(self):
         p = self.plan("set_value", self.SUB, "999")

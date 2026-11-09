@@ -289,7 +289,6 @@ class DisasmTab(BaseTab):
         button(act, "PRESET…", self.recipe, accent=True).pack(side="left", padx=2)
         button(act, "XREFS AUF ADRESSE", self.xrefs).pack(side="left", padx=2)
         button(act, "→ HEX", self.to_hex).pack(side="left", padx=2)
-        button(act, "SPIELER / GEGNER…", self.to_who).pack(side="left", padx=2)
         button(act, "→ CHEAT-EDITOR", self.to_cheat, accent=True).pack(side="right")
         button(act, "ALS CAVE-HOOK", self.to_cave_hook, accent=True).pack(side="right", padx=(0, 6))
 
@@ -393,9 +392,12 @@ class DisasmTab(BaseTab):
         sel = self._selected()
         if not sel:
             return self.log("Erst die Zeile markieren, die geändert werden soll", "warn")
-        a = sel[0]["addr"]
+        self.recipe_at(sel[0]["addr"], f"{sel[0]['mnemonic']} {sel[0]['op_str']}".strip())
+
+    def recipe_at(self, a, insn_text):
+        """PRESET fuer den Befehl bei `a` (auch vom Tab ASSISTENT aus aufrufbar)."""
         from tools_asm_easy_gui import ask_recipe
-        res = ask_recipe(self, f"{sel[0]['mnemonic']} {sel[0]['op_str']}".strip())
+        res = ask_recipe(self, insn_text)
         if not res:
             return
         rid, value = res
@@ -422,12 +424,6 @@ class DisasmTab(BaseTab):
                 self.log("Preset als Cave-Hook im Cheat-Editor angelegt - dort TEST AN / SPEICHERN", "ok")
         self.bg(job, ok, lambda e: messagebox.showerror("Preset", AH.friendly_error(str(e), ""), parent=self)
                 if "Assembler" in str(e) or "Keystone" in str(e) else messagebox.showerror("Preset", str(e), parent=self))
-
-    def to_who(self):
-        sel = self._selected()
-        if not sel:
-            return self.log("Erst den Befehl markieren, der das Leben ändert", "warn")
-        self.win.to_who(sel[0]["addr"])
 
     def xrefs(self):
         sel = self._selected()
@@ -1028,9 +1024,9 @@ class AobTab(BaseTab):
 # ==================================================================
 class ToolsWindow(tk.Toplevel):
     # Reihenfolge der Anfaenger-Tabs (START kommt zuerst, FORTGESCHRITTEN zuletzt)
-    SIMPLE = ("WERT SUCHEN", "CHEATS BEARBEITEN", "★ UNREAL", "★ UNITY")
+    SIMPLE = ("ASSISTENT", "WERT SUCHEN", "CHEATS BEARBEITEN", "★ UNREAL", "★ UNITY")
     ADVANCED = ("SPEICHER", "DISASSEMBLER", "POINTER", "KONVERTER", "AOB / UPDATE", "DEBUGGER", "KERNEL-LOG",
-                "PYTHON-SKRIPT", "FUNKTION AUFRUFEN", "FUNKTIONS-LOGGER", "SPIELER / GEGNER", "JOURNAL / UNDO")
+                "PYTHON-SKRIPT", "FUNKTION AUFRUFEN", "FUNKTIONS-LOGGER", "JOURNAL / UNDO")
     # Sammel-Tabs: Reitername -> [(interner Tab-Name, Reiter-Beschriftung im Sammel-Tab)] in Arbeitsreihenfolge
     GROUPS = {
         "★ UNREAL": (("★ ITEMS", "ITEMS"), ("★ WERTE", "WERTE"), ("★ UE-LIVE", "LIVE"), ("★ CHEAT-MENÜ", "CHEAT-MENÜ"),
@@ -1125,10 +1121,10 @@ class ToolsWindow(tk.Toplevel):
         self.unity_items_tab = None
         self.unity_tab = None
         # jeder Zusatz-Tab einzeln: ein defekter Tab darf die anderen nicht mitreissen
-        extra = (("tools_extra_gui", "CallerTab", "FUNKTION AUFRUFEN"),
+        extra = (("tools_assist_gui", "AssistTab", "ASSISTENT"),
+                 ("tools_extra_gui", "CallerTab", "FUNKTION AUFRUFEN"),
                  ("tools_extra_gui", "LoggerTab", "FUNKTIONS-LOGGER"),
                  ("tools_extra_gui", "JournalTab", "JOURNAL / UNDO"),
-                 ("tools_who_gui", "WhoTab", "SPIELER / GEGNER"),
                  ("tools_uelive_gui", "UeLiveTab", "★ UE-LIVE"),
                  ("tools_items_gui", "ItemsTab", "★ ITEMS"),
                  ("tools_values_gui", "ValuesTab", "★ WERTE", {"engine": "ue"}),
@@ -1149,8 +1145,6 @@ class ToolsWindow(tk.Toplevel):
                 tabs.append((t, name))
                 if clsname == "DiscoverTab":
                     self.discover_tab = t
-                if clsname == "WhoTab":
-                    self.who_tab = t
                 if clsname == "ItemsTab":
                     self.items_tab = t
                 if name == "★ WERTE":
@@ -1388,14 +1382,6 @@ class ToolsWindow(tk.Toplevel):
 
     def to_cave_hook(self, data):
         self.show_tab(self.t_cheat); self.t_cheat.fill_hook(data)
-
-    def to_who(self, addr):
-        """Adresse an den Tab SPIELER / GEGNER geben (vom Disassembler)."""
-        tab = getattr(self, "who_tab", None)
-        if tab is None:
-            return self.log("Der Tab SPIELER / GEGNER ist nicht verfügbar", "err")
-        self.show_tab(tab)
-        tab.fill(addr)
 
     # ---- Sitzung ----
     def session_save(self):

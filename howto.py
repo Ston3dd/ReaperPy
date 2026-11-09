@@ -19,6 +19,7 @@ LANGS = ("de", "en")
 # interner Tab-Name (wie im Code von tools_gui.py) -> Anleitung.  Die "?"-Taste oeffnet die Anleitung des gerade offenen Tabs.
 TAB_TOPICS = {
     "START": "first-steps",
+    "ASSISTENT": "guided-cheat",
     "WERT SUCHEN": "find-value",
     "CHEATS BEARBEITEN": "edit-cheats",
     "DISASSEMBLER": "assembler-basics",
@@ -30,7 +31,6 @@ TAB_TOPICS = {
     "★ WERTE UNITY": "values-and-live", "★ UNITY MANUELL": "values-and-live",
     "POINTER": "pointers", "AOB / UPDATE": "pointers",
     "DEBUGGER": "debugger", "KERNEL-LOG": "debugger", "FUNKTIONS-LOGGER": "debugger",
-    "SPIELER / GEGNER": "player-or-enemy",
     "FORTGESCHRITTEN": "advanced-tools", "SPEICHER": "advanced-tools", "PYTHON-SKRIPT": "advanced-tools",
     "FUNKTION AUFRUFEN": "advanced-tools", "JOURNAL / UNDO": "advanced-tools",
 }

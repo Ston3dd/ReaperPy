@@ -1,31 +1,67 @@
-<div align="center">
-
-<img src="assets/reaperpy.png" alt="ReaperPy" width="120">
-
 # ReaperPy
 
-**Cheats, trainers and debugging for the PS5 – in one friendly desktop app.**
-
-Patches and code caves · memory scanner · pointer scan · debugger · Unreal & Unity item trainers · GoldHEN / etaHEN export
+**A toolkit for the PS5 on top of the [ps5debug-NG](https://github.com/Pharaoh2k/ps5debug-NG) payload: patches and code caves, memory scanner,
+pointer scan, debugger, disassembler, Unreal Engine and Unity tools (items as a trainer in three clicks), a cheat menu -
+with export to GoldHEN/etaHEN cheat formats (`.json`, `.shn`, `.mc4`).**
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)
 
-**English** · [Deutsch](docs/de/README_DE.md)
-
-</div>
-
-ReaperPy is a toolkit on top of the [ps5debug-NG](https://github.com/Pharaoh2k/ps5debug-NG) payload. Find a value, turn it into a
-patch or a code cave, give yourself items in three clicks, and export everything as cheat files for GoldHEN / etaHEN.
-
-> **Use it only on your own console, with your own games, in single-player / offline modes.**
-> Writing to a running game can crash it or corrupt your save game – back up first. No warranty (see [LICENSE](LICENSE)).
+> **Use it only on your own console, with your own games, in single-player/offline modes.**
+> Writing to a running game can crash it or corrupt your save game - back up first. No warranty (see [LICENSE](LICENSE)).
 > ReaperPy contains no game data, no keys for protected content and no way around online protections.
 
-<!--
-Screenshots: see docs/screenshots/README.md. Once the files exist, remove the comment markers around this block.
+---
 
+## Contents
+
+- [Features at a glance](#features-at-a-glance)
+- [Screenshots](#screenshots)
+- [Install and start](#install-and-start)
+- [Quick start](#quick-start)
+- [The main window](#the-main-window)
+- [The Tools window - every tab explained](#the-tools-window---every-tab-explained)
+- [How-to guides for beginners](#how-to-guides-for-beginners)
+- [Unreal Engine games](#unreal-engine-games)
+- [Export formats](#export-formats)
+- [Scripting](#scripting)
+- [Configuration](#configuration)
+- [Development and tests](#development-and-tests)
+- [Project layout](#project-layout)
+- [Credits and licenses](#credits-and-licenses)
+
+---
+
+## Features at a glance
+
+| Area | What you get |
+|---|---|
+| **Patches and caves** | Edit patches as `.reapproj` projects: simple byte patch / NOP, or a code cave written in x86-64 Intel assembly (Keystone). Caves are placed in free padding of the game image. |
+| **Cheat searcher** | CheatEngine-style scanner running on the console: first / next scan, exact, approximate (float), greater / less / between, increased / decreased by, changed / unchanged, unknown initial value. Address list with freeze, set value, "who writes this?". |
+| **Pointer scan** | Build pointer paths to a value (with a map, or the fast on-console scan level by level). |
+| **Debugger** | Attach, software breakpoints, hardware watchpoints, registers, stack, threads, step into / over / out, run to. |
+| **Disassembler / memory** | Hex view with value inspector, snapshots and compare, save a region to file; x86-64 disassembly; AOB signatures. |
+| **Items as a trainer** | **Unreal and Unity games:** find every item of the game, pick the right table and give function automatically, **test** it, **give items right away** or save them as a ready-made trainer - in three clicks. Respects the game's inventory limits; **INVENTORY TO MAX** for games that have an expansion function. |
+| **Unreal Engine tools** | Live object browser, value editing and freezing, an *Entdecker* ("Discoverer") that finds item tables and give-functions, and a **cheat menu** generated from the game's SDK. |
+| **Unity (IL2CPP) tools** | Live values, method patches (always true, fixed return value, empty), enum names for item IDs and the ITEMS tab, from an Il2CppDumper folder. |
+| **Calling and logging** | Call any game function with arguments; log every call of a function through a code cave. |
+| **Safety net** | Journal / undo for every write the tools make. |
+| **Console notifications** | On-screen messages on the PS5 when ReaperPy connects, when a cheat is switched on/off (also while the debugger is attached) and when the debugger attaches / detaches. |
+| **Export / import** | `.json`, `.shn` and `.mc4` cheat files for GoldHEN/etaHEN; import them back into patches. |
+| **Python scripting** | A `ps5` object for scripts: pointers, AOB scans, writes with undo, function calls. |
+| **Per-game profiles** | Notes, favourites, groups and hotkeys per game; automatic code detection by title ID. |
+| **Languages** | German and English (switch at runtime, including all tool tabs). |
+| **Assistant** | Four guided steps from a number in the game to a finished cheat: find the value, narrow it down, find the instruction that writes it, create a preset. |
+| **Assembler for beginners** | Plain-words explanation of each instruction, ready-made PRESETS, live size preview and friendly error messages. |
+| **How-to guides** | Step-by-step guides for beginners inside the program (**HOW TO** button in the main window, **? HELP** button in the tools window) and on GitHub, in German and English, searchable. |
+
+## Screenshots
+
+Screenshots go into [`docs/screenshots/`](docs/screenshots/README.md) (the list of shots to take is there). Once the files exist,
+uncomment the block below.
+
+<!--
 | Main window | Cheat searcher |
 |---|---|
 | ![Main window](docs/screenshots/01-main-window.png) | ![Find value](docs/screenshots/02-find-value.png) |
@@ -33,91 +69,442 @@ Screenshots: see docs/screenshots/README.md. Once the files exist, remove the co
 | Edit cheats (code cave) | Debugger |
 |---|---|
 | ![Edit cheats](docs/screenshots/03-edit-cheats.png) | ![Debugger](docs/screenshots/04-debugger.png) |
+
+| UE-LIVE | UE Discoverer | Cheat menu |
+|---|---|---|
+| ![UE-LIVE](docs/screenshots/05-ue-live.png) | ![UE Discoverer](docs/screenshots/06-ue-discoverer.png) | ![Cheat menu](docs/screenshots/07-cheat-menu.png) |
 -->
 
-## Contents
+---
 
-[Highlights](#highlights) · [Install](#install) · [Quick start](#quick-start) · [Documentation](#documentation) · [Configuration](#configuration) · [Credits](#credits-and-licenses)
+## Install and start
 
-## Highlights
+**Requirements**
 
-| | |
-|---|---|
-| 🎯 **Cheat searcher** | CheatEngine-style scans on the console (exact, float, between, changed, unknown initial value), address list with freeze and *who writes this?* |
-| 🧩 **Patches & code caves** | Byte patch / NOP or x86-64 assembly (Keystone) in free padding of the game image, saved as `.reapproj` projects |
-| 🎒 **Items as a trainer** | Unreal **and** Unity games: find all items, test the give function, **give now** or save a ready-made trainer – three clicks |
-| 🐞 **Debugger** | Breakpoints, hardware watchpoints, registers, stack, threads, step into / over / out |
-| 🔎 **Memory & disassembly** | Hex view with value inspector, snapshots, x86-64 disassembler, AOB signatures that survive game updates |
-| 🧭 **Pointer scan** | Pointer paths to a value, also as a fast level-by-level scan on the console |
-| 📤 **Export / import** | `.json`, `.shn` and `.mc4` for GoldHEN / etaHEN |
-| 🛟 **Safety net** | Journal / undo for every write the tools make |
-| 🐍 **Scripting** | A `ps5` object for Python scripts: pointers, AOB scans, writes with undo, function calls |
-| 🎓 **Beginner-friendly** | START tab, plain-words assembler explanations, step-by-step **HOW TO** guides inside the program, German and English |
-
-More: Unreal object browser and cheat menu, Unity method patches, player-or-enemy detection, per-game profiles with notes and
-hotkeys, notifications on the PS5 screen.
-
-## Install
-
-**You need**
-
-- A jailbroken PS5 running the **[ps5debug-NG](https://github.com/Pharaoh2k/ps5debug-NG)** payload (command port `744`, kernel log `3232`, debugger back channel `755`).
-- A PC in the same network. Allow the app through the firewall for **port 755** (the console connects *back* to report breakpoint hits).
-- Python **3.10+** with `tkinter` – or the ready-made Windows build below.
-
-**From source**
+- A jailbroken PS5 running the **[ps5debug-NG](https://github.com/Pharaoh2k/ps5debug-NG)** payload by OSR / Pharaoh2k (command port `744`, kernel log `3232`, debugger back channel `755`).
+- Python **3.10+** with `tkinter` (included in the Windows installer; on Linux install `python3-tk`).
+- A PC in the same network. Allow the app through the firewall for **port 755** (the console connects *back* to your PC to
+  report breakpoint hits).
 
 ```bash
 pip install -r requirements.txt     # keystone-engine, capstone, pillow
 python gui.py                       # Windows: double-click start.bat (checks Python, tkinter and packages first)
 ```
 
-On Linux install `python3-tk` first.
+A Windows folder build (no Python needed) is created with `build_exe.bat` (PyInstaller, no `--onefile`: configuration,
+profiles and logs stay next to the EXE).
 
-**Ready-made Windows build** – download `ReaperPy_v<version>_win64.zip` from the GitHub **Releases** page, check it against the
-`.sha256` file next to it, unpack it and start `ReaperPy.exe`. Releases from 5.9.1 on update themselves. Details and the
-update-from-5.9.1 note: [docs/en/DEVELOPMENT.md](docs/en/DEVELOPMENT.md).
+**Ready-made Windows build.** Download `ReaperPy_v<version>_win64.zip` from the GitHub **Releases** page, check it against the
+`.sha256` file next to it, unpack it and start `ReaperPy.exe`. Releases from 5.9.1 on can update themselves (see **Auto-update**
+below); 5.9.0 and older have to be replaced by hand once. The updater of 5.9.1 cannot replace files that the running program has
+open - if the update from 5.9.1 ends with `[WinError 32]` and "rolled back" (nothing changed), unpack the 6.0.0 zip over the folder
+once; from 6.0.0 on files in use are applied when ReaperPy has closed.
 
 ## Quick start
 
-1. **Connect.** Start the game, load the payload, enter the console IP in the main window and press **CONNECT**. ReaperPy
-   detects the game (title ID) and loads matching codes from your library.
-2. **Find a value.** **TOOLS → FIND VALUE**: type the number you see in the game, **FIRST SCAN**, change it in the game, type
-   the new number, **NEXT SCAN** – repeat until a few addresses are left. Freeze or set them, or use *Who writes this?* and
-   turn the result into a patch in **EDIT CHEATS**.
-3. **Items as a trainer.** Unreal: **UNREAL → ITEMS**. Unity: **UNITY → ITEMS**. Choose the game folder, **FIND ITEMS**, then
-   **SAVE TRAINER** – or tick items and press **GIVE NOW**.
-4. **Debug.** **TOOLS → ADVANCED → DEBUGGER**: PID, **ATTACH**, set a breakpoint, let the game run, inspect, **STEP**.
+**1. Connect.** Start the game on the console, load the payload, enter the console IP in the main window and press
+**CONNECT**. The app detects the foreground game (title ID) and loads the matching codes from your library.
 
-New to this? Press **HOW TO** in the main window (or **? HELP** in the Tools window) for guides in plain words.
+**2. Find a value and make a cheat.** Open **TOOLS -> FIND VALUE**: type the number you see in the game (health, ammo,
+money), press **FIRST SCAN**, change the number in the game, type the new one, press **NEXT SCAN**. Repeat until a few
+addresses are left. Add them to the address list, set or freeze the value. *Who writes this?* shows the instruction
+that changes it - **EDIT CHEATS** turns it into a NOP patch or a code cave.
 
-## Documentation
+**3. Unreal Engine game - all items as a trainer.** Open **UNREAL -> ITEMS**, choose the game folder (step 1), click
+**FIND ITEMS** (step 2), then **SAVE TRAINER** (step 3) - or tick items and press **GIVE NOW** to get them immediately. No
+tables, FNames or IDs to know - see [below](#unreal-engine-games).
 
-| Topic | Where |
+**3a. Unity game - all items as a trainer.** **UNITY -> ITEMS**: the same three steps with the Il2CppDumper folder - see
+[below](#unity-il2cpp-games).
+
+**3b. Unreal Engine game - single values.** Open **UE-LIVE**, choose the game's SDK folder (output of
+[ps4-unreal-dumper](https://github.com/TetzkatLipHoka/ps4-unreal-dumper)), click a value such as
+`UHealthComponent.Health`, see the live value on the right and change or freeze it. Or let **UE DISCOVERER** analyse the
+game and **CHEAT MENU** build switches for health, stamina, fly, speed ...
+
+**4. Debug.** **TOOLS -> ADVANCED -> DEBUGGER**: PID, **ATTACH**, set a breakpoint on an address, let the game run, inspect
+the registers when it stops, **STEP** / **STEP OVER** / **STEP OUT**, **CONTINUE**.
+
+---
+
+## The main window
+
+- **Patch cards** - every patch of the open project is a card: switch on/off, favourite star, group, hotkey, author, info,
+  copy name, show the patch file in its folder (right-click menu).
+- **FOLDER / LIBRARY** - open a project folder or pick a game from your patch library. Codes are found automatically by
+  title ID when you connect.
+- **GOLDHEN-JSON** - export your patches as cheat files (`.json` / `.shn` / `.mc4`), or import such files.
+- **CONNECT** - connects to the payload, with a watchdog that reconnects when the console drops (optional). A notification on the PS5 confirms the connection.
+- **DE / EN** - language switch (also switches all tool tabs).
+- **Notes per game** - free text that is shown again when you open the same game.
+- **Auto-update** - checks GitHub Releases on start; a newer release is offered with its notes, downloaded, unpacked into the program folder and you are asked to restart (files that are still in use are put in place by a small helper while ReaperPy restarts). Your config, profiles and logs are kept. Off: `"auto_update_check": false`; other repo: `"update_repo": "owner/name"`. A git checkout is never overwritten (use `git pull`).
+
+## The Tools window - every tab explained
+
+### Simple tabs
+
+The Unreal and Unity tools are grouped: the tab **★ UNREAL** holds ITEMS, VALUES, LIVE, CHEAT MENU, DISCOVERER and EXPERT (the
+static UE-AUTO tools), the tab **★ UNITY** holds ITEMS, QUICK (values) and MANUAL. Below they are listed by their short names.
+
+| Tab | What it does |
 |---|---|
-| Every tab explained, the cheat searcher, debugger, cheat menu | [docs/en/TOOLS.md](docs/en/TOOLS.md) |
-| Unreal Engine games: items, values, trainer check, cave space | [docs/en/UNREAL.md](docs/en/UNREAL.md) |
-| Unity (IL2CPP) games | [docs/en/UNITY.md](docs/en/UNITY.md) |
-| Export formats and console notifications | [docs/en/EXPORT.md](docs/en/EXPORT.md) |
-| Python scripting | [docs/en/SCRIPTING.md](docs/en/SCRIPTING.md) |
-| Tests, CI, releases, project layout | [docs/en/DEVELOPMENT.md](docs/en/DEVELOPMENT.md) |
-| Beginner guides (also inside the program) | [docs/howto/en](docs/howto/en) · [Deutsch](docs/howto/de) |
-| Changes | [CHANGELOG.md](CHANGELOG.md) |
+| **START** | Three big steps for beginners with plain-language status: connected? codes found? Leads to the simple tools. |
+| **FIND VALUE** | The cheat searcher. Layout: found addresses on the left, scan controls on the right, your **address list** at the bottom. See [below](#find-value-the-cheat-searcher). |
+| **EDIT CHEATS** | Write a patch: name, author, offset from the image base. *Simple patch / NOP* (original bytes -> new bytes) or *Code cave* (assembly in a separate box, `jmp OriginReturn` goes back). Assembler or hex bytes are accepted; saved as `.reapproj`. |
+| **VALUES** | Health, stamina, gold, experience, ammo ... as ready-made patches, for **Unreal Engine and Unity**, in three steps (game folder -> FIND THE IMPORTANT STUFF -> SAVE PATCHES). See [below](#unreal-engine-games). |
+| **ITEMS** (Unreal) | The easy way for Unreal Engine games: **all items as a ready-made trainer in three steps** (game folder -> FIND ITEMS -> SAVE TRAINER), plus **TEST 1 ITEM**, **GIVE NOW**, **TEST CHECKED ITEMS** and **INVENTORY TO MAX**. See [below](#unreal-engine-games). |
+| **UE-LIVE** | Live values of an Unreal Engine game: pick a member, see all live instances, change / freeze them. |
+| **UE DISCOVERER** | Analyses the SDK and tells you what is there to find: item structs, item tables, give-functions, stat enums, cheat managers - with a check whether a cave trainer can be built for each ("✔" / "✗ not possible: reason"). |
+| **UNITY** | The same idea for Unity (IL2CPP) games: **ITEMS** (all items as a trainer in three steps), then, from the Il2CppDumper folder, live values, method patches (always true, fixed return value, skip) and enum names (item IDs). See [below](#unity-il2cpp-games). |
+| **CHEAT MENU** | Switches and values for the player character, generated from the SDK. Works in shipping builds without a CheatManager. |
+
+### How-to guides for beginners
+
+The **HOW TO** button (German: **ANLEITUNGEN**) in the top bar of the main window opens a window that explains every tool step by step, in plain words. The language
+follows the **DE / EN** switch: switch it and the open guide is shown in the other language at once. The **? HELP** button in the
+header of the Tools window opens the guide that belongs to the tab you are looking at; the search box finds words in all guides.
+
+| Guide | Covers |
+|---|---|
+| First steps | Connecting, the START tab, which tool for which job, staying safe |
+| Cheat in four steps | ASSISTANT: from a number in the game to a finished cheat, no assembler needed |
+| Find a value | FIND VALUE: scans, unknown values, memory sections, what to do next |
+| Edit cheats | EDIT CHEATS: NOP or code cave, from a found value to a cheat |
+| Assembler for beginners | Registers, the common instructions, reading a "who writes" line, a first cave line by line |
+| Items in Unreal / Unity games | The three-step item trainers, test and give buttons, what to do when only one item arrives |
+| Values, live values and the cheat menu | VALUES, LIVE, CHEAT MENU, DISCOVERER, EXPERT, Unity QUICK / MANUAL |
+| Export | `.json` / `.shn` / `.mc4`, where the files go on the console, switch order of item trainers |
+| Pointers and game updates | POINTER and AOB / UPDATE |
+| The debugger | Breakpoints, watchpoints, stepping, KERNEL LOG, FUNCTION LOGGER |
+| Advanced tools | MEMORY, CONVERTER, CALL FUNCTION, PYTHON SCRIPT, JOURNAL / UNDO, sessions |
+| Troubleshooting, Glossary | Common problems and plain-language explanations of the terms |
+
+The guides are plain Markdown files in [`docs/howto/en`](docs/howto/en) and [`docs/howto/de`](docs/howto/de) (file name
+`NN-name.md`, `NN` = order), so you can also read them here on GitHub. The program shows the same files. To add a guide, put a file
+with the same name into both folders; tests check that both languages have the same structure, that every link and every button
+name used in a guide really exists in the program, and that every tab has a guide to open.
+
+### FIND VALUE (the cheat searcher)
+
+Layout: **hits** (left) | **scan** (middle) | **memory sections** (right), the **address list** below. Everything is also
+available through right-click menus; rarely used settings are in the **OPTIONS** dialog.
+
+- **Value / Value type / Compare / To** - the number to look for (*To* = upper bound for "between"). Compare: *Exact*,
+  *Approx. (float)*, *Greater than*, *Less than*, *Between*, *Increased / Decreased*, *Increased by / Decreased by*,
+  *Changed / Unchanged*, *Unknown initial value*. Types: signed/unsigned 8 / 16 / 32 / 64-bit integers, float, double.
+- **Range** - *Data (rw, no code)*, everything writable, everything readable.
+- **MEMORY SECTIONS** (new) - shows what is in the game's memory and what gets scanned:
+  - **eboot.bin is split up** into its code, read-only and data sections (one row each, with address, size and rights);
+    game modules (`.prx`, not system), **system libraries** (one row per library), heap / anonymous memory, shared
+    memory and stacks follow. Heap regions of 1 MB or more get their own row, smaller ones are summarised in one row.
+  - Every row has a **checkbox** (click the box, double-click the row, or press Space). Category rows switch a whole group.
+  - **HIDE** - presets (*all system libraries*, *libSce\**, *libc / libkernel / libm*, *shared memory*, *stacks*) plus
+    **own patterns** (`libSce*, SDL, Shm` - with `*` a wildcard, without it a part of the name). Default: system libraries
+    hidden. Right-click a module -> *Hide module* adds it to the patterns.
+  - **ALL / NONE / EBOOT ONLY / GAME ONLY** buttons; right-click: switch selection on/off, scan only this selection, copy
+    start address, show in memory.
+  - The summary shows *selected / total* regions and size (and the saved percentage). After one scan it also estimates the
+    read time from the speed of that scan. Fewer MB to read = faster scan, especially for **Unknown initial value**.
+  - The filter is applied on a **fresh memory map at scan start** (the heap grows), and it is remembered between sessions
+    (`scan_filter.json` in the data folder). Hiding libraries is normally safe for game values; if a value is not found,
+    switch the filter to *ALL* and scan again.
+- **OPTIONS ...** - speed filter (skip slow regions), simplify float, parallel, aliasing (experimental), skip small
+  segments, **snapshot RAM** (how much of the unknown-value snapshot stays in console RAM; more = much faster but uses
+  console memory) and where the rest is spilled (internal `/data`, M.2 expansion, USB), plus SELF-TEST and REGION REPORT.
+- **Snapshot RAM limit:** the PS5 supports **up to 2048 MB**. From **3072 MB** upwards the payload reports that the PS5
+  does not have enough memory. The drop-down therefore offers 512 / 1024 / 2048 MB (default 2048 MB); the rest of the snapshot is spilled to the chosen storage.
+- **FIRST SCAN / NEXT SCAN / CANCEL / NEW SCAN** - self-test (in OPTIONS) checks protocol and payload capabilities.
+- **Hits** - paged list with address, current, previous and first value. Double-click or **ADD SELECTED / ADD ALL
+  (PAGE)** moves them to the address list; right-click also offers *show in memory* and *copy address*.
+- **Address list** - **SET VALUE**, **FREEZE**, description, remove, **WHO WRITES?** (hardware watchpoint through
+  the debugger), **-> HEX**, **-> POINTER SCAN**, copy address. Freezing uses one bulk write per tick.
+
+### Advanced tabs
+
+| Tab | What it does |
+|---|---|
+| **MEMORY** | Hex view of any address with a value **inspector** (click a byte), **snapshot / compare**, save a region to a file / load a file into memory, copy hexdump. |
+| **DISASSEMBLER** | x86-64 disassembly (Capstone) of live memory from any address or `base`; page forward, follow jumps and calls, double-click to follow. |
+| **POINTER** | Pointer scan with a map, or the **fast scan** that runs level by level on the console (needs a payload with `PTRSCAN`). |
+| **CONVERTER** | Assembler <-> hex bytes (x86-64, Intel syntax), also from disassembled lines (`-> ASSEMBLER`). |
+| **AOB / UPDATE** | Byte patterns with wildcards (`48 8B 05 ?? ?? ?? ??`), scans, signatures per patch. After a game update the **update scan** re-finds each patch and recomputes its offset. |
+| **DEBUGGER** | See [Debugger](#debugger). |
+| **KERNEL LOG** | The console's kernel log with crashes, page faults and errors highlighted - handy when a patch or cave closes the game. Reconnects by itself. |
+| **PYTHON SCRIPT** | A script editor with the `ps5` object; run, stop, undo. See [Scripting](#scripting). |
+| **CALL FUNCTION** | Call a game function with up to 6 arguments: `base+0x1234`, numbers, text (`"abc"`), buffers in the game (`@buf+8`). Shows RAX as hex / signed / float / string. Never repeats automatically. |
+| **FUNCTION LOGGER** | Replaces the first bytes of a function with a jump into a cave that writes every call (registers, return address, stack arguments, xmm0/1, optional thread) into a ring buffer. Group by caller, export CSV; the game is not paused. **STOP** restores the original bytes. |
+| **JOURNAL / UNDO** | Every write the tools make is recorded with the old bytes - undo single entries or everything. |
+| **UE-AUTO** | The static side of the UE tools: candidates from SDK headers, instruction search in the dump, NOP / cave patches with AOB signatures, native functions, call a UFunction through ProcessEvent. Also a command-line tool (`python ue_auto.py --help`). |
+
+### Debugger
+
+- **ATTACH / DETACH** - attaches on its own connection (or borrows the main one). The back channel on port 755 is bound
+  *before* attaching; an "already being debugged" state is cleared and retried automatically.
+- **Breakpoints** (up to 30) and **watchpoints** (4 hardware slots: write, read/write or execute; execute watchpoints are always 1 byte). Hit counters per address; disable/remove while stopped is applied when you continue.
+- **Stop view** - threads, registers (editable), stack with a frame-pointer chain or **stack scan** without frame pointers.
+- **CONTINUE** is a plain `continue` (the payload steps over the breakpoint itself). **STEP** goes one instruction (or reports the
+  state when the console already ran it), **STEP OVER** runs a `call` as a whole, **STEP OUT** runs to the return address,
+  *run to* uses temporary breakpoints in reserved slots.
+- **HALT** pauses the game. The keep-alive never rebuilds the connection while a thread is stopped (that would destroy the stop).
+
+### CHEAT MENU
+
+A table of switches and values for the character you currently control. Click **BUILD MENU** after loading the game in
+UE-LIVE; every entry shows whether it is reachable on your character (✔) or why not (✗).
+
+Because shipping builds strip the CheatManager, nothing here calls cheat functions. Every entry writes plain memory values
+and holds them (like freezing):
+
+1. **Engine values every UE game has** - *Invulnerable* (`bCanBeDamaged` off), *Fly* (`MovementMode = Flying` + `bCheatFlying`),
+   walk / fly speed, jump height, gravity, time dilation for the character or the whole game.
+2. **Game-specific values from the SDK** - health, stamina, mana, shield, ammo, money and cheat switches found by the
+   candidate heuristic. Only objects that belong to your character are touched (enemies with the same class are not);
+   *auto* sets the matching "Max…" value.
+
+**ON / OFF** (or double-click) switches an entry and restores the original value when you switch it off. If the character
+changes (death, loading screen), all entries are released instead of writing into freed memory. Fly and invulnerability
+depend on how the game implements movement and damage - if a game ignores them, use the *health* entries.
+
+---
+
+## Unreal Engine games
+
+ReaperPy reads the output of [ps4-unreal-dumper](https://github.com/TetzkatLipHoka/ps4-unreal-dumper): `offsets.json`,
+`SDK/SDK_HEADERS`, optionally `dump.bin`, `dump.json`, `GObjects.txt`. UE 4.23+ and UE 5 (FNamePool) are supported.
+
+**Items as a trainer (the easy way) - tab UNREAL -> ITEMS**
+
+1. **Game** - choose the game folder (remembered) and connect in the main window; start the game and load a save.
+2. **FIND ITEMS** - ReaperPy rates every table and function of the game, picks the item table(s) and a give-function it can
+   build a trainer for, reads all items live and sorts them into categories (from a category/type column or the item names,
+   e.g. `Item_Fish_Trout` -> *Fish*). Only suitable entries are offered; effect, UI, sound, enemy and text tables are left out.
+   Tick or untick items (click the box, double-click, Space, right-click menu), search by name, filter by category, **ALL ON /
+   ALL OFF** act on the visible rows.
+   - **Filter** *strict / normal / off* - how strictly tables and functions are filtered (default *normal*; *off* hides nothing).
+     If nothing is found, the log tells where the filter dropped things.
+   - **Read all item lists together** - merges all item tables (up to 12) into one list.
+   - **Change the choice myself (advanced users only)** shows *Item list* and *Give function*; *also show unsuitable ones* adds the
+     rest with the reason. Functions that were tested successfully are marked "tested".
+3. **SAVE TRAINER** - enter the amount per item and save. The amount is cut to the game's own limit per item where the item table
+   has one (`OwnLimitByBackPack`, ...). Items become entries of 14 per category (*Fish 1*, *Fish 2* ...). Very large lists are
+   spread over several projects (`Items 1`, `Items 2` ...; at most 400 items and 64 entries per project) - activate only **one**
+   at a time. The folder is a normal ReaperPy project: choose it, activate `00 BASIS` once, then click entries. Saving only
+   reads the game; nothing is changed until you activate BASIS.
+
+**Test it, or give items right away.** All of these run through a short code cave that the game executes itself on its own thread
+(the same safe way as a saved trainer); the hook is removed afterwards. Save the game first and stay in the game (not in the main
+menu).
+
+| Button | What it does |
+|---|---|
+| **TEST 1 ITEM** | Gives ONE item through the chosen function and asks whether it arrived. The answer is remembered for this game: tested functions are ranked up and marked "tested", failed ones are ranked down. |
+| **GIVE NOW** | Gives all ticked items immediately (no trainer, no BASIS). The items arrive like picked-up ones; save in the game to keep them. |
+| **TEST CHECKED ITEMS** | Checks the trainer *before* you save it: image base, give function, native code, object, hook, free cave space, and every item's name against the game. Optionally (asks first) triggers each item once in the running game. Failed items are unticked. |
+| **INVENTORY TO MAX** | Only shown if the game has an inventory-expansion function (found in the SDK, for example `DevExpansionEnableSlotByMaxLevel`). Runs it once; close and reopen the inventory afterwards. GIVE NOW and SAVE TRAINER do **not** unlock slots on their own - click this button yourself if you need more room. |
+
+**Only the first item arrives / backpack full?** The game refuses an item that has no free slot, and every different item needs its own
+slot. Run **INVENTORY TO MAX** before you give items if you need more room. Items land where the give function puts them - usually the backpack, which has a limit. ReaperPy cuts the amount to
+that limit; for more room use **INVENTORY TO MAX**, or choose the warehouse function (`...ToWarehouse`) under *Change the choice
+myself*, or give fewer items / categories at a time.
+
+**Objects the trainer cannot reach.** Some games keep the inventory in a game-instance subsystem that the player controller does not
+reach. ReaperPy then calls the object through its fixed address (checked against its vtable, skipped if the object is gone). This
+is valid until the game is closed: after every game start load a save, **FIND ITEMS** and **SAVE TRAINER** again. The status line
+and the save dialog tell you when this applies.
+
+**Health, gold, experience, ammo (tab VALUES).** One tab for both engines; same three steps.
+- *Unreal Engine:* the values of the player character come from the SDK (health, stamina, mana, shield, ammo, money,
+  experience) and are checked on the running character. SAVE PATCHES searches the game code for the instructions that write
+  each ticked value and builds a code cave per value: **value cannot drop**; if the game uses a subtract instruction
+  (`sub`/`dec`) that instruction is switched off instead (ammo and gold stop dropping, picking things up still works);
+  otherwise the value is fixed to a number. **Experience** is fixed to the number you enter (default 99999 = level-up).
+- *Unity (IL2CPP):* methods are recognised by name from `dump.cs` (`TakeDamage`, `SpendMoney`, `UseStamina`, `UseAmmo`,
+  `get_ExpToNextLevel` ...). Each row says in plain words what happens (method made empty / always returns yes / returns 1).
+  Enemy-looking classes are marked and not pre-ticked. The patches read the original bytes live and carry `"Verify"`, so a
+  different game version refuses them. Set the image base to the shown IL2CPP module base before activating.
+- Patches apply to **all** objects that use the code (enemies too). Unity name recognition is a heuristic - check the list;
+  XP can only be handled when the game has a "needed XP for next level" method.
+
+**Using a trainer made on another console / checking one.** The item numbers (FNames) inside a trainer come from the game
+session it was built in and can differ on another console; a different game version changes the code addresses. Click
+**CHECK / ADAPT TRAINER ...** and choose the trainer folder: ReaperPy compares the trainer's function fingerprints with your
+running game ("matches the game version" / "built for a DIFFERENT version - do not activate") and the item numbers with
+your game. If only the item numbers differ it offers to **adapt** the trainer (rewrites the files for your game; its BASIS
+must be off). Trainers made by ReaperPy are also protected when activated: if the memory at the patch site is neither the
+expected original nor the patch, activation is refused instead of overwriting something else.
+
+**Space for the cave.** The cave is placed in unused padding at the end of the game's code regions. ITEMS reads how much
+room your game has and splits the trainer into as many projects as needed. If there is still no room, the message shows the
+numbers (needed bytes, largest gap, regions whose end is occupied by another cheat or a still active cave).
+
+**Image base.** ITEMS checks the base set in the main window against the console's memory map (module `eboot.bin`). If they
+differ it says so, shows the base from the map and offers **ADOPT BASE**; it never guesses a number.
+
+Not every game works: if the SDK has no give-function the trainer can build (the tab tells you why), use **UE DISCOVERER ->
+SEARCH INVENTORY ENTRIES** to set quantities directly in memory.
+
+**Manual way (special cases)**
+
+1. In **UE-LIVE** choose the game folder and connect. The object index is built once per game start.
+2. **UE DISCOVERER** -> **ANALYZE** for a plain-language summary and next step; **READ TABLE LIVE** lists item rows by name
+   (search box above the list - you never need to know numeric IDs; an ID column is picked up automatically).
+3. **CHEAT MENU** for switches; **UE-LIVE** for any value; **UE-AUTO** for static patches.
+
+Instance addresses change with every game start; classes, offsets and the SDK stay valid. Functions that create objects
+(spawning actors, widgets) can crash the game when called from a helper thread - prefer functions that read and write values.
+
+## Unity (IL2CPP) games
+
+ReaperPy reads the output of [Il2CppDumper](https://github.com/TetzkatLipHoka/Il2CppDumper) (the TetzkatLipHoka fork, which also
+works on console memory dumps). The tab is called **UNITY**.
+
+Your folder should contain `dump.cs` and `script.json` (the `DummyDll` folder is optional - it holds the same information as
+.NET stubs for dnSpy/ILSpy; the offsets and addresses ReaperPy needs are in `dump.cs`). Nested folders, e.g. unzipped
+archives, are fine - the files are searched for.
+
+**Items as a trainer - tab UNITY -> ITEMS.** The same three steps as in the Unreal tab: choose the folder, **FIND ITEMS**,
+**SAVE TRAINER**. ReaperPy picks the item list (the `ItemID`-style enum in `dump.cs`), the method that gives items (`AddItem`,
+`GiveItem` ... with an item-ID parameter and an optional amount) and an entry point (an `Update` method of the inventory class) on
+its own. Categories, several projects, preview before writing and **CHECK TRAINER** work as in the Unreal tab. Finding items needs
+no console connection; saving does. Not tried on a real game yet - methods that take an item object or string are listed with the
+reason and skipped (use the other pages then).
+
+**Values, methods and names - the other pages**
+
+1. **UNITY -> GAME FOLDER...** choose the folder, loading takes about 10 s for a large game.
+2. Start the game on the console and load a save, connect ReaperPy, press **(2) DETECT MODULE**. ReaperPy takes the module
+   base from the process map (`Il2CppUserAssemblies.prx`, like `il2mem.py` does) and checks it against class names read from
+   memory - nothing is guessed. On failure the log shows what was found. If it fails you can type the
+   base address in by hand.
+3. The info box under the buttons explains the numbers (classes = blueprints from the dump, objects = what really exists in
+   the game); the log at the bottom can be resized by dragging its handle, and every divider (list / values) can be dragged.
+4. Use the three pages:
+   - **VALUES** - press **(3) SCAN GAME** once: ReaperPy counts the real objects per class and the list shows only fields of
+     classes that exist in memory (with the object count). Then search `Class.field` (gold, hp, money ...), click it, ReaperPy finds all live objects of that class
+     and shows the value. After the scan, clicking a field shows its objects instantly; INSTANCES REFRESH rescans (use it for objects created after the scan). Double-click changes it (`+100` and `*2` work), **FREEZE** holds it. Static fields (singletons,
+     save data) have exactly one row. Classes without a pointer in `script.json` are found by their name in memory.
+   - **METHODS (cheats)** - search a method (`AddMoney`, `IsDead`, `Damage`), then *always returns TRUE / FALSE*,
+     *returns value...* (int, float, bool ...) or *make method empty* (void methods). Takes effect immediately; **REMOVE**
+     restores the original bytes, **ON / OFF** toggles. The tool refuses patches that would crash (e.g. emptying a method
+     that returns a value). **EXPORT .reapproj** saves the patches (offset = RVA in the IL2CPP module); set ReaperPy's image base
+     to the module base shown in the tab when you load them in EDIT CHEATS.
+   - **NAMES (items, IDs)** - search all enums (`Item Apple`); double-click copies the numeric value for give/set functions.
+
+Notes: object addresses change on every game start, classes/offsets/RVAs stay valid for the same game version. Use a dump of
+the exact version you play. Static fields assume `Il2CppClass.static_fields` at `0xB8` (Unity 2018.3 - 6); the STATIC OFFSET
+box changes that. As with UE: use this for single-player/offline games on your own console.
+
+## Export formats
+
+| Format | Notes |
+|---|---|
+| `.json` | GoldHEN cheat format (name, hook offset, cave bytes, on/off). |
+| `.shn` | SHN XML (Trainer / Cheat / Cheatline). On/off only - buttons are exported as switches. |
+| `.mc4` | SHN + AES-256-CBC + base64, file name `TITLEID_VERSION.ext`. `& < > "` in names are replaced because some readers resolve XML entities blindly. |
+
+**TITLE ID / VERSION FROM GAME** reads both values from the running game. Import (`.json`, `.shn`, `.mc4` -> patches) skips mods in
+sections other than 0 instead of importing them half.
+
+## Notifications on the console
+
+ReaperPy uses the payload's notification command to show short messages on the PS5 screen, so you see what happened
+without alt-tabbing out of the game:
+
+| Event | Message (example) |
+|---|---|
+| Connected / reconnected | `ReaperPy connected (PID 1234)` |
+| Cheat switched on / off | `ON: Infinite HP` / `OFF: Infinite HP` |
+| Cheat switched while the debugger is attached | `ON: Infinite HP (debugger attached)` |
+| ALL ON / ALL OFF / restore after a reconnect | one summary: `ON: 12 cheats (A, B, C +9)` instead of 12 messages |
+| Debugger attached / detached / connection lost | `Debugger attached (PID 1234)`, `Debugger detached`, `Debugger: connection lost` |
+| Breakpoint / watchpoint hit (off by default) | `Debugger: breakpoint at 0x401000` (at most one message every 5 s) |
+
+Messages follow the language switch (DE / EN). They are sent in the background and never block the app; if sending
+fails, they pause until the next connect. Switch them off completely with
+`"ps5_notifications": false`, switch on hit messages with `"ps5_notify_hits": true` (see [Configuration](#configuration)).
+
+## Scripting
+
+```python
+base = ps5.module()                                  # base of eboot.bin
+hp   = ps5.pointer(base + 0x4A1C00, 0x20, 0x1C4)     # resolve a pointer path
+if hp:
+    ps5.write_u32(hp, 999, undo=True)                # undo_all() restores it
+site = ps5.aob("48 8B 05 ?? ?? ?? ?? 8B 40 1C")
+if site:
+    ps5.nop(site, 6)                                 # NOP with undo
+```
+
+Also available: `ps5.call()`, `ps5.foreground()`, `ps5.write_many()`, `ps5.log_calls()`, `ps5.alloc()`.
 
 ## Configuration
 
-Settings live in `reaperpy_config.json` next to the program (template: `reaperpy_config.example.json`).
+Settings are stored in `reaperpy_config.json` next to the program (see `reaperpy_config.example.json`). Set
+`REAPERPY_HOME=<folder>` to keep configuration, profiles and logs elsewhere (e.g. on a USB stick). Logs (`logs/reaperpy.log`,
+rotating) include uncaught errors from the GUI. `"auto_codes": false` disables automatic code detection, `"ps5_notifications": false` all console notifications, `"ps5_notify_hits": true` also a message for every breakpoint hit, `"splash": false`
+or `REAPERPY_NO_SPLASH=1` the start screen.
 
-| Setting | Effect |
+## Development and tests
+
+```bash
+python -m unittest discover -s tests -t .
+```
+
+The tests run without a console and without a display: a fake payload server, simulated process memory, a synthetic Unreal
+world and a Tk stand-in for the GUI. Tests that need Keystone or a native toolchain are skipped when it is missing.
+
+**What is not covered:** the real console with a real payload, the real look of the Tk windows, and real games. Behaviour on
+hardware depends on your console, payload and game - try new features with a single-player game and a backup first.
+Please include the log (`logs/reaperpy.log`) in bug reports.
+
+Code style: `ruff` (configured in `pyproject.toml`, line length 120). The enabled rules are deliberately small - `F`
+(real errors: unused imports/variables, undefined names) and `E711` / `E712` / `E721` / `E731`:
+
+```bash
+ruff check .          # must report "All checks passed!"
+```
+
+Careful with `ruff check --fix`: it removes imports that are only used as a re-export (`ps5_ext.STATUS_*` is read by
+`debugger.py`). Such lines carry `# noqa: F401` and a comment; run the tests after every auto-fix.
+
+**Continuous integration** (`.github/workflows/ci.yml`): the tests run on every push and pull request (Linux with Python 3.10
+and 3.12, Windows with 3.12, with Keystone and Capstone installed); `ruff` runs as an informational job.
+
+**Making a release**
+
+1. Raise `version.py` (and `version_info.txt`), add a `## <version> - <date>` section to `CHANGELOG.md`
+   (`python scripts/changelog_from_git.py <last tag> <version>` drafts it from the commit messages), write
+   `docs/history/RELEASE_NOTES_v<version>.md`.
+2. `python scripts/release_notes.py <version>` prints the text that goes into the GitHub release.
+3. Tag and push: `git tag v<version> && git push origin v<version>`. The release workflow checks that the tag equals
+   `version.py`, runs the tests, builds the Windows zip with its `.sha256` and publishes the release. Building by hand
+   instead: name the file `ReaperPy_v<version>_win64.zip` and upload the `.sha256` file as well - the self-updater needs both.
+
+## Project layout
+
+| Path | Contents |
 |---|---|
-| `REAPERPY_HOME=<folder>` (environment) | Keep configuration, profiles and logs elsewhere, e.g. on a USB stick |
-| `"auto_codes": false` | Switch off automatic code detection by title ID |
-| `"ps5_notifications": false` | No notifications on the PS5 screen |
-| `"ps5_notify_hits": true` | Also a message for every breakpoint hit |
-| `"auto_update_check": false` | Do not check GitHub Releases on start |
-| `"splash": false` or `REAPERPY_NO_SPLASH=1` | No start screen |
-
-Logs are written to `logs/reaperpy.log` (rotating) and include uncaught GUI errors – please attach it to bug reports.
+| `gui.py`, `branding.py`, `i18n.py` | Main window, splash screen, main-window texts (DE/EN) |
+| `tools_*.py` | Tools window and its tabs; `tools_i18n*.py` translates them at runtime (also texts set later, context menus, headings) |
+| `theme.py` | The one colour palette of the whole interface |
+| `asm_explain.py`, `asm_help.py`, `asm_recipes.py`, `tools_asm_easy_gui.py` | Instruction explanations, friendly errors, recipes, assembler dialogs |
+| `assist.py`, `tools_assist_gui.py` | ASSISTANT: value to cheat in four steps |
+| `reappatch_fmt.py` | `.ReapPatch` export (Reaper format) |
+| `howto.py`, `tools_howto_gui.py`, `docs/howto/` | How-to guides: files, small Markdown parser and search, the HOW TO window |
+| `ps5_client.py`, `ps5_ext.py`, `ps5_more.py`, `ps5_backend.py` | Payload protocol client |
+| `ps5_notify.py` | Notifications on the PS5 screen (connect, cheats, debugger) |
+| `scanner.py`, `pointerscan.py`, `ptrscan_server.py` | Scanner and pointer scan |
+| `debugger.py`, `unwind.py` | Debug session, stack unwinder |
+| `patch_engine.py`, `reapatch.py`, `cave_trainer.py`, `export_goldhen.py`, `cheatfmt.py` | Patches, caves, trainers and export |
+| `ue_*.py`, `uesdk.py`, `uecheat.py`, `cheatmenu.py` | Unreal Engine support and the cheat menu logic (`ue_items.py`: rating of tables and functions, items, amount limits, inventory expansion) |
+| `item_check.py` | Tests for items: pre-check (read only), live test with a short cave, give-now and expansion through the cave |
+| `il2cpp_dump.py`, `tools_unity_gui.py` | Unity (IL2CPP) support: Il2CppDumper output, live instances, method patches |
+| `unity_items.py`, `tools_unity_items_gui.py` | Unity ITEMS: items as a trainer for IL2CPP games |
+| `updater.py`, `update_ui.py`, `version.py` | Self-update from GitHub Releases (download, SHA-256 check, backup + rollback), update dialog, program version |
+| `imagebase.py` | Checks the image base against the console's memory map (never guesses) |
+| `scripts/`, `.github/workflows/` | Changelog / release-note helpers; CI (tests, lint) and the release build |
+| `docs/` | `howto/` the guides (`de/`, `en/`), `de/` German notes, `history/` old release notes, `screenshots/` |
+| `tests/` | Unit tests |
 
 ## Credits and licenses
 
@@ -125,16 +512,20 @@ ReaperPy is released under the **[MIT License](LICENSE)**.
 
 **Thanks to**
 
-- **[ps5debug-NG](https://github.com/Pharaoh2k/ps5debug-NG)** – the payload ReaperPy is built for. Author **OSR (OpenSourcereR)**,
-  maintained and extended by **Pharaoh2k** (with EchoStretch and Sonic-Iso), GPL-3.0. ReaperPy is only a client of its published
-  wire protocol (`PROTOCOL.md`, v1.3.2) and contains none of its code. ps5debug-NG is inspired by `ps5debug` (Ctn, SiSTRo) and
-  `ps4debug` (jogolden) and uses the [ps5-payload-sdk](https://github.com/ps5-payload-dev/sdk) by John Törnblom.
-- **[ps4-unreal-dumper](https://github.com/TetzkatLipHoka/ps4-unreal-dumper)** by TetzkatLipHoka (MIT) – the Unreal tools read its
-  output; calling a UFunction follows the method of its `uecall`. No code was copied.
-- **[Il2CppDumper](https://github.com/TetzkatLipHoka/Il2CppDumper)** by TetzkatLipHoka (MIT, fork of Perfare's) – the UNITY tab
-  reads its `dump.cs` and `script.json`. No code was copied.
-- **[PS5Debug-studio](https://github.com/alfizari/PS5Debug-studio)** by alfizari (Apache-2.0) – ReaperPy has its own
-  architecture and code; only a few small ideas and format details (such as the `.shn` / `.mc4` layout) were taken over.
+- **[ps5debug-NG](https://github.com/Pharaoh2k/ps5debug-NG)** - the payload ReaperPy is built for. Author **OSR (OpenSourcereR)**,
+  maintained and extended by **Pharaoh2k** (with EchoStretch and Sonic-Iso), licensed under GPL-3.0. ReaperPy is only a client
+  of its published wire protocol (`PROTOCOL.md`, v1.3.2) and contains none of its code; the payload is a separate program
+  with its own license. ps5debug-NG in turn is inspired by `ps5debug` (Ctn, SiSTRo) and `ps4debug` (jogolden) and uses
+  the [ps5-payload-sdk](https://github.com/ps5-payload-dev/sdk) by John Törnblom.
+- **[ps4-unreal-dumper](https://github.com/TetzkatLipHoka/ps4-unreal-dumper)** by TetzkatLipHoka (MIT) - ReaperPy's Unreal
+  Engine tools read the output of this dumper; calling a UFunction follows the method of its `uecall`. No code was copied.
+- **[Il2CppDumper](https://github.com/TetzkatLipHoka/Il2CppDumper)** by TetzkatLipHoka (MIT, fork of Perfare's Il2CppDumper) - the
+  UNITY tab reads its `dump.cs` and `script.json`. No code was copied.
+- **[PS5Debug-studio](https://github.com/alfizari/PS5Debug-studio)** by alfizari (Apache-2.0) - ReaperPy has its own
+  architecture and code; only a few tweaks (small ideas and format details such as the `.shn` / `.mc4` layout) were taken over.
 
-See [NOTICE](NOTICE) for what was taken from where and for the licenses of the packages used (Capstone BSD-3-Clause,
-Keystone GPL-2.0, Pillow HPND). Binary builds bundle these packages – read the note in `NOTICE` before you distribute one.
+See [NOTICE](NOTICE) for the details of what was taken from where, and for the licenses of the packages ReaperPy uses
+(Capstone BSD-3-Clause, Keystone GPL-2.0, Pillow HPND). Binary builds bundle these packages - read the note in `NOTICE`
+before you distribute one.
+
+German documentation of earlier versions is kept in [`docs/de/`](docs/de/) and [`docs/history/`](docs/history/).
