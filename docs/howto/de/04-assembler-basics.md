@@ -2,6 +2,11 @@
 
 Assembler ist die Sprache des Prozessors. Du musst sie nicht lernen, um ReaperPy zu benutzen, aber ein paar Ideen machen den **DISASSEMBLER**, den **KONVERTER** und Code-Caves viel verständlicher. Die PS5 nutzt x86-64; ReaperPy schreibt es in Intel-Syntax.
 
+## Hilfen für den Einstieg
+- Im **DISASSEMBLER** steht in der Spalte **ERKLÄRUNG** zu jeder Zeile in einfachen Worten, was sie tut. Markierst du eine Zeile, steht die ganze Erklärung unter der Tabelle.
+- Mit **PRESET…** änderst du eine Zeile, ohne Assembler zu schreiben: zum Beispiel "Befehl abschalten" oder "Wert immer auf eine Zahl setzen". ReaperPy baut den Code selbst.
+- Bei **ÄNDERN…** zeigt eine Vorschau, wie groß dein Code ist und ob er passt. Fehler erklärt ReaperPy auf Deutsch, mit der Zeile und einem Beispiel.
+
 ## Was die Werkzeuge tun
 - Der **DISASSEMBLER** macht aus den Bytes im Speicher lesbare Befehle.
 - Der **KONVERTER** macht aus Assembler-Text Bytes und zurück.
@@ -51,7 +56,7 @@ jmp OriginReturn              ; zurück ins Spiel
 
 Ist das Leben ein *Float*, musst du einen Float setzen. 1000.0 ist `0x447A0000`: `mov dword ptr [rbx+0x120], 0x447A0000`.
 
-> **Hinweis:** Ein Patch gilt für **jedes** Objekt, das diesen Code benutzt - auch für Gegner. Werden auch die Gegner unbesiegbar, vergleiche zuerst das Basisregister (hier `rbx`) mit dem Spieler, oder nimm die fertigen Werkzeuge aus [Werte, Live-Werte und das Cheat-Menü](howto:values-and-live).
+> **Hinweis:** Ein Patch gilt für **jedes** Objekt, das diesen Code benutzt - auch für Gegner. Werden auch die Gegner unbesiegbar, hilft der Tab **SPIELER / GEGNER**: Er findet selbst heraus, woran man den Spieler erkennt. Siehe [Spieler oder Gegner?](howto:player-or-enemy). Oder nimm die fertigen Werkzeuge aus [Werte, Live-Werte und das Cheat-Menü](howto:values-and-live).
 
 ## Regeln, die das Spiel am Leben halten
 - Ändere nur Register, die das Spiel an dieser Stelle nicht mehr braucht. Im Zweifel sichere sie: `push rax` am Anfang, `pop rax` vor `jmp OriginReturn`.

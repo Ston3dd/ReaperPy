@@ -265,6 +265,36 @@ _RIP_TOKEN = re.compile(r"\[\s*rip\s*\+\s*@(hook\s*[+-]\s*)?(0x[0-9a-fA-F]+|\d+)
 _HOOK_REL = re.compile(r"@hook\s*([+-])\s*(0x[0-9a-fA-F]+|\d+)", re.I)
 
 
+def _forward_ref_before(lines, k):
+    """True, wenn vor Zeile k ein Befehl auf eine Marke zeigt, die erst ab Zeile k steht."""
+    later = {ln.strip()[:-1] for ln in lines[k:] if ln.strip().endswith(":")}
+    if not later:
+        return False
+    for ln in lines[:k]:
+        parts = ln.strip().split(None, 1)
+        if len(parts) == 2 and not ln.strip().endswith(":") and later & set(re.findall(r"[A-Za-z_]\w*", parts[1])):
+            return True
+    return False
+
+
+def _line_by_decode(backend, lines, k, cave_base):
+    """(Offset, Groesse) des Befehls in Zeile k, wenn die Zeilen davor Vorwärts-Labels enthalten.
+
+    Der ganze Code (RIP-Operanden vorläufig [rip + 0], Größe bleibt gleich) wird assembliert und mit Capstone
+    zurückgelesen; Zeile -> Befehlsnummer = Anzahl der Befehlszeilen davor."""
+    import asm_tools
+    full = [_RIP_TOKEN.sub("[rip + 0]", ln) for ln in lines]
+    code = _extract_bytes(backend.assemble("\n".join(full) + "\n", cave_base))
+    insns, _used = asm_tools.disassemble(code, cave_base)
+
+    def is_insn(ln):
+        t = ln.strip()
+        return bool(t) and not t.endswith(":") and not t.startswith((".", ";", "#", "//"))
+    idx = sum(1 for ln in lines[:k] if is_insn(ln))
+    ins = insns[idx]
+    return ins["addr"] - cave_base, ins["size"]
+
+
 def _resolve_rip_tokens(backend, src_lines, cave_base, hook_addr):
     """Rechnet RIP-relative Operanden für die Cave-Position aus.
 
@@ -283,12 +313,17 @@ def _resolve_rip_tokens(backend, src_lines, cave_base, hook_addr):
             target = val
         prefix = "\n".join(out[:k]) + "\n"
         try:
+            if _forward_ref_before(out, k):       # Sprung auf eine spaetere Marke: Prefix-Groesse waere unsicher
+                raise RuntimeError("Vorwaerts-Label")
             off = len(_extract_bytes(backend.assemble(prefix, cave_base))) if k else 0
             probe = line[:m.start()] + "[rip + 0]" + line[m.end():]
             isz = len(_extract_bytes(backend.assemble(probe, cave_base + off)))
         except Exception as e:
-            raise RuntimeError(f"RIP-Operand in Zeile {line.strip()!r} nicht auflösbar "
-                               f"(Vorwärts-Label davor?): {e}")
+            try:                                  # Vorwärts-Label davor: Offset aus dem fertigen Gesamtcode lesen
+                off, isz = _line_by_decode(backend, out, k, cave_base)
+            except Exception:
+                raise RuntimeError(f"RIP-Operand in Zeile {line.strip()!r} nicht auflösbar "
+                                   f"(Vorwärts-Label davor?): {e}")
         disp = target - (cave_base + off + isz)
         if not -0x80000000 <= disp <= 0x7FFFFFFF:
             raise RuntimeError(f"RIP-Ziel {target:#x} liegt außerhalb ±2 GB der Cave ({cave_base:#x})")

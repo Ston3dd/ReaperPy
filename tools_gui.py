@@ -11,9 +11,12 @@ import tempfile
 import threading
 import time
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog, simpledialog
+from tkinter import ttk, messagebox, filedialog
 
 import aob as AOB
+import asm_explain as AX
+import asm_help as AH
+import asm_recipes as AR
 import asm_tools as AT
 import ps5_ext as X
 from ps5_client import PS5DebugClient
@@ -270,17 +273,22 @@ class DisasmTab(BaseTab):
         if not AT.HAVE_CAPSTONE:
             label(bar, "  Capstone fehlt: pip install capstone").pack(side="left")
 
-        cols = [("addr", "ADRESSE"), ("off", "OFFSET"), ("bytes", "BYTES"), ("ins", "INSTRUKTION")]
+        cols = [("addr", "ADRESSE"), ("off", "OFFSET"), ("bytes", "BYTES"), ("ins", "INSTRUKTION"), ("exp", "ERKLÄRUNG")]
         fr = tk.Frame(self, bg=BG); fr.pack(fill="both", expand=True, padx=8)
-        self.tv = tree(fr, cols, [150, 90, 200, 380], height=22)
+        self.tv = tree(fr, cols, [150, 90, 170, 300, 520], height=20)
         with_scroll(fr, self.tv)
         self.tv.bind("<Double-1>", lambda _e: self.follow())
+        self.tv.bind("<<TreeviewSelect>>", lambda _e: self._explain())
+        self.lbl_exp = tk.Label(self, text="", bg=BG, fg=ACCENT, font=FONT_LABEL, justify="left", wraplength=1000, anchor="w")
+        self.lbl_exp.pack(fill="x", padx=10)
 
         act = tk.Frame(self, bg=BG); act.pack(fill="x", padx=8, pady=8)
         button(act, "NOP", self.nop).pack(side="left", padx=2)
         button(act, "ÄNDERN…", self.patch).pack(side="left", padx=2)
+        button(act, "PRESET…", self.recipe, accent=True).pack(side="left", padx=2)
         button(act, "XREFS AUF ADRESSE", self.xrefs).pack(side="left", padx=2)
         button(act, "→ HEX", self.to_hex).pack(side="left", padx=2)
+        button(act, "SPIELER / GEGNER…", self.to_who).pack(side="left", padx=2)
         button(act, "→ CHEAT-EDITOR", self.to_cheat, accent=True).pack(side="right")
         button(act, "ALS CAVE-HOOK", self.to_cave_hook, accent=True).pack(side="right", padx=(0, 6))
 
@@ -308,7 +316,17 @@ class DisasmTab(BaseTab):
             off = l["addr"] - base
             self.tv.insert("", "end", iid=str(i), values=(
                 f"{l['addr']:016X}", f"+{off:X}" if off >= 0 else "-",
-                AT.hexdump_line(l["bytes"]), f"{l['mnemonic']} {l['op_str']}".strip()))
+                AT.hexdump_line(l["bytes"]), f"{l['mnemonic']} {l['op_str']}".strip(),
+                AX.explain(l["mnemonic"], l["op_str"])))
+        self.lbl_exp.configure(text="")
+
+    def _explain(self):
+        """Klartext zur markierten Zeile (die Spalte ERKLÄRUNG kann abgeschnitten sein)."""
+        sel = self._selected()
+        if not sel:
+            return
+        t = AX.explain(sel[0]["mnemonic"], sel[0]["op_str"])
+        self.lbl_exp.configure(text=t or tools_i18n.translate("Dazu habe ich keine Erklärung - siehe Anleitung 'Assembler für Einsteiger'."))
 
     def next_page(self):
         if self.lines:
@@ -353,9 +371,11 @@ class DisasmTab(BaseTab):
             return
         a = sel[0]["addr"]
         size = sum(l["size"] for l in sel)
-        text = simpledialog.askstring(
-            "Ändern", f"Neuer Assembler-Code für {size} Byte(s) @ {a:#x}\n"
-                      f"(mehrere Befehle mit ; trennen, Rest wird NOP):", parent=self)
+        from tools_asm_easy_gui import ask_asm
+        text = ask_asm(self, "Ändern", f"Neuer Assembler-Code für {size} Byte(s) @ {a:#x}\n"
+                                       f"(ein Befehl pro Zeile, der Rest wird mit NOP aufgefüllt):",
+                       space=size, addr=a, initial=" ; ".join(f"{l['mnemonic']} {l['op_str']}".strip() for l in sel)
+                       .replace(" ; ", "\n"))
         if not text:
             return
         try:
@@ -364,8 +384,49 @@ class DisasmTab(BaseTab):
                 return messagebox.showerror("Zu groß", f"{len(data)} > {size} Bytes")
             data += b"\x90" * (size - len(data))
         except Exception as e:
-            return messagebox.showerror("Assembler", str(e))
+            return messagebox.showerror("Assembler", AH.friendly_error(str(e), text))
         self._write(a, data, "Patch")
+
+    def recipe(self):
+        """Fertige Änderung wählen statt Assembler zu tippen (Presets: asm_recipes.py)."""
+        sel = self._selected()
+        if not sel:
+            return self.log("Erst die Zeile markieren, die geändert werden soll", "warn")
+        a = sel[0]["addr"]
+        from tools_asm_easy_gui import ask_recipe
+        res = ask_recipe(self, f"{sel[0]['mnemonic']} {sel[0]['op_str']}".strip())
+        if not res:
+            return
+        rid, value = res
+
+        def job():
+            data = self.win.client.read_memory(a, 96)
+            plan = AR.make_plan(rid, data, a, value)
+            if plan["kind"] == "patch":
+                code = AT.assemble(plan["new"], a, self.win.client)
+                plan["bytes"] = code + b"\x90" * (plan["size"] - len(code))
+            else:
+                plan["hook"] = {"addr": a, "size": plan["size"], "default": plan["default"], "cave": AR.cave_text(plan),
+                                "new": "jmp OriginTarget", "warnings": plan["warnings"]}
+            return plan
+
+        def ok(plan):
+            for w in plan["warnings"]:
+                self.log(f"Hinweis: {w}", "warn")
+            if plan["kind"] == "patch":
+                if messagebox.askyesno("Preset", f"{plan['size']} Byte(s) ab {a:#x} ändern?", parent=self):
+                    self._write(a, plan["bytes"], "Preset")
+            else:
+                self.win.to_cave_hook(plan["hook"])
+                self.log("Preset als Cave-Hook im Cheat-Editor angelegt - dort TEST AN / SPEICHERN", "ok")
+        self.bg(job, ok, lambda e: messagebox.showerror("Preset", AH.friendly_error(str(e), ""), parent=self)
+                if "Assembler" in str(e) or "Keystone" in str(e) else messagebox.showerror("Preset", str(e), parent=self))
+
+    def to_who(self):
+        sel = self._selected()
+        if not sel:
+            return self.log("Erst den Befehl markieren, der das Leben ändert", "warn")
+        self.win.to_who(sel[0]["addr"])
 
     def xrefs(self):
         sel = self._selected()
@@ -456,7 +517,8 @@ class ConverterTab(BaseTab):
             return AT.assemble(text, base, self.win.client)
         self.bg(job, lambda b: (self.hx.delete("1.0", "end"),
                                 self.hx.insert("1.0", AT.hexdump_line(b)),
-                                self.log(f"{len(b)} Byte(s) assembliert", "ok")))
+                                self.log(f"{len(b)} Byte(s) assembliert", "ok")),
+                lambda e: self.log(AH.friendly_error(str(e), text), "err"))
 
     def to_asm(self):
         try:
@@ -963,7 +1025,7 @@ class ToolsWindow(tk.Toplevel):
     # Reihenfolge der Anfaenger-Tabs (START kommt zuerst, FORTGESCHRITTEN zuletzt)
     SIMPLE = ("WERT SUCHEN", "CHEATS BEARBEITEN", "★ UNREAL", "★ UNITY")
     ADVANCED = ("SPEICHER", "DISASSEMBLER", "POINTER", "KONVERTER", "AOB / UPDATE", "DEBUGGER", "KERNEL-LOG",
-                "PYTHON-SKRIPT", "FUNKTION AUFRUFEN", "FUNKTIONS-LOGGER", "JOURNAL / UNDO")
+                "PYTHON-SKRIPT", "FUNKTION AUFRUFEN", "FUNKTIONS-LOGGER", "SPIELER / GEGNER", "JOURNAL / UNDO")
     # Sammel-Tabs: Reitername -> [(interner Tab-Name, Reiter-Beschriftung im Sammel-Tab)] in Arbeitsreihenfolge
     GROUPS = {
         "★ UNREAL": (("★ ITEMS", "ITEMS"), ("★ WERTE", "WERTE"), ("★ UE-LIVE", "LIVE"), ("★ CHEAT-MENÜ", "CHEAT-MENÜ"),
@@ -1061,6 +1123,7 @@ class ToolsWindow(tk.Toplevel):
         extra = (("tools_extra_gui", "CallerTab", "FUNKTION AUFRUFEN"),
                  ("tools_extra_gui", "LoggerTab", "FUNKTIONS-LOGGER"),
                  ("tools_extra_gui", "JournalTab", "JOURNAL / UNDO"),
+                 ("tools_who_gui", "WhoTab", "SPIELER / GEGNER"),
                  ("tools_uelive_gui", "UeLiveTab", "★ UE-LIVE"),
                  ("tools_items_gui", "ItemsTab", "★ ITEMS"),
                  ("tools_values_gui", "ValuesTab", "★ WERTE", {"engine": "ue"}),
@@ -1081,6 +1144,8 @@ class ToolsWindow(tk.Toplevel):
                 tabs.append((t, name))
                 if clsname == "DiscoverTab":
                     self.discover_tab = t
+                if clsname == "WhoTab":
+                    self.who_tab = t
                 if clsname == "ItemsTab":
                     self.items_tab = t
                 if name == "★ WERTE":
@@ -1318,6 +1383,14 @@ class ToolsWindow(tk.Toplevel):
 
     def to_cave_hook(self, data):
         self.show_tab(self.t_cheat); self.t_cheat.fill_hook(data)
+
+    def to_who(self, addr):
+        """Adresse an den Tab SPIELER / GEGNER geben (vom Disassembler)."""
+        tab = getattr(self, "who_tab", None)
+        if tab is None:
+            return self.log("Der Tab SPIELER / GEGNER ist nicht verfügbar", "err")
+        self.show_tab(tab)
+        tab.fill(addr)
 
     # ---- Sitzung ----
     def session_save(self):

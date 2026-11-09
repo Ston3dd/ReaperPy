@@ -52,6 +52,8 @@ with export to GoldHEN/etaHEN cheat formats (`.json`, `.shn`, `.mc4`).**
 | **Python scripting** | A `ps5` object for scripts: pointers, AOB scans, writes with undo, function calls. |
 | **Per-game profiles** | Notes, favourites, groups and hotkeys per game; automatic code detection by title ID. |
 | **Languages** | German and English (switch at runtime, including all tool tabs). |
+| **Player or enemy** | Finds out from the caller stack, an object field or the object address which hits belong to the player, so a cheat can apply to the player only (or enemies only) even when both share the health code. |
+| **Assembler for beginners** | Plain-words explanation of each instruction, ready-made PRESETS, live size preview and friendly error messages. |
 | **How-to guides** | Step-by-step guides for beginners inside the program (**HOW TO** button in the main window, **? HELP** button in the tools window) and on GitHub, in German and English, searchable. |
 
 ## Screenshots
@@ -484,6 +486,8 @@ and 3.12, Windows with 3.12, with Keystone and Capstone installed); `ruff` runs 
 | `gui.py`, `branding.py`, `i18n.py` | Main window, splash screen, main-window texts (DE/EN) |
 | `tools_*.py` | Tools window and its tabs; `tools_i18n*.py` translates them at runtime (also texts set later, context menus, headings) |
 | `theme.py` | The one colour palette of the whole interface |
+| `asm_explain.py`, `asm_help.py`, `asm_recipes.py`, `tools_asm_easy_gui.py` | Instruction explanations, friendly errors, recipes, assembler dialogs |
+| `whois.py`, `tools_who_gui.py` | PLAYER / ENEMY: recording stub, analysis, guarded cave |
 | `howto.py`, `tools_howto_gui.py`, `docs/howto/` | How-to guides: files, small Markdown parser and search, the HOW TO window |
 | `ps5_client.py`, `ps5_ext.py`, `ps5_more.py`, `ps5_backend.py` | Payload protocol client |
 | `ps5_notify.py` | Notifications on the PS5 screen (connect, cheats, debugger) |

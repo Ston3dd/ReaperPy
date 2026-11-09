@@ -30,6 +30,7 @@ TAB_TOPICS = {
     "★ WERTE UNITY": "values-and-live", "★ UNITY MANUELL": "values-and-live",
     "POINTER": "pointers", "AOB / UPDATE": "pointers",
     "DEBUGGER": "debugger", "KERNEL-LOG": "debugger", "FUNKTIONS-LOGGER": "debugger",
+    "SPIELER / GEGNER": "player-or-enemy",
     "FORTGESCHRITTEN": "advanced-tools", "SPEICHER": "advanced-tools", "PYTHON-SKRIPT": "advanced-tools",
     "FUNKTION AUFRUFEN": "advanced-tools", "JOURNAL / UNDO": "advanced-tools",
 }
