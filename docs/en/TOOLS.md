@@ -27,7 +27,7 @@ static UE-AUTO tools), the tab **★ UNITY** holds ITEMS, QUICK (values) and MAN
 
 | Tab | What it does |
 |---|---|
-| **START** | Three big steps for beginners with plain-language status: connected? codes found? Leads to the simple tools. |
+| **START** | Three big steps for beginners with plain-language status: connected? codes found? Leads to the **ASSISTANT** and the other simple tools. **CHECK CONNECTION** tests IP, console, payload and game one after the other and says in plain words what to fix. |
 | **FIND VALUE** | The cheat searcher. Layout: found addresses on the left, scan controls on the right, your **address list** at the bottom. See [below](#find-value-the-cheat-searcher). |
 | **EDIT CHEATS** | Write a patch: name, author, offset from the image base. *Simple patch / NOP* (original bytes -> new bytes) or *Code cave* (assembly in a separate box, `jmp OriginReturn` goes back). Assembler or hex bytes are accepted; saved as `.reapproj`. |
 | **VALUES** | Health, stamina, gold, experience, ammo ... as ready-made patches, for **Unreal Engine and Unity**, in three steps (game folder -> FIND THE IMPORTANT STUFF -> SAVE PATCHES). See [Unreal Engine games](UNREAL.md). |

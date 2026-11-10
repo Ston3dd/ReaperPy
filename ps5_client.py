@@ -208,7 +208,7 @@ class PS5DebugClient:
                 return c, p
             except Exception as e:
                 last_err = e
-        raise ConnectionError(f"Kein Payload auf {host}: {last_err}")
+        raise ConnectionError(f"Kein Payload auf {host}: {last_err}") from last_err
 
     def close(self):
         if self.sock:

@@ -1121,6 +1121,7 @@ class ToolsWindow(tk.Toplevel):
         self.values_tab_unity = None
         self.unity_items_tab = None
         self.unity_tab = None
+        self.assist_tab = None
         # jeder Zusatz-Tab einzeln: ein defekter Tab darf die anderen nicht mitreissen
         extra = (("tools_assist_gui", "AssistTab", "ASSISTENT"),
                  ("tools_extra_gui", "CallerTab", "FUNKTION AUFRUFEN"),
@@ -1157,6 +1158,8 @@ class ToolsWindow(tk.Toplevel):
                     self.unity_tab = t
                 if clsname == "UnityItemsTab":
                     self.unity_items_tab = t
+                if clsname == "AssistTab":
+                    self.assist_tab = t
             except Exception as e:
                 msg = f"Tab {name} nicht geladen: {e}"
                 self.after(200, lambda msg=msg: self.log(msg, "err"))

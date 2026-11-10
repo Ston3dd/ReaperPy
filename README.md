@@ -103,9 +103,9 @@ once; from 6.0.0 on files in use are applied when ReaperPy has closed.
 ## Quick start
 
 **1. Connect.** Start the game on the console, load the payload, enter the console IP in the main window and press
-**CONNECT**. The app detects the foreground game (title ID) and loads the matching codes from your library.
+**CONNECT** (if it fails, **TOOLS -> START -> CHECK CONNECTION** tells you in plain words why). The app detects the foreground game (title ID) and loads the matching codes from your library.
 
-**2. Find a value and make a cheat.** Open **TOOLS -> FIND VALUE**: type the number you see in the game (health, ammo,
+**2. Find a value and make a cheat.** The easy way: **TOOLS -> ASSISTANT** guides you in four steps (see [Cheat in four steps](docs/howto/en/02-guided-cheat.md)). By hand: open **TOOLS -> FIND VALUE**, type the number you see in the game (health, ammo,
 money), press **FIRST SCAN**, change the number in the game, type the new one, press **NEXT SCAN**. Repeat until a few
 addresses are left. Add them to the address list, set or freeze the value. *Who writes this?* shows the instruction
 that changes it - **EDIT CHEATS** turns it into a NOP patch or a code cave.
@@ -148,7 +148,7 @@ static UE-AUTO tools), the tab **★ UNITY** holds ITEMS (with live give/test), 
 
 | Tab | What it does |
 |---|---|
-| **START** | Three big steps for beginners with plain-language status: connected? codes found? Leads to the simple tools. |
+| **START** | Three big steps for beginners with plain-language status: connected? codes found? Leads to the **ASSISTANT** and the other simple tools. **CHECK CONNECTION** tests IP, console, payload and game one after the other and says in plain words what to fix. |
 | **FIND VALUE** | The cheat searcher. Layout: found addresses on the left, scan controls on the right, your **address list** at the bottom. See [below](#find-value-the-cheat-searcher). |
 | **EDIT CHEATS** | Write a patch: name, author, offset from the image base. *Simple patch / NOP* (original bytes -> new bytes) or *Code cave* (assembly in a separate box, `jmp OriginReturn` goes back). Assembler or hex bytes are accepted; saved as `.reapproj`. |
 | **VALUES** | Health, stamina, gold, experience, ammo ... as ready-made patches, for **Unreal Engine and Unity**, in three steps (game folder -> FIND THE IMPORTANT STUFF -> SAVE PATCHES). See [below](#unreal-engine-games). |

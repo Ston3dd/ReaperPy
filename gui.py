@@ -551,10 +551,11 @@ class App:
         lbl("", "label_ps5_port").pack(side="right", padx=(4, 0))
 
         self.ip_var = tk.StringVar(value=self.cfg.get("ps5_ip", "192.168.178.25"))
-        tk.Entry(top, textvariable=self.ip_var, bg=BG, fg=ACCENT,
+        self.ip_entry = tk.Entry(top, textvariable=self.ip_var, bg=BG, fg=ACCENT,
                  insertbackground=ACCENT, font=FONT_MONO, relief="flat",
                  width=16, bd=0, highlightthickness=1, highlightbackground=BORDER,
-                 highlightcolor=ACCENT_DIM).pack(side="right", padx=4)
+                 highlightcolor=ACCENT_DIM)
+        self.ip_entry.pack(side="right", padx=4)
         lbl("", "label_ps5_ip").pack(side="right", padx=(10, 2))
 
     def _refresh_lang_buttons(self):
@@ -1124,6 +1125,13 @@ class App:
             self._connected = False
             self.q.put(("status", self.tr.t("status_conn_fail", err=e)))
             self.q.put(("log", (self.tr.t("log_conn_fail", err=e), "err")))
+            try:                                    # Klartext-Tipp: woran liegt es, was tun?
+                import conncheck
+                tip = conncheck.explain_error(e, host, port, self.tr.lang)
+                if tip:
+                    self.q.put(("log", (f"[net] {tip}", "warn")))
+            except Exception:  # noqa: BLE001 - der Tipp ist nur eine Hilfe
+                pass
             self.q.put(("fx", ("denied", {"error": e})))
 
     def _trainer_preflight(self, card):

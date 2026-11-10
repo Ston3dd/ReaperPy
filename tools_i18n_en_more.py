@@ -4,6 +4,17 @@ Wird am Ende von tools_i18n_en.py in EN eingemischt. Schluessel = deutscher Text
 """
 
 EN_MORE = {
+    'Starte dein Spiel und lade den Spielstand. Trage im Hauptfenster die IP deiner PS5 ein und klicke oben auf VERBINDEN. Wenn das Spiel Codes hat, erscheinen sie dort automatisch. Klappt es nicht? VERBINDUNG PRÜFEN (unten) sagt dir in Klartext, woran es liegt.': 'Start your game and load your save game. Enter the IP of your PS5 in the main window and click CONNECT at the top. If the game has codes, they appear there automatically. Does it not work? CHECK CONNECTION (below) tells you in plain words what is wrong.',
+    'Wert finden und Cheat bauen': 'Find a value and build a cheat',
+    'Du siehst im Spiel eine Zahl (z. B. 100 Leben oder 5000 Gold)? Der ASSISTENT führt dich in vier Schritten: Zahl suchen, eingrenzen, den Befehl finden, der sie ändert, und daraus einen Cheat bauen - ohne Assembler-Kenntnisse.': 'Do you see a number in the game (e.g. 100 health or 5000 gold)? The ASSISTANT guides you in four steps: search the number, narrow it down, find the instruction that changes it, and build a cheat from it - no assembler knowledge needed.',
+    'ZUM ASSISTENTEN': 'GO TO ASSISTANT',
+    'Cheat speichern': 'Save the cheat',
+    'Der fertige Cheat liegt im Reiter CHEATS BEARBEITEN. Gib ihm einen Namen, probiere ihn mit TEST AN und speichere ihn. Für dein Cheat-Menü exportierst du ihn im Hauptfenster über GOLDHEN-JSON.': 'The finished cheat is in the EDIT CHEATS tab. Give it a name, try it with TEST ON and save it. To use it in your cheat menu, export it in the main window with GOLDHEN-JSON.',
+    'Wert von Hand suchen': 'Search a value by hand',
+    'Für Kenner: der volle Cheat-Sucher mit allen Suchmodi und Speicherbereichen.': 'For experts: the full cheat searcher with all search modes and memory sections.',
+    'VERBINDUNG PRÜFEN': 'CHECK CONNECTION',
+    'Prüfe die Verbindung ...': 'Checking the connection ...',
+    'Prüft IP, PS5, Payload und Spiel - ohne etwas zu verändern.': 'Checks IP, PS5, payload and game - without changing anything.',
     'Nur direkte, dekodierbare CALL-Ziele innerhalb des Puffers; indirekte Calls und echte Funktionsgrenzen werden nicht zuverlässig erkannt.': 'Only direct, decodable CALL targets inside the buffer; indirect calls and real function boundaries are not detected reliably.',
     'kein Spiel im Vordergrund': 'no game in the foreground',
     '  1. Spiel starten, Spielstand LADEN, in ReaperPy verbinden, diesen Ordner als Projekt waehlen.': '  1. Start the game, LOAD a save, connect ReaperPy and choose this folder as the project.',

@@ -16,11 +16,13 @@ ReaperPy changes numbers and code in a game while it runs on your jailbroken PS5
 4. Press **CONNECT**. When it works, the status line shows the process number (`connected - PID ...`) and the console usually shows a short notification.
 5. ReaperPy recognises the game by its title ID and loads matching codes from your library automatically.
 
+**It does not connect?** Open **TOOLS → START** and press **CHECK CONNECTION**. ReaperPy checks, one after the other, whether the IP is valid, whether the console answers, whether the payload is loaded and whether a game is running - and tells you in plain words where it stops and what to do (for example "payload not loaded - send it again"). Nothing is changed on the console. If **CONNECT** fails, the log shows the same kind of hint.
+
 ## 2. Open the tools
 Press **TOOLS** in the main window. The first tab, **START**, tells you in plain words whether you are connected and which codes are loaded, and it has big buttons for the beginner steps. The **? HELP** button at the top opens the how-to article that belongs to the tab you are looking at. You can also open all guides at any time with the **HOW TO** button in the main window, even without a connection.
 
 ## 3. Which tool for which job
-- **A number I can see** (health, ammo, money): [Find a value](howto:find-value).
+- **A number I can see** (health, ammo, money), and you want a finished cheat: [Cheat in four steps](howto:guided-cheat) (the **ASSISTANT** tab). To search by hand with every option: [Find a value](howto:find-value).
 - **All items of an Unreal Engine game**: [Items in Unreal games](howto:items-unreal).
 - **All items of a Unity game**: [Items in Unity games](howto:items-unity).
 - **Health, gold, experience, ammo as ready-made patches**, or live values: [Values, live values and the cheat menu](howto:values-and-live).

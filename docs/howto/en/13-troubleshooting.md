@@ -1,6 +1,7 @@
 # Troubleshooting
 
 ## I cannot connect
+- Press **TOOLS → START → CHECK CONNECTION**: it tells you in plain words whether the IP, the console, the payload or the game is the problem.
 - Is the payload loaded and the game running? Check the IP in **PS5 IP**.
 - The PC and the console must be in the same network. Allow ReaperPy through the firewall (port **755** for the debugger).
 - Tick **AUTO-RECONNECT** in the main window if the connection drops now and then.

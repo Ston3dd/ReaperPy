@@ -1,6 +1,7 @@
 # Fehlersuche
 
 ## Ich kann nicht verbinden
+- Drücke **WERKZEUGE → START → VERBINDUNG PRÜFEN**: Es sagt dir in einfachen Worten, ob die IP, die Konsole, der Payload oder das Spiel das Problem ist.
 - Ist der Payload geladen und das Spiel gestartet? Prüfe die IP bei **PS5 IP**.
 - PC und Konsole müssen im selben Netzwerk sein. Erlaube ReaperPy in der Firewall (Port **755** für den Debugger).
 - Hake **AUTO-RECONNECT** im Hauptfenster an, wenn die Verbindung ab und zu abbricht.

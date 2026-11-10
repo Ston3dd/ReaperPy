@@ -16,11 +16,13 @@ ReaperPy ändert Zahlen und Code in einem Spiel, während es auf deiner gehackte
 4. Drücke **VERBINDEN**. Wenn es klappt, zeigt die Statuszeile die Prozessnummer (`verbunden - PID ...`) und die Konsole zeigt meist eine kurze Benachrichtigung.
 5. ReaperPy erkennt das Spiel an seiner Titel-ID und lädt passende Codes aus deiner Bibliothek automatisch.
 
+**Es verbindet nicht?** Öffne **WERKZEUGE → START** und drücke **VERBINDUNG PRÜFEN**. ReaperPy prüft nacheinander, ob die IP gültig ist, ob die Konsole antwortet, ob der Payload geladen ist und ob ein Spiel läuft - und sagt dir in einfachen Worten, wo es hakt und was du tun kannst (zum Beispiel „Payload nicht geladen - sende ihn erneut“). Auf der Konsole wird nichts verändert. Scheitert **VERBINDEN**, steht im Protokoll ein ähnlicher Hinweis.
+
 ## 2. Werkzeuge öffnen
 Drücke im Hauptfenster auf **WERKZEUGE**. Der erste Tab, **START**, sagt dir in einfachen Worten, ob du verbunden bist und welche Codes geladen sind, und hat große Knöpfe für die Einsteiger-Schritte. Der Knopf **? HILFE** oben öffnet die Anleitung, die zum gerade sichtbaren Tab gehört. Alle Anleitungen öffnest du jederzeit auch mit dem Knopf **ANLEITUNGEN** im Hauptfenster, sogar ohne Verbindung.
 
 ## 3. Welches Werkzeug für welche Aufgabe
-- **Eine Zahl, die ich sehen kann** (Leben, Munition, Geld): [Einen Wert finden](howto:find-value).
+- **Eine Zahl, die ich sehen kann** (Leben, Munition, Geld), und du willst einen fertigen Cheat: [Cheat in vier Schritten](howto:guided-cheat) (Tab **ASSISTENT**). Zum Suchen von Hand mit allen Optionen: [Einen Wert finden](howto:find-value).
 - **Alle Items eines Unreal-Engine-Spiels**: [Items in Unreal-Spielen](howto:items-unreal).
 - **Alle Items eines Unity-Spiels**: [Items in Unity-Spielen](howto:items-unity).
 - **Leben, Gold, Erfahrung, Munition als fertige Patches** oder Live-Werte: [Werte, Live-Werte und das Cheat-Menü](howto:values-and-live).

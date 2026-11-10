@@ -331,7 +331,7 @@ class StartTabAndNavigation(unittest.TestCase):
                                     root=types.SimpleNamespace(deiconify=lambda: shown.append("deiconify"), lift=lambda: shown.append("lift"),
                                                                focus_force=lambda: shown.append("focus")))
         logs = []
-        win = types.SimpleNamespace(app=app, show_tab=lambda t: shown.append(("tab", t)), scan_tab="SCAN", t_cheat="CHEAT",
+        win = types.SimpleNamespace(app=app, show_tab=lambda t: shown.append(("tab", t)), scan_tab="SCAN", t_cheat="CHEAT", assist_tab="ASSIST",
                                     discover_tab="DISC", adv_frame="ADV", log=lambda m, k="info": logs.append((k, m)),
                                     ui=lambda fn: fn())
         t = S.StartTab(None, win)
@@ -358,6 +358,63 @@ class StartTabAndNavigation(unittest.TestCase):
         self.assertEqual(shown[-3:], ["deiconify", "lift", "focus"])
         t.go("gibt_es_nicht")
         self.assertEqual(logs[-1][0], "err")
+
+    def test_beginner_steps_lead_to_the_assistant(self):
+        import tools_start_gui as S
+        self.assertEqual([s[4] for s in S.STEPS], ["show_main", "assist_tab", "t_cheat"])
+        self.assertEqual(S.STEPS[1][3], "ZUM ASSISTENTEN")
+        self.assertTrue(any(e[3] == "scan_tab" for e in S.EXTRAS))           # der volle Sucher bleibt erreichbar
+        t, shown, _l = self.make_start()
+        t.go("assist_tab")
+        self.assertEqual(shown[-1], ("tab", "ASSIST"))
+        with Lang("en"):
+            self.assertEqual(T.translate(S.STEPS[1][3]), "GO TO ASSISTANT")
+            self.assertEqual(T.translate("VERBINDUNG PRÜFEN"), "CHECK CONNECTION")
+
+    def test_show_main_marks_the_ip_field(self):
+        t, shown, _l = self.make_start()
+        marks = []
+        t.win.app.ip_entry = types.SimpleNamespace(focus_set=lambda: marks.append("focus"),
+                                                   select_range=lambda a, b: marks.append(("sel", a, b)))
+        t.go("show_main")
+        self.assertEqual(marks, ["focus", ("sel", 0, "end")])
+
+    def test_check_connection_button_runs_the_diagnosis(self):
+        import conncheck
+        t, _s, _l = self.make_start(connected=False)
+        got = {}
+        t.win.app.ip_var = types.SimpleNamespace(get=lambda: " 192.168.1.20 ")
+        t.win.app.port_var = types.SimpleNamespace(get=lambda: "744")
+        t.win.app.backend.process_name = "eboot.bin"
+
+        def bg(fn, ok=None, err=None, lock=True):
+            got["lock"] = lock
+            try:
+                res = fn()
+            except Exception as e:  # noqa: BLE001
+                return err(e)
+            ok(res)
+        t.win.bg = bg
+        old = conncheck.diagnose
+        conncheck.diagnose = lambda host, port, **kw: (got.update(host=host, port=port, **kw), [
+            conncheck.Step("ok", "Adresse"), conncheck.Step("fail", "PS5 erreichbar", "Keine Antwort")])[1]
+        try:
+            t.run_check()
+        finally:
+            conncheck.diagnose = old
+        self.assertEqual((got["host"], got["port"], got["process_name"], got["lock"]), ("192.168.1.20", 744, "eboot.bin", False))
+        self.assertIn("✗  PS5 erreichbar", t.v_check.get())
+        self.assertFalse(t._checking)                                         # danach wieder klickbar
+
+    def test_check_connection_reports_unexpected_errors(self):
+        import conncheck
+        t, _s, _l = self.make_start(connected=False)
+        t.win.bg = lambda fn, ok=None, err=None, lock=True: err(RuntimeError("kaputt"))
+        t.win.app.backend.host, t.win.app.backend.port = "1.2.3.4", 744
+        t.run_check()
+        self.assertIn("kaputt", t.v_check.get())
+        self.assertFalse(t._checking)
+        self.assertTrue(callable(conncheck.diagnose))
 
     def test_start_tab_texts_are_translated(self):
         import tools_start_gui as S

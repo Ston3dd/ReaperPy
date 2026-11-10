@@ -9,23 +9,28 @@ import sys
 import tkinter as tk
 from tkinter import messagebox
 
+import conncheck
+import tools_i18n
 from tools_common import ACCENT, BG, BG_CARD, FONT_HEAD, FONT_LABEL, TEXT, TEXT_DIM, BaseTab, button
 
 STEPS = [
     ("1", "Spiel verbinden",
-     "Starte dein Spiel und lade den Spielstand. Klicke im Hauptfenster oben auf VERBINDEN. "
-     "Wenn das Spiel Codes hat, erscheinen sie dort automatisch.",
+     "Starte dein Spiel und lade den Spielstand. Trage im Hauptfenster die IP deiner PS5 ein und klicke oben auf "
+     "VERBINDEN. Wenn das Spiel Codes hat, erscheinen sie dort automatisch. Klappt es nicht? VERBINDUNG PRÜFEN "
+     "(unten) sagt dir in Klartext, woran es liegt.",
      "HAUPTFENSTER ZEIGEN", "show_main"),
-    ("2", "Wert suchen",
-     "Du siehst im Spiel eine Zahl (z. B. 100 Leben oder 5000 Gold)? Suche sie, ändere sie im Spiel, "
-     "suche nochmal - bis nur noch wenige Treffer übrig sind. Dann kannst du den Wert ändern.",
-     "ZU WERT SUCHEN", "scan_tab"),
-    ("3", "Als Cheat speichern",
-     "Gefundene Adressen kommen in die Cheat-Liste. Dort gibst du ihnen einen Namen und exportierst sie "
-     "für dein Cheat-Menü.",
+    ("2", "Wert finden und Cheat bauen",
+     "Du siehst im Spiel eine Zahl (z. B. 100 Leben oder 5000 Gold)? Der ASSISTENT führt dich in vier Schritten: "
+     "Zahl suchen, eingrenzen, den Befehl finden, der sie ändert, und daraus einen Cheat bauen - ohne Assembler-Kenntnisse.",
+     "ZUM ASSISTENTEN", "assist_tab"),
+    ("3", "Cheat speichern",
+     "Der fertige Cheat liegt im Reiter CHEATS BEARBEITEN. Gib ihm einen Namen, probiere ihn mit TEST AN und "
+     "speichere ihn. Für dein Cheat-Menü exportierst du ihn im Hauptfenster über GOLDHEN-JSON.",
      "ZU CHEATS BEARBEITEN", "t_cheat"),
 ]
 EXTRAS = [
+    ("Wert von Hand suchen", "Für Kenner: der volle Cheat-Sucher mit allen Suchmodi und Speicherbereichen.",
+     "ZU WERT SUCHEN", "scan_tab"),
     ("Anleitungen", "Schritt-für-Schritt-Erklärungen zu allen Werkzeugen - zum Lesen und Suchen, in deiner Sprache.",
      "ANLEITUNGEN ÖFFNEN", "howto"),
     ("Unreal-Engine-Spiel: Items als Trainer", "Alle Items eines Unreal-Spiels automatisch finden und als fertigen "
@@ -50,14 +55,25 @@ class StartTab(BaseTab):
     def __init__(self, parent, win):
         super().__init__(parent, win)
         self.v_status = tk.StringVar(value="")
+        self.v_check = tk.StringVar(value="")
         self.buttons = {}
+        self._checking = False
+        self._check_steps = None            # letztes Ergebnis der Pruefung
         tk.Label(self, text="▸  WILLKOMMEN BEI REAPERPY", bg=BG, fg=ACCENT, font=FONT_HEAD).pack(anchor="w", padx=16, pady=(14, 2))
         tk.Label(self, text="In drei Schritten zum eigenen Cheat - ohne Vorkenntnisse.", bg=BG, fg=TEXT_DIM,
                  font=FONT_LABEL).pack(anchor="w", padx=16)
         box = tk.Frame(self, bg=BG_CARD)
         box.pack(fill="x", padx=16, pady=10)
         tk.Label(box, textvariable=self.v_status, bg=BG_CARD, fg=TEXT, font=FONT_LABEL, justify="left",
-                 anchor="w").pack(fill="x", padx=12, pady=8)
+                 anchor="w").pack(fill="x", padx=12, pady=(8, 2))
+        row = tk.Frame(box, bg=BG_CARD)
+        row.pack(fill="x", padx=12, pady=(0, 4))
+        self.btn_check = button(row, "VERBINDUNG PRÜFEN", self.run_check, accent=True)
+        self.btn_check.pack(side="left")
+        tk.Label(row, text="Prüft IP, PS5, Payload und Spiel - ohne etwas zu verändern.", bg=BG_CARD, fg=TEXT_DIM,
+                 font=FONT_LABEL).pack(side="left", padx=10)
+        tk.Label(box, textvariable=self.v_check, bg=BG_CARD, fg=TEXT, font=FONT_LABEL, justify="left",
+                 anchor="w", wraplength=780).pack(fill="x", padx=12, pady=(0, 8))
         for num, title, text, btn, target in STEPS:
             self._card(num, title, text, btn, target)
         tk.Label(self, text="Mehr", bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(anchor="w", padx=16, pady=(10, 0))
@@ -101,6 +117,10 @@ class StartTab(BaseTab):
                 self.win.app.root.deiconify()
                 self.win.app.root.lift()
                 self.win.app.root.focus_force()
+                entry = getattr(self.win.app, "ip_entry", None)         # IP-Feld: hier fehlt Einsteigern am meisten
+                if entry is not None:
+                    entry.focus_set()
+                    entry.select_range(0, "end")
             except Exception:  # noqa: BLE001
                 pass
             return
@@ -112,6 +132,34 @@ class StartTab(BaseTab):
             self.log("Dieses Werkzeug ist nicht verfügbar", "err")
             return
         self.win.show_tab(tab)
+
+    def run_check(self):
+        # Knopf VERBINDUNG PRÜFEN: IP -> PS5 -> Payload -> Spiel, in einem Hintergrund-Job (rein lesend)
+        if self._checking:
+            return
+        app = self.win.app
+        try:                                                            # Werte hier (UI-Thread) lesen
+            host = app.ip_var.get().strip()
+            port = int(app.port_var.get())
+        except (AttributeError, ValueError):
+            host = getattr(app.backend, "host", "")
+            port = getattr(app.backend, "port", conncheck.DEFAULT_PORT)
+        proc = getattr(app.backend, "process_name", "eboot.bin")
+        lang = tools_i18n.lang()
+        self._checking = True
+        self._check_steps = None
+        self.v_check.set("Prüfe die Verbindung ...")
+        self.win.bg(lambda: conncheck.diagnose(host, port, process_name=proc, lang=lang),
+                    self._check_done, self._check_failed, lock=False)
+
+    def _check_done(self, steps):
+        self._checking = False
+        self._check_steps = steps
+        self.v_check.set(conncheck.render(steps, tools_i18n.lang()))
+
+    def _check_failed(self, exc):
+        self._checking = False
+        self.v_check.set(f"{type(exc).__name__}: {exc}")
 
     def status_text(self):
         """Klartext-Status (rein lesend)."""

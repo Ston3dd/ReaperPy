@@ -6,6 +6,22 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 
 **A guided assistant from a number in the game to a finished cheat, and ReapPatch export.**
 
+### Added (easier start)
+- **START tab: CHECK CONNECTION (VERBINDUNG PRÜFEN).** One button checks, one step after the other, whether the **IP** is valid (typical
+  slips are named: empty, `ip:port`, `192.168.1`, a URL), whether the **PS5 answers** (timeout / refused / no route / unknown name), whether the
+  **payload** speaks ps5debug-NG and whether a **game is running** - and says in plain words where it stops and what to do (for example "payload
+  not loaded - send it again after every PS5 restart"). If the entered port is closed but the payload answers on another common port, that port
+  is used and named. Read-only: it opens its own short connection and closes it. After a green check it reminds you of firewall port 755. New
+  module `conncheck.py`, German and English.
+- **Hints in the log when CONNECT fails.** Under the error line the main window now adds a `[net]` hint with the likely cause and the next step.
+  The cause of the last failed port is kept (`connect_auto` re-raises it with `from`), so the hint also works after the automatic port search.
+- **SHOW MAIN WINDOW** (START, step 1) now also puts the cursor into the **PS5 IP** field and selects it.
+
+### Changed
+- **START tab leads to the ASSISTANT.** Step 2 is now **GO TO ASSISTANT** ("Find a value and build a cheat"); step 3 points to EDIT CHEATS, where the
+  assistant puts the finished cheat. The full searcher stays reachable as **GO TO FIND VALUE** under "More". The how-to guides "First steps" and
+  "Troubleshooting" mention both changes.
+
 ### Removed
 - The **SPIELER / GEGNER (PLAYER / ENEMY)** tab and its button in the DISASSEMBLER tab from 6.2.0: too complicated in use. The how-to guide
   "Player or enemy?" is gone too (guides are now 14 with the new "Cheat in four steps").
