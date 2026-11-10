@@ -157,6 +157,134 @@ class Modes(Base):
         self.assertNotIn("Code-Cave", shown[-1])
 
 
+class ReturnLen(Base):
+    """OriginReturn: leer = automatisch aus ORIGINAL (ganze Befehle), eingetragen = gilt, aber mindestens 8 (Hook-Laenge)."""
+    HEX9 = "48 8B 05 00 00 00 00 90 90"                 # 9 Byte
+
+    def setUp(self):
+        super().setUp()
+        self._bch = G.AT.build_cave_hook
+        self.tab.v_type.set("cave")
+        self.tab.t_cave = FakeText("  jmp OriginReturn\n")
+
+    def tearDown(self):
+        G.AT.build_cave_hook = self._bch
+        super().tearDown()
+
+    def fake_hook(self, size, calls=None):
+        def f(data, addr, min_len=8):
+            if calls is not None:
+                calls.append((bytes(data), addr))
+            return {"size": size}
+        G.AT.build_cave_hook = f
+
+    def test_default_field_is_empty(self):
+        self.assertEqual(self.tab.v["ret"].get(), "")
+        self.tab.v["ret"].set("12")
+        self.tab.clear()
+        self.assertEqual(self.tab.v["ret"].get(), "")
+
+    def test_manual_value_counts(self):
+        self.tab.v["ret"].set("9")
+        self.assertEqual(self.tab._return_len(), (9, "manual"))
+        self.tab.v["ret"].set("0x0A")
+        self.assertEqual(self.tab._return_len(), (10, "manual"))
+
+    def test_manual_value_below_hook_length_is_rejected(self):
+        self.tab.v["ret"].set("5")
+        with self.assertRaises(ValueError) as cm:
+            self.tab._return_len()
+        self.assertIn("zu klein", str(cm.exception))
+        self.assertIn("8", str(cm.exception))
+
+    def test_manual_value_must_be_a_number(self):
+        self.tab.v["ret"].set("abc")
+        with self.assertRaises(ValueError) as cm:
+            self.tab._return_len()
+        self.assertIn("Zahl", str(cm.exception))
+
+    def test_auto_uses_whole_instructions_from_original(self):
+        calls = []
+        self.fake_hook(9, calls)
+        self.tab.t_def = FakeText("48 8B 05 00 00 00 00 90 90 90 90")    # 11 Byte, Befehlsgrenze bei 9
+        self.assertEqual(self.tab._return_len(), (9, "auto"))
+        self.assertEqual(calls, [(bytes.fromhex("488B05000000009090 9090".replace(" ", "")), 0)])
+
+    def test_auto_falls_back_to_the_byte_count_without_disassembler(self):
+        def boom(*a, **k):
+            raise RuntimeError("capstone fehlt")
+        G.AT.build_cave_hook = boom
+        self.tab.t_def = FakeText(self.HEX9)
+        self.assertEqual(self.tab._return_len(), (9, "auto"))
+
+    def test_too_few_original_bytes_use_the_default(self):
+        self.tab.t_def = FakeText("48 8B 05 00 00 00 00")                  # 7 Byte
+        self.assertEqual(self.tab._return_len(), (8, "default"))
+        self.tab.t_def = FakeText("")
+        self.assertEqual(self.tab._return_len(), (8, "default"))
+        self.tab.t_def = FakeText("kein hex")
+        self.assertEqual(self.tab._return_len(), (8, "default"))
+
+    def test_build_json_writes_the_derived_value_for_caves_only(self):
+        self.fake_hook(9)
+        self.tab.t_def = FakeText(self.HEX9)
+        ret = [v for v in self.tab.build_json()["Variables"] if v["label"] == "OriginReturn"]
+        self.assertEqual([r["offset"] for r in ret], [9])
+        self.tab.v_type.set("patch")
+        self.assertFalse([v for v in self.tab.build_json()["Variables"] if v["label"] == "OriginReturn"])
+
+    def test_build_json_rejects_a_too_small_value(self):
+        self.tab.v["ret"].set("4")
+        with self.assertRaises(ValueError):
+            self.tab.build_json()
+
+    def test_log_says_where_the_value_comes_from(self):
+        self.fake_hook(9)
+        self.tab.t_def = FakeText(self.HEX9)
+        self.tab._note_return_len()
+        self.assertEqual(self.win.logs[-1][0], "info")
+        self.assertIn("automatisch: 9 Bytes", self.win.logs[-1][1])
+        self.tab.t_def = FakeText("90")
+        self.tab._note_return_len()
+        self.assertEqual(self.win.logs[-1][0], "warn")
+        n = len(self.win.logs)
+        self.tab.v["ret"].set("9")                                          # von Hand: nichts zu melden
+        self.tab._note_return_len()
+        self.tab.v["ret"].set("")
+        self.tab.v_type.set("patch")                                        # kein Cave: nichts zu melden
+        self.tab._note_return_len()
+        self.assertEqual(len(self.win.logs), n)
+
+    def test_saving_reports_a_bad_value_and_does_not_save(self):
+        errors = []
+        old = G.messagebox.showerror
+        G.messagebox.showerror = lambda *a, **k: errors.append(a)
+        try:
+            self.tab.v_adv.set(True)
+            self.tab.v["ret"].set("3")
+            self.tab.save()
+        finally:
+            G.messagebox.showerror = old
+        self.assertEqual(self.saved, [])
+        self.assertIn("zu klein", errors[0][1])
+
+    def test_disassembler_template_sets_an_explicit_value(self):
+        self.tab.fill_hook({"addr": 0x401234, "size": 10, "default": "48 8B 05 00 00 00 00 90 90 90",
+                            "new": "jmp OriginTarget", "cave": "mov eax, 1\njmp OriginReturn"})
+        self.assertEqual(self.tab._return_len(), (10, "manual"))
+
+    def test_english(self):
+        self.tab.v["ret"].set("3")
+        old = T.lang()
+        T.set_lang("en")
+        try:
+            with self.assertRaises(ValueError) as cm:
+                self.tab._return_len()
+        finally:
+            T.set_lang(old)
+        self.assertIn("too small", str(cm.exception))
+
+
 class AutoSignature(Base):
     def test_simple_mode_creates_the_signature_then_saves(self):
         seen = {}

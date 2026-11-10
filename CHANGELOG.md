@@ -6,6 +6,14 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 
 **A guided assistant from a number in the game to a finished cheat, and ReapPatch export.**
 
+### Fixed
+- **OriginReturn was a fixed 8 unless the disassembler filled it.** A cave written by hand (or loaded without the value) returned to the wrong
+  place whenever the overwritten instructions did not end exactly at byte 8 - the game then crashed or ran garbage. The field is now **empty =
+  automatic**: ReaperPy derives it from the ORIGINAL bytes (whole instructions covering at least 8 bytes, the same rule as the disassembler
+  template; plain byte count if no disassembler is available) and logs `OriginReturn automatisch: N Bytes` on SAVE and TEST ON. If ORIGINAL has
+  fewer than 8 bytes, it uses 8 and warns. A typed value is still honoured, but values below 8 and non-numbers are rejected with a clear message
+  (a cave hook always overwrites 8 bytes, so a smaller return lands inside the hook).
+
 ### Added (EDIT CHEATS for beginners)
 - **Simple / advanced view in EDIT CHEATS.** The tab opens in the **simple** view: NAME, AUTHOR, OFFSET, ORIGINAL and NEW - the patch type,
   OriginReturn, cave code and signature row are hidden. The new **ADVANCED OPTIONS** checkbox shows them again; the choice is remembered

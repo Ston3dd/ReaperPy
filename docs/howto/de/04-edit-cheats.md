@@ -9,6 +9,8 @@ Wenn du verbunden speicherst, erzeugt ReaperPy die **Signatur** für dich. Mit d
 
 Hake **ERWEITERTE OPTIONEN** an, um Patch-Art, **OriginReturn**, Cave-Code und Signatur zu sehen und selbst zu bestimmen. Die Wahl wird gemerkt. Ein Cheat mit Code-Cave (zum Beispiel aus einem Preset) funktioniert auch in der einfachen Ansicht; ein Hinweis sagt dir, wie viele Zeilen die Cave hat.
 
+**OriginReturn** ist die Zahl der Bytes, die der Hook überschreibt - also die Stelle, an der das Spiel nach deiner Cave weiterläuft. Lass das Feld leer, dann rechnet ReaperPy es aus den Originalbytes aus (ganze Befehle, mindestens 8 Bytes) und schreibt es ins Protokoll. Trägst du selbst eine Zahl ein, muss sie mindestens 8 sein, weil ein Cave-Hook immer 8 Bytes überschreibt.
+
 ## Woraus ein Patch besteht
 - **Name** und **Autor** - was du in der Patch-Liste siehst.
 - **Offset** - der Abstand vom Anfang des Spielprogramms (der *Image-Basis*), damit der Cheat nach einem Neustart weiter funktioniert.

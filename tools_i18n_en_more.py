@@ -4,6 +4,11 @@ Wird am Ende von tools_i18n_en.py in EN eingemischt. Schluessel = deutscher Text
 """
 
 EN_MORE = {
+    'OriginReturn (Bytes, leer = automatisch)': 'OriginReturn (bytes, empty = automatic)',
+    'OriginReturn automatisch: {} Bytes (aus den ORIGINAL-Bytes, ganze Befehle).': 'OriginReturn automatic: {} bytes (from the ORIGINAL bytes, whole instructions).',
+    'OriginReturn nicht angegeben und ORIGINAL hat weniger als 8 Bytes - ich nehme {}. Das stimmt nur, wenn dort ein Befehl endet; sicherer ist DISASSEMBLER → CHEAT-EDITOR.': 'OriginReturn not given and ORIGINAL has fewer than 8 bytes - I use {}. That is only right if an instruction ends there; safer is DISASSEMBLER → CHEAT EDITOR.',
+    'OriginReturn muss eine Zahl sein (oder leer lassen = automatisch).': 'OriginReturn must be a number (or leave it empty = automatic).',
+    'OriginReturn {} ist zu klein: Der Hook überschreibt immer {} Bytes.': 'OriginReturn {} is too small: the hook always overwrites {} bytes.',
     'Einfach: Die Felder füllen sich meist von selbst - aus dem ASSISTENTEN oder dem DISASSEMBLER (→ CHEAT-EDITOR). Trage einen NAME ein, probiere mit TEST AN und speichere. Signatur und Rücksprung-Länge erledigt ReaperPy.': 'Simple: the fields usually fill themselves - from the ASSISTANT or the DISASSEMBLER (→ CHEAT EDITOR). Enter a NAME, try it with TEST ON and save. ReaperPy takes care of the signature and the return length.',
     'Erweitert: Du siehst Cave-Code, OriginReturn und Signatur und bestimmst sie selbst.': 'Advanced: you see the cave code, OriginReturn and signature and set them yourself.',
     'Dieser Cheat nutzt eine Code-Cave ({} Zeilen) - den Code siehst du unter ERWEITERTE OPTIONEN.': 'This cheat uses a code cave ({} lines) - you can see the code under ADVANCED OPTIONS.',

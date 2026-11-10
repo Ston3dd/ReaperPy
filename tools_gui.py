@@ -550,6 +550,12 @@ SIMPLE_HINT = ("Einfach: Die Felder füllen sich meist von selbst - aus dem ASSI
                "Trage einen NAME ein, probiere mit TEST AN und speichere. Signatur und Rücksprung-Länge erledigt ReaperPy.")
 ADVANCED_HINT = "Erweitert: Du siehst Cave-Code, OriginReturn und Signatur und bestimmst sie selbst."
 CAVE_NOTE = "Dieser Cheat nutzt eine Code-Cave ({} Zeilen) - den Code siehst du unter ERWEITERTE OPTIONEN."
+HOOK_MIN = 8        # ein Cave-Hook (jmp rel32 + NOPs) überschreibt immer 8 Byte - OriginReturn kann nicht kleiner sein
+RET_AUTO = "OriginReturn automatisch: {} Bytes (aus den ORIGINAL-Bytes, ganze Befehle)."
+RET_DEFAULT = ("OriginReturn nicht angegeben und ORIGINAL hat weniger als 8 Bytes - ich nehme {}. Das stimmt nur, wenn dort ein "
+               "Befehl endet; sicherer ist DISASSEMBLER → CHEAT-EDITOR.")
+RET_NAN = "OriginReturn muss eine Zahl sein (oder leer lassen = automatisch)."
+RET_TOO_SMALL = "OriginReturn {} ist zu klein: Der Hook überschreibt immer {} Bytes."
 SIG_AUTO = "Keine Signatur eingetragen - ReaperPy erzeugt sie jetzt automatisch (damit der Cheat ein Spiel-Update übersteht) ..."
 SIG_FAILED = ("Signatur konnte nicht erzeugt werden ({}) - der Cheat wird ohne Signatur gespeichert "
               "und muss nach einem Spiel-Update neu gesetzt werden.")
@@ -564,7 +570,7 @@ class CheatTab(BaseTab):
         self.test_rp = None
         self.v = {k: tk.StringVar() for k in ("name", "author", "offset", "aob", "aoboff", "ret")}
         self.v["aoboff"].set("0")
-        self.v["ret"].set("8")
+        self.v["ret"].set("")                                   # leer = automatisch aus ORIGINAL
         self.v_type = tk.StringVar(value="patch")
 
         self.v_adv = tk.BooleanVar(value=self._saved_advanced())
@@ -585,8 +591,8 @@ class CheatTab(BaseTab):
             tk.Radiobutton(t, text=txt, variable=self.v_type, value=val, command=self._type,
                            bg=BG, fg=TEXT, selectcolor=BG_CARD, activebackground=BG,
                            activeforeground=ACCENT, font=FONT_LABEL).pack(side="left", padx=(0, 12))
-        label(t, "OriginReturn (Bytes)").pack(side="left", padx=(12, 4))
-        entry(t, self.v["ret"], 4).pack(side="left")
+        label(t, "OriginReturn (Bytes, leer = automatisch)").pack(side="left", padx=(12, 4))
+        entry(t, self.v["ret"], 6).pack(side="left")
 
         self._row_type = t
         cols = tk.Frame(self, bg=BG); cols.pack(fill="both", expand=True, padx=8, pady=4)
@@ -697,7 +703,7 @@ class CheatTab(BaseTab):
     def clear(self):
         for k in self.v:
             self.v[k].set("")
-        self.v["aoboff"].set("0"); self.v["ret"].set("8")
+        self.v["aoboff"].set("0"); self.v["ret"].set("")
         for t in (self.t_def, self.t_new):
             t.delete("1.0", "end")
         self.t_cave.delete("1.0", "end"); self.t_cave.insert("1.0", tools_i18n.translate(CAVE_TEMPLATE))
@@ -732,6 +738,43 @@ class CheatTab(BaseTab):
             blocks.append((cur, "\n".join(lines)))
         return blocks
 
+    def _return_len(self):
+        """OriginReturn in Bytes -> (Wert, 'manual' | 'auto' | 'default').
+        Eingetragen: gilt (mindestens HOOK_MIN, sonst landet der Rücksprung mitten im Hook).  Leer: aus den ORIGINAL-Bytes - ganze
+        Befehle, die mindestens HOOK_MIN abdecken (wie der DISASSEMBLER es macht).  Zu wenig ORIGINAL-Bytes: Standard HOOK_MIN."""
+        t = self.v["ret"].get().strip()
+        if t:
+            try:
+                n = int(t, 0)
+            except ValueError:
+                raise ValueError(tools_i18n.translate(RET_NAN)) from None
+            if n < HOOK_MIN:
+                raise ValueError(tools_i18n.translate(RET_TOO_SMALL).format(n, HOOK_MIN))
+            return n, "manual"
+        try:
+            data = bytes(AT.parse_hex_bytes(self.t_def.get("1.0", "end")))
+        except Exception:  # noqa: BLE001 - ORIGINAL leer / kein Hex
+            data = b""
+        if len(data) >= HOOK_MIN:
+            try:
+                return AT.build_cave_hook(data, 0)["size"], "auto"
+            except Exception:  # noqa: BLE001 - kein Disassembler / abgeschnittener Befehl: Länge der Bytes nehmen
+                return len(data), "auto"
+        return HOOK_MIN, "default"
+
+    def _note_return_len(self):
+        """Ins Protokoll, woher OriginReturn kommt (nur Cave, nur wenn nicht von Hand eingetragen)."""
+        if self.v_type.get() != "cave":
+            return
+        try:
+            n, how = self._return_len()
+        except Exception:  # noqa: BLE001
+            return
+        if how == "auto":
+            self.log(tools_i18n.translate(RET_AUTO).format(n), "info")
+        elif how == "default":
+            self.log(tools_i18n.translate(RET_DEFAULT).format(n), "warn")
+
     def build_json(self):
         name = self.v["name"].get().strip()
         if not name:
@@ -747,7 +790,7 @@ class CheatTab(BaseTab):
             src["aobOffset"] = int(self.v["aoboff"].get() or "0", 0)
         variables = [src]
         if self.v_type.get() == "cave":
-            variables.append({"label": "OriginReturn", "offset": int(self.v["ret"].get() or "8", 0)})
+            variables.append({"label": "OriginReturn", "offset": self._return_len()[0]})
             labels = self._cave_labels()
             if not labels:
                 raise ValueError("Cave-Code fehlt")
@@ -803,6 +846,7 @@ class CheatTab(BaseTab):
             data = self.build_json()
         except Exception as e:
             return messagebox.showerror("Cheat-Editor", str(e))
+        self._note_return_len()
         folder = self.win.app.PATCH_DIR or ""
         fn = filedialog.asksaveasfilename(
             parent=self, initialdir=folder or None,
@@ -886,6 +930,7 @@ class CheatTab(BaseTab):
             return messagebox.showerror("Test", str(e))
         if self.test_state:
             return self.log("Test läuft schon - erst TEST AUS", "warn")
+        self._note_return_len()
         self.test_rp = rp
 
         def job():

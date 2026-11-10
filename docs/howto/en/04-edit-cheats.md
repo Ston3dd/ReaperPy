@@ -9,6 +9,8 @@ When you save while connected, ReaperPy creates the **signature** for you. The s
 
 Tick **ADVANCED OPTIONS** to see the patch type, **OriginReturn**, the cave code and the signature and to set them yourself. The choice is remembered. A cheat that uses a code cave (for example from a preset) keeps working in the simple view; a note tells you how many lines the cave has.
 
+**OriginReturn** is the number of bytes the hook overwrites - the place where the game continues after your cave. Leave it empty and ReaperPy works it out from the original bytes (whole instructions, at least 8 bytes) and says so in the log. If you type a number, it must be at least 8, because a code-cave hook always overwrites 8 bytes.
+
 ## What a patch consists of
 - **Name** and **author** - what you see in the patch list.
 - **Offset** - the distance from the start of the game's program (the *image base*), so the cheat keeps working after a restart.
