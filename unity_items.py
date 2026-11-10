@@ -326,17 +326,31 @@ def give_score(g, item_enum):
     return s
 
 
-def give_candidates(game, item_enum=None, limit=40):
+LEVELS = ("strict", "normal", "off")      # wie beim Filter im Unreal-Tab: streng / normal / aus
+GIVE_NAME_WIDE = re.compile(r"(?i)put|insert|store|equip|unlock|craft|spawn|create|earn|pick|loot|obtain|stash|deposit|"
+                            r"set\w*item|item\w*(set|change)")
+_LEVEL_MIN_SCORE = {"strict": 3, "normal": 1, "off": -99}
+
+
+def give_candidates(game, item_enum=None, limit=40, level="strict"):
     """Methoden, die ein Item geben koennten -> (baubar: [Give] nach Score, abgelehnt: [(Methode, Grund)]).
-    Nur Methoden im Spiel-Code (Assembly-CSharp); Unity-/System-Bibliotheken geben keine Spiel-Items."""
+    Nur Methoden im Spiel-Code (Assembly-CSharp); Unity-/System-Bibliotheken geben keine Spiel-Items.
+    level: strict = nur Namen wie Add/Give/Grant ..., normal = auch Put/Insert/Craft/Equip ..., off = jede Methode mit
+    Item-Parameter (viele Fehltreffer - dann erst mit 'Item testen' pruefen)."""
+    if level not in _LEVEL_MIN_SCORE:
+        level = "strict"
     enums = enum_map(game)
     ok, bad = [], []
+    min_score = _LEVEL_MIN_SCORE[level]
     for m in game.all_methods():
         if not m.cls.image.startswith("Assembly-CSharp") or m.cls.kind == "enum":
             continue
-        if not (GIVE_NAME_LOOSE.search(m.name) or m.name in ("Put", "Insert", "Store")):
+        named = GIVE_NAME_LOOSE.search(m.name) or m.name in ("Put", "Insert", "Store")
+        if not named and level != "off" and not (level == "normal" and GIVE_NAME_WIDE.search(m.name)):
             continue
-        if re.search(r"(?i)^(remove|delete|drop|use|consume|sell|clear|can|has|is)", m.name):
+        if level != "off" and re.search(r"(?i)^(remove|delete|drop|use|consume|sell|clear|can|has|is)", m.name):
+            continue
+        if level == "off" and re.search(r"(?i)^(get_|set_|op_|\.)|^(remove|delete|destroy|clear)", m.name):
             continue
         try:
             g = classify_give(m, enums, item_enum)
@@ -346,7 +360,7 @@ def give_candidates(game, item_enum=None, limit=40):
                 bad.append((m, str(e)))
             continue
         g.score = give_score(g, item_enum)
-        if g.score < 3:
+        if g.score < min_score:
             continue
         ok.append(g)
     ok.sort(key=lambda g: -g.score)

@@ -17,13 +17,16 @@ The tab **VALUES** (under **UNREAL** and **UNITY**) is the easiest way. The thre
 In **UNREAL → LIVE** you choose the game's SDK folder, click a value such as `UHealthComponent.Health` and see the live value on the right. Right-click a row to change the value, freeze or unfreeze it, show it in memory or find who writes it. Instance addresses change with every game start; classes and offsets stay valid.
 
 ## CHEAT MENU: switches for your character
-Press **BUILD MENU** after loading the game in LIVE. Each entry shows whether it can be reached on your character (check mark) or why not (cross). **ON / OFF** (or double-click) switches an entry and puts the original value back when you switch it off. If your character changes (death, loading screen), all entries are released.
+Press **BUILD MENU** after loading the game in LIVE. Each entry shows whether it can be reached on your character (check mark) or why not (cross). **ON / OFF** (or double-click) switches an entry and puts the original value back when you switch it off. If your character changes (death, loading screen), all entries are released. **BUILD CODE CAVE** turns the selected entry into a permanent cheat: ReaperPy searches the game code for the instruction that writes the value and saves a cave as a `.reapproj` patch (without an active project it asks for a folder). **CAVE: CHOOSE HIT** lets you pick the instruction yourself.
 
 ## DISCOVERER: what is there to find?
 **UNREAL → DISCOVERER** analyses the SDK and tells you in plain words what the game offers: item tables, give-functions, stat enums, cheat managers - and whether a trainer can be built for each. Start with **ANALYZE**. **READ TABLE LIVE** lists the rows of a table by name. **SEARCH INVENTORY ENTRIES** sets quantities directly in memory when no give-function fits.
 
 ## EXPERT
 **UNREAL → EXPERT** holds the static tools: candidates from the SDK headers, instruction search in the dump, NOP and cave patches. It is also a command-line tool (`python ue_auto.py --help`).
+
+## Unity: CHEAT MENU
+**UNITY → CHEAT MENU** works like the Unreal one, built from `dump.cs`: method patches (taking damage, spending money, using stamina) and fields (health, gold, stamina, EXP, hunger ...). Load the game folder in MANUAL, connect, load a save and press **BUILD MENU**. **ON / OFF** switches an entry, **SET VALUE** writes a number and holds it, **ALL OFF** restores the originals. For fields **BUILD CODE CAVE** creates a permanent cave; for methods **SAVE PATCH** saves the ready patch.
 
 ## Unity: QUICK and MANUAL
 In **UNITY → MANUAL**:

@@ -17,13 +17,16 @@ Der Tab **WERTE** (unter **UNREAL** und **UNITY**) ist der einfachste Weg. Die d
 In **UNREAL → LIVE** wählst du den SDK-Ordner des Spiels, klickst einen Wert wie `UHealthComponent.Health` an und siehst rechts den Live-Wert. Mit der rechten Maustaste auf einer Zeile änderst du den Wert, frierst ihn ein oder taust ihn auf, zeigst ihn im Speicher oder findest den Schreiber. Instanz-Adressen ändern sich bei jedem Spielstart; Klassen und Offsets bleiben gültig.
 
 ## CHEAT-MENÜ: Schalter für deine Spielfigur
-Drücke **MENÜ AUFBAUEN**, nachdem du das Spiel in LIVE geladen hast. Jeder Eintrag zeigt, ob er an deiner Figur erreichbar ist (Haken) oder warum nicht (Kreuz). **AN / AUS** (oder Doppelklick) schaltet einen Eintrag um und stellt beim Ausschalten den Originalwert wieder her. Wechselt deine Figur (Tod, Ladebildschirm), werden alle Einträge freigegeben.
+Drücke **MENÜ AUFBAUEN**, nachdem du das Spiel in LIVE geladen hast. Jeder Eintrag zeigt, ob er an deiner Figur erreichbar ist (Haken) oder warum nicht (Kreuz). **AN / AUS** (oder Doppelklick) schaltet einen Eintrag um und stellt beim Ausschalten den Originalwert wieder her. Wechselt deine Figur (Tod, Ladebildschirm), werden alle Einträge freigegeben. **CODE CAVE BAUEN** macht aus dem gewählten Eintrag einen dauerhaften Cheat: ReaperPy sucht im Spiel-Code die Instruktion, die den Wert schreibt, und speichert eine Cave als `.reapproj`-Patch (ohne aktives Projekt fragt es nach einem Ordner). Mit **CAVE: TREFFER WÄHLEN** suchst du die Instruktion selbst aus.
 
 ## ENTDECKER: Was gibt es zu finden?
 **UNREAL → ENTDECKER** analysiert das SDK und sagt dir in einfachen Worten, was das Spiel bietet: Item-Tabellen, Geben-Funktionen, Statistik-Enums, Cheat-Manager - und ob sich für jedes ein Trainer bauen lässt. Starte mit **ANALYSIEREN**. **TABELLE LIVE LESEN** listet die Zeilen einer Tabelle nach Namen. **INVENTAR-EINTRÄGE SUCHEN** setzt Mengen direkt im Speicher, wenn keine Geben-Funktion passt.
 
 ## EXPERTE
 **UNREAL → EXPERTE** enthält die statischen Werkzeuge: Kandidaten aus den SDK-Headern, Befehlssuche im Dump, NOP- und Cave-Patches. Es ist auch ein Kommandozeilen-Tool (`python ue_auto.py --help`).
+
+## Unity: CHEAT-MENÜ
+**UNITY → CHEAT-MENÜ** funktioniert wie das von Unreal, gebaut aus `dump.cs`: Methoden-Patches (Schaden nehmen, Geld ausgeben, Ausdauer verbrauchen) und Felder (Leben, Gold, Ausdauer, EXP, Hunger ...). Lade im Reiter MANUELL den Spiel-Ordner, verbinde, lade einen Spielstand und drücke **MENÜ AUFBAUEN**. **AN / AUS** schaltet einen Eintrag, **WERT SETZEN** schreibt eine Zahl und hält sie fest, **ALLE AUS** stellt die Originale zurück. Bei Feldern erzeugt **CODE CAVE BAUEN** eine dauerhafte Cave, bei Methoden speichert **PATCH SPEICHERN** den fertigen Patch.
 
 ## Unity: SCHNELL und MANUELL
 In **UNITY → MANUELL**:

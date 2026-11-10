@@ -1120,6 +1120,7 @@ EN.update({
 # --- Nachtrag 4: Cheat-Menue ---
 EN.update({
     '★ CHEAT-MENÜ': '★ CHEAT MENU',
+    '★ UNITY CHEAT-MENÜ': '★ UNITY CHEAT MENU',
     '🔄  MENÜ AUFBAUEN': '🔄  BUILD MENU',
     'ALLE AUS': 'ALL OFF',
     'AN / AUS': 'ON / OFF',

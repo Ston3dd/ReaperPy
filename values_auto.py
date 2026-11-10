@@ -19,14 +19,14 @@ import il2cpp_dump as D
 XP_CATEGORY = "Erfahrung/Level"
 XP_DEFAULT = "99999"
 UNITY_PER_CAT = 6
-CATEGORY_ORDER = ["Leben", "Ausdauer", "Mana/Energie", "Schild/Rüstung", "Munition", "Geld", XP_CATEGORY, "Schalter",
+CATEGORY_ORDER = ["Leben", "Ausdauer", "Mana/Energie", "Schild/Rüstung", "Munition", "Geld", XP_CATEGORY, "Hunger/Durst", "Schalter",
                   "Cooldown", "Sonstiges"]
 
 # ------------------------------------------------------------------------------------------------------------------
 # Unity: Methoden nach Namen erkennen
 # ------------------------------------------------------------------------------------------------------------------
 Rule = namedtuple("Rule", "cat pattern void_noop bool_value int_value")
-_CUR = r"(money|gold|coins?|cash|currency|gems?|credits?|souls?|funds|bolts|silver|diamonds?)"
+_CUR = r"(money|gold|coins?|cash|currency|gems?|credits?|souls?|funds|bolts|silver|diamonds?|crystals?|shards?|essence|dollars?|rupees?|zeny|renown|tokens?|orbs?)"
 _SPEND = r"(spend|remove|subtract|deduct|pay|consume|use|take|lose|withdraw|decrease|reduce)"
 RULES = [
     Rule("Leben", r"(take|receive|apply|deal|inflict|suffer)?damage(taken)?|(on)?(take|receive|get)(hit|damage)|hurt|"
@@ -35,13 +35,16 @@ RULES = [
     Rule("Leben", r"is(alive|invincible|invulnerable|immortal)|godmode", False, "true", None),
     Rule("Geld", _SPEND + _CUR, True, "true", None),
     Rule("Geld", r"(can|has)(afford|enough" + _CUR + r"?|money|gold)|canbuy|canpay", False, "true", None),
-    Rule("Ausdauer", r"(use|consume|drain|reduce|spend|decrease|deplete|lose)(stamina|sprint|focus|fuel|oxygen|breath)",
+    Rule("Ausdauer", r"(use|consume|drain|reduce|spend|decrease|deplete|lose)(stamina|sprint|focus|fuel|oxygen|breath|vigor|dash|energybar|endurance)",
          True, "true", None),
-    Rule("Ausdauer", r"(has|can)(stamina|enoughstamina|sprint|run)", False, "true", None),
+    Rule("Ausdauer", r"(has|can)(stamina|enoughstamina|sprint|run|dash|enoughenergy)", False, "true", None),
     Rule("Mana/Energie", r"(use|consume|drain|reduce|spend|decrease|deplete|lose)(mana|energy|magic|power)", True, "true", None),
     Rule("Munition", r"(use|consume|reduce|decrease|spend|remove|deplete)(ammo|ammunition|bullets?|arrows?|rounds?|"
                      r"charges?|clip)", True, "true", None),
     Rule("Munition", r"(has|have)(ammo|ammunition|bullets?)|canshoot|canfire", False, "true", None),
+    Rule("Hunger/Durst", r"(use|consume|drain|reduce|decrease|deplete|lose|add|increase|gain)(hunger|thirst|food|water|sanity|stress|"
+                         r"temperature|radiation|hydration|fatigue|tiredness)", True, "true", None),
+    Rule("Hunger/Durst", r"(is|get)(hungry|thirsty|starving|freezing|exhausted|tired)", False, "false", None),
     Rule(XP_CATEGORY, r"(required|needed|next|nextlevel)(level)?(exp|experience|xp)(tolevel|tonext|fornext|forlevel)?|"
                       r"(exp|experience|xp)(to|for|needed|required)(next)?(level|levelup)?|"
                       r"(getexp|getxp)(for|to)(next)?level", False, None, 1),
@@ -139,7 +142,7 @@ def ue_entries(menu):
 
 # Wert, der bei 'festschreiben' eingesetzt wird, wenn kein 'kann nicht sinken' / NOP moeglich ist (Zahl, nie 'auto')
 FORCE_DEFAULTS = {"Leben": "9999", "Ausdauer": "9999", "Mana/Energie": "9999", "Schild/Rüstung": "9999",
-                  "Munition": "999", "Geld": "999999"}
+                  "Munition": "999", "Geld": "999999", "Hunger/Durst": "0"}
 SUBTRACT = ("sub", "dec")           # schreibende Abzieh-Befehle: abschalten = 'wird nicht weniger'
 
 

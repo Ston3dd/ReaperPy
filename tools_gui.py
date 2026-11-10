@@ -1031,7 +1031,8 @@ class ToolsWindow(tk.Toplevel):
     GROUPS = {
         "★ UNREAL": (("★ ITEMS", "ITEMS"), ("★ WERTE", "WERTE"), ("★ UE-LIVE", "LIVE"), ("★ CHEAT-MENÜ", "CHEAT-MENÜ"),
                      ("★ UE-ENTDECKER", "ENTDECKER"), ("UE-AUTO", "EXPERTE")),
-        "★ UNITY": (("★ UNITY ITEMS", "ITEMS"), ("★ WERTE UNITY", "SCHNELL"), ("★ UNITY MANUELL", "MANUELL")),
+        "★ UNITY": (("★ UNITY ITEMS", "ITEMS"), ("★ WERTE UNITY", "SCHNELL"), ("★ UNITY MANUELL", "MANUELL"),
+                   ("★ UNITY CHEAT-MENÜ", "CHEAT-MENÜ")),
     }
     GROUPED = {inner for subs in GROUPS.values() for inner, _t in subs}
 
@@ -1133,6 +1134,7 @@ class ToolsWindow(tk.Toplevel):
                  ("tools_discover_gui", "DiscoverTab", "★ UE-ENTDECKER"),
                  ("tools_cheatmenu_gui", "CheatMenuTab", "★ CHEAT-MENÜ"),
                  ("tools_unity_gui", "UnityTab", "★ UNITY MANUELL"),
+                 ("tools_unity_cheatmenu_gui", "UnityCheatMenuTab", "★ UNITY CHEAT-MENÜ"),
                  ("tools_ue_gui", "UeTab", "UE-AUTO"))
         group_of = {inner: g for g, subs in self.GROUPS.items() for inner, _t in subs}
         for modname, clsname, name, *kw in extra:

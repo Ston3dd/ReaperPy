@@ -20,6 +20,11 @@ Press **SAVE TRAINER**. The result is a normal ReaperPy project, just like in [I
 
 > **Tip:** Methods that need an item object or a text instead of an ID are listed with the reason and skipped.
 
+## Give items right now
+Under step 3 there is a row **Right now in the running game**. Click an item and press **TEST 1 ITEM**: ReaperPy calls the give method in the running game (stay in the game, not in the main menu, and save first). It then asks whether the item arrived and remembers the answer - a method that gave nothing is replaced by the next one. **TEST CHECKED ITEMS** calls every ticked item once and tells you where it stopped, **GIVE NOW** gives all ticked items with your amount, without a trainer file.
+
+> **Tip:** If no give method is found, set **Give-method filter** to *normal* or *off*. *Off* shows every method with an item parameter - then always test with **TEST 1 ITEM** first.
+
 ## Other Unity pages
 For single values and method patches see [Values, live values and the cheat menu](howto:values-and-live).
 

@@ -88,7 +88,7 @@ ENGINE = [
 GAME_CATS = [("Cheat-Schalter", "Schalter", "toggle"), ("Leben", "Leben", "value"), ("Ausdauer", "Ausdauer", "value"),
              ("Mana/Energie", "Mana/Energie", "value"), ("Schild/Rüstung", "Schild/Rüstung", "value"),
              ("Munition", "Munition", "value"), ("Währung", "Geld", "value"),
-             ("Erfahrung", "Erfahrung/Level", "value")]
+             ("Erfahrung", "Erfahrung/Level", "value"), ("Hunger/Durst", "Hunger/Durst/Sanity", "value")]
 PER_CAT = 3
 
 

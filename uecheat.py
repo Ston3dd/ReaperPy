@@ -38,6 +38,7 @@ FIXED = {"ffixedpoint64", "ffixedpoint", "ffixedpoint32"}
 BP_CLASS = re.compile(r"^[AU]?(WBP|ABP|BP|BPI|PRESET)_|_C$")
 NOISE_CLASS = re.compile(r"^[AU]?(BT|GameFeature|GameNetworkManager|EnvQuery|MovieScene|Niagara|Behavior)")
 DATA_CLASS = re.compile(r"(DatabaseRow|DataTable|DataStruct|MasterData|Row)$|^[AU]?\w*Static\w*(Data|Param\w*)$")
+POINT_OWNERS = {"skill", "perk", "stat", "attribute", "ability", "talent", "mastery", "upgrade", "tech"}
 TIMEISH = {"time", "span", "timer", "duration", "interval", "delay", "seconds", "sec", "rate", "ratio"}
 CATEGORIES = {
     "Cheat-Schalter": (
@@ -68,7 +69,7 @@ CATEGORIES = {
         BOOLS,
     ),
     "Leben": ({"health", "hp", "hitpoints", "vitality", "hitpoint", "hitpts"}, 10, NUM),
-    "Ausdauer": ({"stamina", "endurance", "sprint"}, 8, NUM),
+    "Ausdauer": ({"stamina", "endurance", "sprint", "vigor", "vigour", "fatigue", "breath", "oxygen", "air", "fuel", "dash"}, 8, NUM),
     "Mana/Energie": ({"mana", "energy", "magic", "focus", "power", "ult", "ultimate", "rage"}, 7, NUM),
     "Schild/Rüstung": ({"shield", "armor", "armour", "defense", "defence", "barrier"}, 7, NUM),
     "Munition": ({"ammo", "ammunition", "clip", "magazine", "bullets", "rounds", "reserve", "mag"}, 9, NUM),
@@ -92,11 +93,27 @@ CATEGORIES = {
             "balance",
             "funds",
             "tokens",
+            "dollars",
+            "diamonds",
+            "diamond",
+            "crystals",
+            "shards",
+            "essence",
+            "orbs",
+            "rubies",
+            "zeny",
+            "rupees",
+            "renown",
+            "bucks",
         },
         9,
         NUM,
     ),
-    "Erfahrung": ({"xp", "exp", "experience", "level", "skillpoints", "skillpoint", "talentpoints"}, 7, NUM),
+    "Erfahrung": ({"xp", "exp", "experience", "level", "skillpoints", "skillpoint", "talentpoints", "skillpts", "perkpoints",
+                   "statpoints", "attributepoints", "abilitypoints", "masterypoints", "prestige", "rank", "reputation",
+                   "mastery", "totalxp", "currentxp", "curexp", "curxp"}, 7, NUM),
+    "Hunger/Durst": ({"hunger", "thirst", "food", "water", "satiety", "hydration", "sanity", "stress", "temperature",
+                      "warmth", "radiation", "toxicity", "infection", "bleed", "bleeding"}, 6, NUM),
     "Item-Menge": (
         {
             "quantity",
@@ -306,6 +323,8 @@ def classify_member(m, cls_name, wrap=None):
         if not hit and not sub:
             continue
         hit = hit or sub
+        if cat == "Währung" and hit == ["points"] and any(x in POINT_OWNERS for x in w):
+            continue  # SkillPoints/PerkPoints sind Erfahrung, kein Geld
         if cat == "Cheat-Schalter":
             if t not in types and m.ptype != "BoolProperty":
                 continue

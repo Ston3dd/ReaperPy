@@ -10,6 +10,28 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 - The **SPIELER / GEGNER (PLAYER / ENEMY)** tab and its button in the DISASSEMBLER tab from 6.2.0: too complicated in use. The how-to guide
   "Player or enemy?" is gone too (guides are now 14 with the new "Cheat in four steps").
 
+### Added (Unity catches up with Unreal)
+- **UNITY ITEMS: give and test live.** New buttons **TEST 1 ITEM**, **TEST CHECKED ITEMS** and **GIVE NOW** call the give method in the
+  running game (live object from the IL2CPP scan, item value and amount in the argument registers) - no trainer file needed. After a
+  single test the tool asks whether the item arrived and remembers the answer (**tested** ranking: +4 / -8, a failed method is replaced
+  by the next one). Calls are never repeated and stop at the first error.
+- **UNITY ITEMS: more give methods.** New **filter** for the give methods: *strict* (Add/Give/Grant ...), *normal* (also Put/Insert/Craft/
+  Equip/Unlock ...) and *off* (every method with an item parameter). Only integer/enum/bool parameters can be passed; methods taking
+  names, objects or decimals are still listed with the reason why they cannot be called. New module `unity_live.py`.
+- **New tab UNITY > CHEAT MENU** (same operation as the Unreal one): ready switches and values from `dump.cs` - method patches (damage,
+  spending money, stamina use ...) and fields (health, gold, stamina, EXP, hunger ...). ON/OFF, set value, hold (rewritten every
+  250 ms), ALL OFF restores the originals. **BUILD CODE CAVE** (fields) finds the instruction that writes the field and saves the cave as
+  `.reapproj`; **SAVE PATCH** (methods) saves the ready patch. New modules `unity_cheatmenu.py`, `tools_unity_cheatmenu_gui.py`.
+
+### Added (both engines)
+- **More values are found** (Unreal SDK and Unity dump): hunger/thirst/sanity/oxygen ("Hunger/Durst" category), more currencies
+  (diamonds, crystals, shards, rupees ...), more experience words (skill/perk/stat points, rank, reputation ...), more stamina words
+  (vigor, oxygen, fuel ...). Skill points now count as experience, not money.
+
+### Changed
+- **Unreal CHEAT MENU: building a code cave from a cheat is visible now.** Buttons **BUILD CODE CAVE** and **CAVE: CHOOSE HIT** sit next to
+  SET VALUE (before it only worked via right-click). Without an active project the tool now asks for a folder instead of refusing.
+
 ### Added
 - **New tab ASSISTANT (first tab)**: four steps without assembler knowledge.
   1. **Find the value** - type a number from the game (or choose "Number unknown" for bars) and press **SEARCH**.

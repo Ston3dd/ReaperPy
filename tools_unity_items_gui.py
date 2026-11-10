@@ -17,6 +17,7 @@ from tkinter import filedialog, messagebox, ttk
 
 import cave_trainer as TR
 import unity_items as U
+import unity_live as UL
 from tools_common import (BG, BG_CARD, ACCENT, ERROR, FONT_HEAD, FONT_LABEL, TEXT, TEXT_DIM, WARN, BaseTab, entry,
                           tree, with_scroll)
 from tools_scan_gui import card, clabel, pbtn
@@ -24,6 +25,7 @@ from tools_scan_gui import card, clabel, pbtn
 MAX_SHOWN = 5000
 ALL_CATS = "alle Kategorien"
 CHK = {True: "☑", False: "☐"}
+LEVEL_TEXT = {"strict": "streng", "normal": "normal", "off": "aus (alles zeigen)"}
 MAX_ENUMS = 60
 
 
@@ -36,6 +38,9 @@ class UnityItemsTab(BaseTab):
         self.items, self.on, self.view = [], [], []
         self.out_dirs = []
         self.cap = None
+        self.verified = {}                          # Geben-Methode -> 'ok' | 'bad' (Ergebnis von 1 ITEM TESTEN)
+        self.level = "normal"                       # Filter der Geben-Methoden: strict | normal | off
+        self.v_level = tk.StringVar(value=LEVEL_TEXT["normal"])
         self._busy = False
         self.v_q = tk.StringVar()
         self.v_cat = tk.StringVar(value=ALL_CATS)
@@ -93,6 +98,15 @@ class UnityItemsTab(BaseTab):
         self.cb_hook = ttk.Combobox(sel, textvariable=self.v_hook, values=[], width=34, state="readonly")
         self.cb_hook.pack(side="left", padx=6)
         self.cb_hook.bind("<<ComboboxSelected>>", lambda _e: self.pick_hook())
+        lv = tk.Frame(body, bg=BG_CARD)
+        lv.pack(fill="x", pady=(4, 0))
+        clabel(lv, "Filter der Geben-Methoden").pack(side="left")
+        self.cb_level = ttk.Combobox(lv, textvariable=self.v_level, values=list(LEVEL_TEXT.values()), width=18,
+                                     state="readonly")
+        self.cb_level.pack(side="left", padx=(6, 12))
+        self.cb_level.bind("<<ComboboxSelected>>", lambda _e: self.pick_level())
+        clabel(lv, "streng = nur Add/Give/Grant ...   normal = auch Put/Craft/Equip ...   aus = jede Methode mit Item-Parameter "
+                   "(dann mit 1 ITEM TESTEN prüfen)").pack(side="left")
         clabel(body, "(alles automatisch gewählt - nur ändern, falls die Liste falsch aussieht)").pack(anchor="w")
 
         flt = tk.Frame(body, bg=BG_CARD)
@@ -139,6 +153,12 @@ class UnityItemsTab(BaseTab):
         self.b_save.pack(side="right")
         pbtn(row, "ORDNER ÖFFNEN", self.open_folder).pack(side="right", padx=6)
         pbtn(row, "TRAINER PRÜFEN …", self.check_trainer).pack(side="right")
+        live = tk.Frame(body, bg=BG_CARD)
+        live.pack(fill="x", pady=(6, 0))
+        clabel(live, "Sofort im laufenden Spiel (ohne Trainer):").pack(side="left")
+        pbtn(live, "🧪  1 ITEM TESTEN", self.test_one).pack(side="left", padx=(8, 4))
+        pbtn(live, "🧪  ANGEHAKTE TESTEN", self.test_checked).pack(side="left", padx=4)
+        pbtn(live, "⚡  JETZT GEBEN", self.give_live, primary=True).pack(side="left", padx=4)
         self.lbl_done = tk.Label(body, text="", bg=BG_CARD, fg=TEXT_DIM, font=FONT_LABEL, anchor="w", justify="left",
                                  wraplength=1100)
         self.lbl_done.pack(fill="x", pady=(6, 0))
@@ -194,13 +214,15 @@ class UnityItemsTab(BaseTab):
     def _give_title(g):
         return f"{g.method.cls.name}.{g.method.name}({g.method.params})" if g is not None else ""
 
-    def _analyse(self, game, enum_cls=None):
+    def _analyse(self, game, enum_cls=None, level=None):
         """Im Job-Thread: Item-Liste, Geben-Methoden und Einstiege ermitteln (nur aus dump.cs)."""
-        enums = U.item_enums(game, {g.id_param["type"] for g in U.give_candidates(game, None)[0]
+        level = level or self.level
+        enums = U.item_enums(game, {g.id_param["type"] for g in U.give_candidates(game, None, level=level)[0]
                                     if g.id_param["kind"] == "enum"})
         if enum_cls is None and enums:
             enum_cls = enums[0][0]
-        gives, bad = U.give_candidates(game, enum_cls)
+        gives, bad = U.give_candidates(game, enum_cls, level=level)
+        gives = UL.rank_gives(gives, self.verified)
         give = gives[0] if gives else None
         hooks = U.hook_candidates(game, give) if give else []
         items = U.build_items(enum_cls) if enum_cls is not None else []
@@ -273,7 +295,14 @@ class UnityItemsTab(BaseTab):
         if game is None or self._busy:
             return
         self._busy = True
-        self.bg(lambda: self._analyse(game, enum_cls), lambda r: self._adopt(r, keep_list=True), self._fail)
+        self.bg(lambda: self._analyse(game, enum_cls, self.level), lambda r: self._adopt(r, keep_list=True), self._fail)
+
+    def pick_level(self):
+        name = self.v_level.get()
+        lv = next((k for k, v in LEVEL_TEXT.items() if v == name), "normal")
+        if lv != self.level:
+            self.level = lv
+            self._reanalyse(self.enum)
 
     def pick_enum(self):
         name = self.v_enum.get()
@@ -549,3 +578,142 @@ class UnityItemsTab(BaseTab):
             self._busy = False
             self.lbl_done.configure(text="Das hat nicht geklappt: " + (str(e) or e.__class__.__name__), fg=ERROR)
         self.bg(job, ok, fail)
+
+    # ------------------------------------------------------------------
+    # Live geben / testen
+    # ------------------------------------------------------------------
+    def _live_ready(self):
+        """-> (client, give) oder None (Hinweis steht dann im Statusfeld)."""
+        if self._busy:
+            self.log("Es läuft noch ein Auftrag - kurz warten", "warn")
+            return None
+        client = getattr(self.win, "client", None)
+        if self.give is None or self._game() is None:
+            self._found("Erst Schritt ① und ITEMS FINDEN (Spiel laden).", ERROR)
+            return None
+        if client is None:
+            self._found("Erst mit der Konsole verbinden - Live-Geben braucht das laufende Spiel.", ERROR)
+            return None
+        return client, self.give
+
+    def _live_job(self, fn, ok, what):
+        """fn(live, client) im Hintergrund; ok(res) im UI-Thread."""
+        self._busy = True
+        self._found(what, WARN)
+        un, client = self._unity(), self.win.client
+
+        def job():
+            live = un._ensure_base(client)
+            try:
+                live.set_maps(un._maps(client))
+            except Exception:  # noqa: BLE001
+                pass
+            return fn(live, client)
+
+        def done(res):
+            self._busy = False
+            ok(res)
+
+        def fail(e):
+            self._busy = False
+            self._found("✗ Geben abgebrochen: " + (str(e) or e.__class__.__name__), ERROR)
+            self.log(str(e), "err")
+        self.bg(job, done, fail)
+
+    def _selected_item(self):
+        idx = self._sel_idx()
+        if idx:
+            return self.items[idx[0]]
+        chosen = self._chosen()
+        return chosen[0] if chosen else None
+
+    def test_one(self):
+        r = self._live_ready()
+        if r is None:
+            return
+        client, give = r
+        it = self._selected_item()
+        if it is None:
+            return self._found("Erst ein Item in der Liste anklicken.", ERROR)
+        try:
+            amount = min(self._amount(), 5)
+        except ValueError as e:
+            return self._found(str(e), ERROR)
+        if not messagebox.askyesno("1 Item testen", f"{it['name']} x {amount} wird über {UL.give_key(give)} im laufenden Spiel "
+                                   "gegeben. Im Spiel bleiben (nicht im Hauptmenü), vorher speichern.\n\nTesten?",
+                                   parent=self.win):
+            return
+        game = give
+
+        def fn(live, cl):
+            return UL.give_one(cl, live, game, it["id"], amount)
+
+        def ok(_rax):
+            has = messagebox.askyesno("Ergebnis", f"Ist {it['name']} jetzt im Spiel angekommen (Inventar ansehen)?",
+                                      parent=self.win)
+            self.mark_verified(game, has)
+        self._live_job(fn, ok, f"Teste {it['name']} …")
+
+    def mark_verified(self, give, worked):
+        self.verified[UL.give_key(give)] = UL.VERIFIED_OK if worked else UL.VERIFIED_BAD
+        self.gives = UL.rank_gives(self.gives, self.verified)
+        self.cb_give.configure(values=[self._give_title(g) for g in self.gives])
+        if worked:
+            self._found(f"✔ {self._give_title(give)} funktioniert - als getestet gemerkt", ACCENT)
+            return
+        self._found(f"✗ {self._give_title(give)} gibt nichts - die nächste Methode ist jetzt vorn", WARN)
+        nxt = next((g for g in self.gives if UL.give_key(g) != UL.give_key(give)), None)
+        if nxt is not None:
+            self.v_give.set(self._give_title(nxt))
+            self.pick_give()
+
+    def test_checked(self):
+        r = self._live_ready()
+        if r is None:
+            return
+        client, give = r
+        chosen = self._chosen()[:UL.MAX_TEST_ALL]
+        if not chosen:
+            return self._found("Erst Items anhaken (Schritt ②).", ERROR)
+        if not messagebox.askyesno("Angehakte testen", f"{len(chosen)} angehakte Items werden nacheinander mit Menge 1 "
+                                   "gegeben, um zu sehen, ob der Aufruf bei jedem durchgeht. Vorher speichern.\n\nTesten?",
+                                   parent=self.win):
+            return
+        self._live_job(lambda live, cl: UL.give_many(cl, live, give, chosen, 1),
+                       lambda res: self._test_done(res, len(chosen)), f"Teste {len(chosen)} Items …")
+
+    def _test_done(self, res, n):
+        done, errors = res
+        if errors:
+            it, why = errors[0]
+            return self._found(f"✗ {done} von {n} Items durchgegangen, Abbruch bei {it['name']}: {why}", ERROR)
+        self._found(f"✔ {done} von {n} Items ohne Fehler aufgerufen - Inventar im Spiel ansehen", ACCENT)
+
+    def give_live(self):
+        r = self._live_ready()
+        if r is None:
+            return
+        client, give = r
+        chosen = self._chosen()
+        if not chosen:
+            return self._found("Erst Items anhaken (Schritt ②).", ERROR)
+        try:
+            amount = self._amount()
+        except ValueError as e:
+            return self._found(str(e), ERROR)
+        hint = "" if self.verified.get(UL.give_key(give)) == UL.VERIFIED_OK else \
+            "\n\nDiese Methode ist noch nicht getestet - erst '1 ITEM TESTEN'."
+        if not messagebox.askyesno("Jetzt geben", f"{len(chosen)} Items x {amount} werden SOFORT über {UL.give_key(give)} "
+                                   "ins laufende Spiel gegeben (ohne Trainer). Vorher speichern, im Spiel bleiben."
+                                   + hint + "\n\nJetzt geben?", parent=self.win):
+            return
+        prog = lambda k, n: self.win.ui(lambda: self._found(f"Gebe Items … {k + 1}/{n}", WARN))  # noqa: E731
+        self._live_job(lambda live, cl: UL.give_many(cl, live, give, chosen, amount, progress=prog, log=self._ilog),
+                       lambda res: self._give_done(res, amount), f"Gebe {len(chosen)} Items … (nicht anfassen)")
+
+    def _give_done(self, res, amount):
+        done, errors = res
+        if errors:
+            it, why = errors[0]
+            return self._found(f"✗ {done} Items gegeben, dann Abbruch bei {it['name']}: {why}", ERROR)
+        self._found(f"✔ {done} Items x {amount} gegeben - im Spiel nachsehen", ACCENT)

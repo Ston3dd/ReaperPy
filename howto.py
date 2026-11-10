@@ -28,7 +28,7 @@ TAB_TOPICS = {
     "★ UNITY": "items-unity", "★ UNITY ITEMS": "items-unity",
     "★ WERTE": "values-and-live", "★ UE-LIVE": "values-and-live", "★ CHEAT-MENÜ": "values-and-live",
     "★ UE-ENTDECKER": "values-and-live", "UE-AUTO": "values-and-live",
-    "★ WERTE UNITY": "values-and-live", "★ UNITY MANUELL": "values-and-live",
+    "★ WERTE UNITY": "values-and-live", "★ UNITY MANUELL": "values-and-live", "★ UNITY CHEAT-MENÜ": "values-and-live",
     "POINTER": "pointers", "AOB / UPDATE": "pointers",
     "DEBUGGER": "debugger", "KERNEL-LOG": "debugger", "FUNKTIONS-LOGGER": "debugger",
     "FORTGESCHRITTEN": "advanced-tools", "SPEICHER": "advanced-tools", "PYTHON-SKRIPT": "advanced-tools",

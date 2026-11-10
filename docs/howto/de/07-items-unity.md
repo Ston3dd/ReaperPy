@@ -20,6 +20,11 @@ Drücke **TRAINER SPEICHERN**. Das Ergebnis ist ein normales ReaperPy-Projekt, g
 
 > **Tipp:** Methoden, die ein Item-Objekt oder einen Text statt einer ID brauchen, stehen mit dem Grund in der Liste und werden übersprungen.
 
+## Items sofort geben
+Unter Schritt 3 gibt es die Zeile **Sofort im laufenden Spiel**. Klicke ein Item an und drücke **1 ITEM TESTEN**: ReaperPy ruft die Geben-Methode im laufenden Spiel auf (im Spiel bleiben, nicht im Hauptmenü, vorher speichern). Danach fragt es, ob das Item angekommen ist, und merkt sich die Antwort - eine Methode, die nichts gegeben hat, wird durch die nächste ersetzt. **ANGEHAKTE TESTEN** ruft jedes angehakte Item einmal auf und sagt, wo es abgebrochen hat, **JETZT GEBEN** gibt alle angehakten Items mit deiner Menge, ohne Trainer-Datei.
+
+> **Tipp:** Wird keine Geben-Methode gefunden, stelle den **Filter der Geben-Methoden** auf *normal* oder *aus*. *Aus* zeigt jede Methode mit Item-Parameter - dann immer zuerst mit **1 ITEM TESTEN** prüfen.
+
 ## Weitere Unity-Seiten
 Für einzelne Werte und Methoden-Patches siehe [Werte, Live-Werte und das Cheat-Menü](howto:values-and-live).
 

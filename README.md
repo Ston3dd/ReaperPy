@@ -144,7 +144,7 @@ the registers when it stops, **STEP** / **STEP OVER** / **STEP OUT**, **CONTINUE
 ### Simple tabs
 
 The Unreal and Unity tools are grouped: the tab **★ UNREAL** holds ITEMS, VALUES, LIVE, CHEAT MENU, DISCOVERER and EXPERT (the
-static UE-AUTO tools), the tab **★ UNITY** holds ITEMS, QUICK (values) and MANUAL. Below they are listed by their short names.
+static UE-AUTO tools), the tab **★ UNITY** holds ITEMS (with live give/test), QUICK (values), MANUAL and CHEAT MENU. Below they are listed by their short names.
 
 | Tab | What it does |
 |---|---|
@@ -157,6 +157,7 @@ static UE-AUTO tools), the tab **★ UNITY** holds ITEMS, QUICK (values) and MAN
 | **UE DISCOVERER** | Analyses the SDK and tells you what is there to find: item structs, item tables, give-functions, stat enums, cheat managers - with a check whether a cave trainer can be built for each ("✔" / "✗ not possible: reason"). |
 | **UNITY** | The same idea for Unity (IL2CPP) games: **ITEMS** (all items as a trainer in three steps), then, from the Il2CppDumper folder, live values, method patches (always true, fixed return value, skip) and enum names (item IDs). See [below](#unity-il2cpp-games). |
 | **CHEAT MENU** | Switches and values for the player character, generated from the SDK. Works in shipping builds without a CheatManager. |
+| **UNITY CHEAT MENU** | The same for Unity games, built from `dump.cs`: method patches and fields (health, gold, stamina, EXP, hunger ...), ON/OFF, hold, code cave or ready patch. |
 
 ### How-to guides for beginners
 

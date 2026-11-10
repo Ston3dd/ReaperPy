@@ -157,11 +157,31 @@ class T(unittest.TestCase):
         self.assertTrue(any("+0x60" in m for m in self.logs("err")))
         self.assertFalse(self.t._busy)
 
-    def test_without_project_folder_says_what_to_do(self):
+    def test_without_project_folder_asks_for_a_folder(self):
+        import tkinter.filedialog as fd
         self.w.app.PATCH_DIR = None
-        self.pick(self.hp)
-        self.t.cave_auto()
-        self.assertTrue(any("Projekt" in m for m in self.logs("err")))
+        asked = []
+        old = getattr(fd, "askdirectory", None)
+        fd.askdirectory = lambda **kw: (asked.append(1), self.dir)[1]
+        try:
+            self.pick(self.hp)
+            self.t.cave_auto()
+        finally:
+            fd.askdirectory = old
+        self.assertEqual(len(asked), 1)                           # nur einmal gefragt
+        self.assertEqual(len(self.files()), 1)
+
+    def test_without_project_folder_and_cancel_builds_nothing(self):
+        import tkinter.filedialog as fd
+        self.w.app.PATCH_DIR = None
+        old = getattr(fd, "askdirectory", None)
+        fd.askdirectory = lambda **kw: ""
+        try:
+            self.pick(self.hp)
+            self.t.cave_auto()
+        finally:
+            fd.askdirectory = old
+        self.assertTrue(any("Ordner" in m for m in self.logs("err")))
         self.assertEqual(self.files(), [])
 
     def test_without_selection_and_menu(self):

@@ -50,6 +50,7 @@ class CheatMenuTab(BaseTab):
 
         mid = tk.Frame(self, bg=BG)
         mid.pack(fill="both", expand=True, padx=8, pady=4)
+        self._cave_dir = None             # vom Nutzer gewaehlter Ordner, wenn kein Projekt aktiv ist
         self._code = None                 # (Schluessel, Code-Sicht, Disassembler) - der Spiel-Code wird nur einmal gelesen
         self.tv = tree(mid, [("on", "AN"), ("cat", "KATEGORIE"), ("label", "EINTRAG"), ("val", "WERT / STATUS")],
                        [50, 120, 380, 360], height=16, anchors={"on": "center"},
@@ -59,12 +60,14 @@ class CheatMenuTab(BaseTab):
         self.tv.bind("<Double-1>", lambda _e: self.toggle())
         self.tv.bind("<<TreeviewSelect>>", lambda _e: self._on_select())
 
-        bar = tk.Frame(self, bg=BG)
+        bar = self._bar = tk.Frame(self, bg=BG)
         bar.pack(fill="x", padx=8, pady=(2, 0))
         button(bar, "AN / AUS", self.toggle, accent=True).pack(side="left", padx=2)
         label(bar, "  Wert").pack(side="left")
         entry(bar, self.v_val, 12).pack(side="left", padx=4)
         button(bar, "WERT SETZEN", self.set_value).pack(side="left", padx=2)
+        button(bar, "CODE CAVE BAUEN", self.cave_auto).pack(side="left", padx=(14, 2))
+        button(bar, "CAVE: TREFFER WÄHLEN", self.cave_pick).pack(side="left", padx=2)
         tk.Checkbutton(bar, text="festhalten", variable=self.v_hold, bg=BG, fg=TEXT_DIM, selectcolor=BG,
                        activebackground=BG).pack(side="left", padx=8)
         self.lbl_note = label(self, "", dim=True)
@@ -244,17 +247,24 @@ class CheatMenuTab(BaseTab):
             self.log(f"Cheat-Menü: {e.label}: {e.status}", "err")
             return None
         try:
-            self._patch_dir()
+            self._patch_dir()                       # ohne Projekt wird hier einmal nach dem Ordner gefragt
         except Exception as ex:                     # noqa: BLE001
             self.log(f"Cheat-Menü: {ex}", "err")
             return None
         return e
 
     def _patch_dir(self):
+        """Patch-Ordner des Projekts; ohne Projekt wird einmal nach einem Ordner gefragt (statt abzubrechen)."""
         app = self.win.app
-        if not getattr(app, "PATCH_DIR", None):
-            raise RuntimeError("kein Projekt/Patch-Ordner aktiv - im Hauptfenster erst ein Projekt öffnen (ORDNER)")
-        return app.PATCH_DIR
+        d = getattr(app, "PATCH_DIR", None) or self._cave_dir
+        if d:
+            return d
+        from tkinter import filedialog
+        d = filedialog.askdirectory(parent=self.win, title=_tr("Ordner für die Code Cave wählen (kein Projekt aktiv)"))
+        if not d:
+            raise RuntimeError("kein Ordner gewählt - Cave nicht gebaut")
+        self._cave_dir = d
+        return d
 
     def _get_code(self, progress=None):
         """Spiel-Code fuer die Instruktionssuche: dump.bin des Spielordners, sonst live von der Konsole (einmal, dann gemerkt)."""
