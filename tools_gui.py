@@ -14,6 +14,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
 import aob as AOB
+import projects
 import asm_explain as AX
 import asm_help as AH
 import asm_recipes as AR
@@ -545,6 +546,17 @@ CAVE_TEMPLATE = (";  Cave-Code (läuft anstelle der überschriebenen Befehle)\n"
                  "    jmp OriginReturn\n")
 
 
+SIMPLE_HINT = ("Einfach: Die Felder füllen sich meist von selbst - aus dem ASSISTENTEN oder dem DISASSEMBLER (→ CHEAT-EDITOR). "
+               "Trage einen NAME ein, probiere mit TEST AN und speichere. Signatur und Rücksprung-Länge erledigt ReaperPy.")
+ADVANCED_HINT = "Erweitert: Du siehst Cave-Code, OriginReturn und Signatur und bestimmst sie selbst."
+CAVE_NOTE = "Dieser Cheat nutzt eine Code-Cave ({} Zeilen) - den Code siehst du unter ERWEITERTE OPTIONEN."
+SIG_AUTO = "Keine Signatur eingetragen - ReaperPy erzeugt sie jetzt automatisch (damit der Cheat ein Spiel-Update übersteht) ..."
+SIG_FAILED = ("Signatur konnte nicht erzeugt werden ({}) - der Cheat wird ohne Signatur gespeichert "
+              "und muss nach einem Spiel-Update neu gesetzt werden.")
+SIG_OFFLINE = ("Nicht verbunden - der Cheat wird ohne Signatur gespeichert "
+               "und muss nach einem Spiel-Update neu gesetzt werden.")
+
+
 class CheatTab(BaseTab):
     def __init__(self, parent, win):
         super().__init__(parent, win)
@@ -555,7 +567,15 @@ class CheatTab(BaseTab):
         self.v["ret"].set("8")
         self.v_type = tk.StringVar(value="patch")
 
-        g = tk.Frame(self, bg=BG); g.pack(fill="x", padx=8, pady=(8, 2))
+        self.v_adv = tk.BooleanVar(value=self._saved_advanced())
+        top = tk.Frame(self, bg=BG); top.pack(fill="x", padx=8, pady=(8, 0))
+        tk.Checkbutton(top, text="ERWEITERTE OPTIONEN", variable=self.v_adv, command=self._toggle_mode,
+                       bg=BG, fg=TEXT, selectcolor=BG_CARD, activebackground=BG, activeforeground=ACCENT,
+                       font=FONT_LABEL).pack(side="right")
+        self.lbl_mode = label(top, "", justify="left", wraplength=760)
+        self.lbl_mode.pack(side="left", fill="x", expand=True)
+
+        g = tk.Frame(self, bg=BG); g.pack(fill="x", padx=8, pady=(4, 2))
         for i, (k, t, w) in enumerate([("name", "NAME", 30), ("author", "AUTOR", 16),
                                         ("offset", "OFFSET (ab Image-Base)", 16)]):
             label(g, t).grid(row=0, column=i * 2, sticky="w", padx=(0, 4))
@@ -568,6 +588,7 @@ class CheatTab(BaseTab):
         label(t, "OriginReturn (Bytes)").pack(side="left", padx=(12, 4))
         entry(t, self.v["ret"], 4).pack(side="left")
 
+        self._row_type = t
         cols = tk.Frame(self, bg=BG); cols.pack(fill="both", expand=True, padx=8, pady=4)
         a = tk.Frame(cols, bg=BG); a.pack(side="left", fill="both", expand=True)
         b = tk.Frame(cols, bg=BG); b.pack(side="left", fill="both", expand=True, padx=(8, 0))
@@ -577,10 +598,12 @@ class CheatTab(BaseTab):
         self.lbl_new.pack(anchor="w")
         self.t_new = textbox(b, height=6, width=34); self.t_new.pack(fill="both", expand=True)
 
-        label(self, "CAVE-CODE (nur bei Code-Cave) – neue Labels mit  'Name:'  in eigener Zeile")\
-            .pack(anchor="w", padx=8)
-        self.t_cave = textbox(self, height=7, width=80)
-        self.t_cave.pack(fill="both", expand=True, padx=8)
+        self._cave_box = tk.Frame(self, bg=BG)
+        self._cave_box.pack(fill="both", expand=True, padx=8)
+        label(self._cave_box, "CAVE-CODE (nur bei Code-Cave) – neue Labels mit  'Name:'  in eigener Zeile")\
+            .pack(anchor="w")
+        self.t_cave = textbox(self._cave_box, height=7, width=80)
+        self.t_cave.pack(fill="both", expand=True)
         self.t_cave.insert("1.0", tools_i18n.translate(CAVE_TEMPLATE))
 
         s = tk.Frame(self, bg=BG); s.pack(fill="x", padx=8, pady=4)
@@ -590,13 +613,59 @@ class CheatTab(BaseTab):
         entry(s, self.v["aoboff"], 5).pack(side="left", padx=6)
         button(s, "ERZEUGEN", self.make_sig).pack(side="left")
 
+        self._row_sig = s
         f = tk.Frame(self, bg=BG); f.pack(fill="x", padx=8, pady=8)
+        # nur im erweiterten Modus sichtbar: (Rahmen, pack-Optionen, davor einsortieren) - in dieser Reihenfolge
+        self._adv_parts = [(self._row_type, {"fill": "x", "padx": 8, "pady": 2}, cols),
+                           (self._cave_box, {"fill": "both", "expand": True, "padx": 8}, f),
+                           (self._row_sig, {"fill": "x", "padx": 8, "pady": 4}, f)]
         button(f, "NEU", self.clear).pack(side="left", padx=2)
         button(f, "LADEN…", self.load_file).pack(side="left", padx=2)
         button(f, "TEST AN", self.test_on).pack(side="left", padx=(16, 2))
         button(f, "TEST AUS", self.test_off).pack(side="left", padx=2)
         button(f, "SPEICHERN…", self.save, accent=True).pack(side="right")
         self._type()
+        self._apply_mode()
+
+    # ---- Einfach / Erweitert ----
+    def _saved_advanced(self):
+        try:
+            return bool(self.win.app.cfg.get("cheat_editor_advanced", False))
+        except Exception:  # noqa: BLE001
+            return False
+
+    def _toggle_mode(self):
+        """Umschalter: Modus anwenden und die Wahl merken (Konfig)."""
+        self._apply_mode()
+        try:
+            cfg = self.win.app.cfg
+            cfg["cheat_editor_advanced"] = bool(self.v_adv.get())
+            projects.save_config(cfg)
+        except Exception:  # noqa: BLE001 - Merken ist nur Komfort
+            pass
+
+    def _apply_mode(self):
+        """Einfach: nur NAME / OFFSET / ORIGINAL / NEU.  Erweitert: zusätzlich Typ, OriginReturn, Cave-Code, Signatur."""
+        adv = bool(self.v_adv.get())
+        for w, _kw, _before in self._adv_parts:                  # erst alle weg, dann in fester Reihenfolge zurueck
+            w.pack_forget()
+        if adv:
+            for w, kw, before in self._adv_parts:
+                w.pack(before=before, **kw)
+        self._update_hint()
+
+    def _update_hint(self):
+        if self.v_adv.get():
+            text = tools_i18n.translate(ADVANCED_HINT)
+        else:
+            text = tools_i18n.translate(SIMPLE_HINT)
+            if self.v_type.get() == "cave":
+                try:
+                    n = sum(len(code.splitlines()) for _l, code in self._cave_labels())
+                    text += " " + tools_i18n.translate(CAVE_NOTE).format(n)
+                except Exception:  # noqa: BLE001 - nur ein Hinweistext
+                    pass
+        self.lbl_mode.configure(text=text)
 
     # ---- Übernahme aus anderen Tabs ----
     def fill(self, d):
@@ -638,6 +707,8 @@ class CheatTab(BaseTab):
         self.t_cave.configure(state="normal" if cave else "disabled")
         if cave and not self.t_new.get("1.0", "end").strip():
             self.t_new.insert("1.0", "jmp OriginTarget")
+        if hasattr(self, "lbl_mode"):
+            self._update_hint()
 
     # ---- Modell <-> JSON ----
     def _offset(self):
@@ -693,6 +764,41 @@ class CheatTab(BaseTab):
             return 8
 
     def save(self):
+        """SPEICHERN.  Im einfachen Modus erzeugt ReaperPy fehlende Signaturen selbst (sonst überlebt der Cheat kein Update)."""
+        try:
+            self.build_json()                               # Eingaben zuerst pruefen: Fehler vor allem anderen melden
+        except Exception as e:
+            return messagebox.showerror("Cheat-Editor", str(e))
+        if self.v_adv.get() or self.v["aob"].get().strip():
+            return self._save_now()                         # Profi: Signatur wie eingetragen (auch leer)
+        if getattr(self.win, "client", None) is None:
+            self.log(tools_i18n.translate(SIG_OFFLINE), "warn")
+            return self._save_now()
+        try:
+            a = self.base + self._offset()
+        except Exception:  # noqa: BLE001
+            return self._save_now()
+        hl = self._sig_len()
+        self.log(tools_i18n.translate(SIG_AUTO), "info")
+
+        def job():
+            return AOB.make_signature(self.win.client, self.win.client.get_maps(), a, hl)
+
+        def ok(r):
+            self.v["aob"].set(r[0])
+            self.v["aoboff"].set("0")
+            self.log(f"Signatur eindeutig ({len(r[0].split())} Bytes)", "ok")
+            self._save_now()
+
+        def fail(e):
+            self.log(tools_i18n.translate(SIG_FAILED).format(e), "warn")
+            self._save_now()
+        self.bg(job, ok, fail)
+
+    def _sig_len(self):
+        return 8 if self.v_type.get() == "cave" else self._hook_len_hint()
+
+    def _save_now(self):
         try:
             data = self.build_json()
         except Exception as e:
@@ -755,7 +861,7 @@ class CheatTab(BaseTab):
             a = self.base + self._offset()
         except Exception as e:
             return self.log(str(e), "err")
-        hl = 8 if self.v_type.get() == "cave" else self._hook_len_hint()
+        hl = self._sig_len()
 
         def job():
             return AOB.make_signature(self.win.client, self.win.client.get_maps(), a, hl)

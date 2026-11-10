@@ -4,6 +4,13 @@ Wird am Ende von tools_i18n_en.py in EN eingemischt. Schluessel = deutscher Text
 """
 
 EN_MORE = {
+    'Einfach: Die Felder füllen sich meist von selbst - aus dem ASSISTENTEN oder dem DISASSEMBLER (→ CHEAT-EDITOR). Trage einen NAME ein, probiere mit TEST AN und speichere. Signatur und Rücksprung-Länge erledigt ReaperPy.': 'Simple: the fields usually fill themselves - from the ASSISTANT or the DISASSEMBLER (→ CHEAT EDITOR). Enter a NAME, try it with TEST ON and save. ReaperPy takes care of the signature and the return length.',
+    'Erweitert: Du siehst Cave-Code, OriginReturn und Signatur und bestimmst sie selbst.': 'Advanced: you see the cave code, OriginReturn and signature and set them yourself.',
+    'Dieser Cheat nutzt eine Code-Cave ({} Zeilen) - den Code siehst du unter ERWEITERTE OPTIONEN.': 'This cheat uses a code cave ({} lines) - you can see the code under ADVANCED OPTIONS.',
+    'ERWEITERTE OPTIONEN': 'ADVANCED OPTIONS',
+    'Keine Signatur eingetragen - ReaperPy erzeugt sie jetzt automatisch (damit der Cheat ein Spiel-Update übersteht) ...': 'No signature entered - ReaperPy creates it automatically now (so the cheat survives a game update) ...',
+    'Signatur konnte nicht erzeugt werden ({}) - der Cheat wird ohne Signatur gespeichert und muss nach einem Spiel-Update neu gesetzt werden.': 'The signature could not be created ({}) - the cheat is saved without a signature and has to be set again after a game update.',
+    'Nicht verbunden - der Cheat wird ohne Signatur gespeichert und muss nach einem Spiel-Update neu gesetzt werden.': 'Not connected - the cheat is saved without a signature and has to be set again after a game update.',
     'Starte dein Spiel und lade den Spielstand. Trage im Hauptfenster die IP deiner PS5 ein und klicke oben auf VERBINDEN. Wenn das Spiel Codes hat, erscheinen sie dort automatisch. Klappt es nicht? VERBINDUNG PRÜFEN (unten) sagt dir in Klartext, woran es liegt.': 'Start your game and load your save game. Enter the IP of your PS5 in the main window and click CONNECT at the top. If the game has codes, they appear there automatically. Does it not work? CHECK CONNECTION (below) tells you in plain words what is wrong.',
     'Wert finden und Cheat bauen': 'Find a value and build a cheat',
     'Du siehst im Spiel eine Zahl (z. B. 100 Leben oder 5000 Gold)? Der ASSISTENT führt dich in vier Schritten: Zahl suchen, eingrenzen, den Befehl finden, der sie ändert, und daraus einen Cheat bauen - ohne Assembler-Kenntnisse.': 'Do you see a number in the game (e.g. 100 health or 5000 gold)? The ASSISTANT guides you in four steps: search the number, narrow it down, find the instruction that changes it, and build a cheat from it - no assembler knowledge needed.',

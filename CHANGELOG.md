@@ -6,6 +6,14 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 
 **A guided assistant from a number in the game to a finished cheat, and ReapPatch export.**
 
+### Added (EDIT CHEATS for beginners)
+- **Simple / advanced view in EDIT CHEATS.** The tab opens in the **simple** view: NAME, AUTHOR, OFFSET, ORIGINAL and NEW - the patch type,
+  OriginReturn, cave code and signature row are hidden. The new **ADVANCED OPTIONS** checkbox shows them again; the choice is remembered
+  (`cheat_editor_advanced` in the config). A line at the top explains the current view; a cheat that uses a code cave (for example from a
+  preset) says so with its line count instead of showing the code.
+- **Signature on SAVE.** In the simple view, SAVE creates a missing signature itself (so the cheat survives a game update). If the signature is
+  not unique, or the console is not connected, the log says so and the cheat is saved anyway. Advanced view and entered signatures are not touched.
+
 ### Added (easier start)
 - **START tab: CHECK CONNECTION (VERBINDUNG PRÜFEN).** One button checks, one step after the other, whether the **IP** is valid (typical
   slips are named: empty, `ip:port`, `192.168.1`, a URL), whether the **PS5 answers** (timeout / refused / no route / unknown name), whether the
