@@ -1,4 +1,4 @@
-"""gui.py - ReaperPy v5.7 (PS5) - Hacker-Style GUI + Shnext/ReapProj + DE/EN.
+"""gui.py - ReaperPy (PS5) - Hacker-Style GUI + Shnext/ReapProj + DE/EN.
 
 Neu in 4.1: Karten mit Akzentstreifen, Bibliothek, Auto-Reconnect (PID-Watchdog),
 Sitzungen, Fortschrittsbalken bei Sammel-Aktionen.

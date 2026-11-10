@@ -186,7 +186,7 @@ class Ps5Api:
             self.write(addr, init)
         return addr
 
-    # -- ReaperPy 5.0: Funktionsaufruf, Spiel-Erkennung, Bulk-Schreiben, Logger ----------------
+    # -- Funktionsaufruf, Spiel-Erkennung, Bulk-Schreiben, Logger ----------------
     def call(self, addr, *args, safe=True):
         """Funktion im Spiel aufrufen (bis 6 Ganzzahl-/Zeiger-Argumente) -> RAX.
         Argumente: Zahlen, oder str -> wird als C-String im Spiel abgelegt."""

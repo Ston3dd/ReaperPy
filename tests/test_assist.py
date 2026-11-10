@@ -1,6 +1,7 @@
 """assist.py: Suchart aus der Zahl, Hinweise, effektive Adresse, schreibenden Befehl aus einem Watchpoint-Treffer bestimmen
 (Befehle werden mit GNU as assembliert und mit objdump zerlegt - Capstone ist nicht noetig)."""
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -11,7 +12,9 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import assist as A  # noqa: E402
 
-TOOLS = shutil.which("as") and shutil.which("objdump") and shutil.which("ld") and shutil.which("objcopy")
+NATIVE = platform.system() == "Linux" and platform.machine() in ("x86_64", "AMD64")
+# Nur Linux: unter Windows liefert objcopy fuer .o-Dateien (COFF) keine Bytes
+TOOLS = NATIVE and shutil.which("as") and shutil.which("objdump") and shutil.which("ld") and shutil.which("objcopy")
 
 
 def assemble(src):
@@ -86,7 +89,7 @@ class Ea(unittest.TestCase):
         self.assertIsNone(A.mem_operand("eax, 5"))
 
 
-@unittest.skipUnless(TOOLS, "GNU as/objdump fehlen")
+@unittest.skipUnless(TOOLS, "braucht Linux x86-64 mit GNU as/objdump/objcopy")
 class Writer(unittest.TestCase):
     RIP = 0x7000100
 

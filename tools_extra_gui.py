@@ -1,4 +1,4 @@
-"""tools_extra_gui.py - neue Tabs in ReaperPy 5.0: FUNKTION AUFRUFEN, FUNKTIONS-LOGGER, JOURNAL.
+"""tools_extra_gui.py - Tabs FUNKTION AUFRUFEN, FUNKTIONS-LOGGER, JOURNAL.
 
 Idee von Funktions-Caller und -Logger: PS5Debug-studio (alfizari, Apache-2.0).  Umsetzung eigen
 (siehe caller.py / logger.py / journal.py - dort steht die ganze Logik, hier nur die Oberflaeche).
