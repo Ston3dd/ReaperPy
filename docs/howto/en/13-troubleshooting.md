@@ -21,6 +21,12 @@ See the end of [Find a value](howto:find-value): try *Float*, switch the memory 
 - The trainer worked yesterday and not today: a trainer saved with an old ReaperPy keeps a fixed object address. Press **FIND ITEMS** and **SAVE TRAINER** again (version 6.0.1 and newer find the object by themselves).
 - The game was updated: use a dump of the new version, find and save again.
 
+## Buttons are greyed out
+Buttons that work on the live game (for example **READ**, **WRITE**, **TEST ON**) are greyed out while the main window is not connected to the console. Hover over one: the tooltip says why. Click **CONNECT** in the main window - the buttons unlock by themselves and the tools reconnect, you do not have to reopen them. Buttons for files and exports are never greyed out.
+
+## What do the small "?" and the question-mark cursor mean?
+Hover over a term such as OFFSET, SIGNATURE, OriginReturn or NOP: after a moment a short explanation appears. A "?" next to a field does the same.
+
 ## The cheat does not show up in GoldHEN / etaHEN
 - Is the file in the right folder? See [Export](howto:export).
 - Do title ID and version match the game exactly? Use **TITLE ID/VERSION FROM GAME**.

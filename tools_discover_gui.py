@@ -68,7 +68,7 @@ class DiscoverTab(BaseTab):
         q.bind("<KeyRelease>", lambda _e: self.fill())
         button(top, "BERICHT SPEICHERN…", self.save_report).pack(side="left", padx=8)
         button(top, "IN UE-LIVE ÖFFNEN", self.open_in_live).pack(side="left", padx=2)
-        tk.Label(self, textvariable=self.v_info, bg=BG, fg=TEXT_DIM, anchor="w").pack(fill="x", padx=10)
+        tk.Label(self, textvariable=self.v_info, bg=BG, fg=TEXT_DIM, anchor="w").pack(fill="x", padx=12)
 
         mid = tk.PanedWindow(self, orient="vertical", bg=BG, sashwidth=4)
         mid.pack(fill="both", expand=True, padx=8, pady=4)
@@ -110,7 +110,7 @@ class DiscoverTab(BaseTab):
         entry(bar2, self.v_cnt, 10).pack(side="left", padx=4)
         button(bar2, "MENGE SETZEN…", self.set_entry_count).pack(side="left", padx=8)
         bar3 = tk.Frame(self, bg=BG)
-        bar3.pack(fill="x", padx=8, pady=(6, 0))
+        bar3.pack(fill="x", padx=8, pady=(8, 0))
         button(bar3, "🧰  CAVE-TRAINER EXPORTIEREN…", self.export_cave_trainer, accent=True).pack(side="left", padx=2)
         label(bar3, "  Menge").pack(side="left")
         entry(bar3, self.v_amount, 9).pack(side="left", padx=4)

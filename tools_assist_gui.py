@@ -12,19 +12,20 @@ import asm_tools as AT
 import ps5_ext as X
 import scanner as SC
 import tools_i18n
-from tools_common import ACCENT, BG, FONT_HEAD, FONT_LABEL, TEXT_DIM, WARN, BaseTab, button, entry, label, tree, with_scroll
+from tools_common import (ACCENT, BG, FONT_HEAD, FONT_LABEL, FONT_TEXT, TEXT_DIM, WARN, BaseTab, button, entry, label, tree,
+                          with_scroll)
 
 MAX_ROWS = 50
 POLL_MS = 400
 
 
 def _head(parent, text):
-    tk.Label(parent, text=text, bg=BG, fg=ACCENT, font=FONT_HEAD, anchor="w").pack(fill="x", padx=10, pady=(10, 2))
+    tk.Label(parent, text=text, bg=BG, fg=ACCENT, font=FONT_HEAD, anchor="w").pack(fill="x", padx=12, pady=(12, 2))
 
 
 def _hint(parent, text):
-    lb = tk.Label(parent, text=text, bg=BG, fg=TEXT_DIM, font=FONT_LABEL, anchor="w", justify="left", wraplength=900)
-    lb.pack(fill="x", padx=10)
+    lb = tk.Label(parent, text=text, bg=BG, fg=TEXT_DIM, font=FONT_TEXT, anchor="w", justify="left", wraplength=900)
+    lb.pack(fill="x", padx=12)
     return lb
 
 
@@ -40,19 +41,19 @@ class AssistTab(BaseTab):
         self.vname = "Int32"
 
         label(self, "In vier Schritten vom Wert im Spiel zum fertigen Cheat. Du musst kein Assembler koennen.").pack(
-            anchor="w", padx=10, pady=(8, 0))
+            anchor="w", padx=12, pady=(8, 0))
 
         # ---- 1 ----
         _head(self, "1  WERT FINDEN")
         _hint(self, "Lies im Spiel eine Zahl ab (zum Beispiel dein Leben oder dein Geld) und trage sie hier ein. "
                     "Kommazahlen mit Punkt. Siehst du nur eine Leiste ohne Zahl, waehle 'Zahl unbekannt'.")
-        r1 = tk.Frame(self, bg=BG); r1.pack(fill="x", padx=10, pady=4)
+        r1 = tk.Frame(self, bg=BG); r1.pack(fill="x", padx=12, pady=4)
         self.v_unknown = tk.BooleanVar(value=False)
         tk.Radiobutton(r1, text="Ich kenne die Zahl", value=False, variable=self.v_unknown, bg=BG, fg=ACCENT,
                        selectcolor=BG, activebackground=BG, activeforeground=ACCENT, font=FONT_LABEL).pack(side="left")
         tk.Radiobutton(r1, text="Zahl unbekannt", value=True, variable=self.v_unknown, bg=BG, fg=ACCENT,
                        selectcolor=BG, activebackground=BG, activeforeground=ACCENT, font=FONT_LABEL).pack(side="left", padx=8)
-        label(r1, "ZAHL").pack(side="left", padx=(14, 4))
+        label(r1, "ZAHL").pack(side="left", padx=(16, 4))
         self.v_num = tk.StringVar()
         e = entry(r1, self.v_num, 12)
         e.pack(side="left")
@@ -64,11 +65,11 @@ class AssistTab(BaseTab):
         _hint(self, "Aendere den Wert im Spiel (zum Beispiel ein Leben verlieren) und trage die neue Zahl ein. "
                     "Bei unbekannter Zahl: sage, ob der Wert gefallen, gestiegen oder gleich geblieben ist. "
                     "Wiederhole das, bis nur noch wenige Treffer uebrig sind.")
-        r2 = tk.Frame(self, bg=BG); r2.pack(fill="x", padx=10, pady=4)
+        r2 = tk.Frame(self, bg=BG); r2.pack(fill="x", padx=12, pady=4)
         label(r2, "NEUE ZAHL").pack(side="left")
         self.v_new = tk.StringVar()
         e2 = entry(r2, self.v_new, 12)
-        e2.pack(side="left", padx=6)
+        e2.pack(side="left", padx=8)
         e2.bind("<Return>", lambda _e: self.narrow("exact"))
         button(r2, "EINGRENZEN", lambda: self.narrow("exact"), accent=True).pack(side="left", padx=2)
         button(r2, "GEFALLEN", lambda: self.narrow("down")).pack(side="left", padx=(12, 2))
@@ -76,31 +77,33 @@ class AssistTab(BaseTab):
         button(r2, "GLEICH GEBLIEBEN", lambda: self.narrow("same")).pack(side="left", padx=2)
         button(r2, "NEU STARTEN", self.restart).pack(side="right", padx=2)
         self.lbl_count = label(self, "Noch nicht gesucht.")
-        self.lbl_count.pack(anchor="w", padx=10)
-        fr = tk.Frame(self, bg=BG); fr.pack(fill="x", padx=10, pady=(2, 0))
-        self.tv_c = tree(fr, [("a", "ADRESSE"), ("v", "WERT JETZT")], [200, 160], height=4)
+        self.lbl_count.pack(anchor="w", padx=12)
+        fr = tk.Frame(self, bg=BG); fr.pack(fill="x", padx=12, pady=(2, 0))
+        self.tv_c = tree(fr, [("a", "ADRESSE"), ("v", "WERT JETZT")], [200, 160], height=4,
+                         empty="Noch keine Treffer. Gib oben die Zahl ein und klicke SUCHEN.")
         with_scroll(fr, self.tv_c)
-        button(self, "WERTE AKTUALISIEREN", self.refresh_candidates).pack(anchor="w", padx=10, pady=2)
+        button(self, "WERTE AKTUALISIEREN", self.refresh_candidates).pack(anchor="w", padx=12, pady=2)
 
         # ---- 3 ----
         _head(self, "3  WER AENDERT DEN WERT?")
         _hint(self, "Markiere oben den Treffer, dessen Wert im Spiel mitgeht, und klicke BEOBACHTEN. Dann loese im Spiel die "
                     "Aenderung aus (Schaden nehmen, Geld ausgeben). Das Spiel laeuft dabei weiter.")
-        r3 = tk.Frame(self, bg=BG); r3.pack(fill="x", padx=10, pady=4)
+        r3 = tk.Frame(self, bg=BG); r3.pack(fill="x", padx=12, pady=4)
         self.b_watch = button(r3, "BEOBACHTEN", self.start_watch, accent=True)
         self.b_watch.pack(side="left")
         button(r3, "STOPP", self.stop_watch).pack(side="left", padx=4)
         self.lbl_watch = label(r3, "Aus.")
-        self.lbl_watch.pack(side="left", padx=10)
-        fr3 = tk.Frame(self, bg=BG); fr3.pack(fill="x", padx=10)
+        self.lbl_watch.pack(side="left", padx=12)
+        fr3 = tk.Frame(self, bg=BG); fr3.pack(fill="x", padx=12)
         self.tv_w = tree(fr3, [("a", "BEFEHL @"), ("i", "BEFEHL"), ("t", "WAS PASSIERT"), ("n", "ANZAHL")],
-                         [150, 260, 400, 70], height=4)
+                         [150, 260, 400, 70], height=4,
+                         empty="Noch nichts beobachtet. Klicke BEOBACHTEN und ändere den Wert im Spiel.")
         with_scroll(fr3, self.tv_w)
 
         # ---- 4 ----
         _head(self, "4  CHEAT ERSTELLEN")
         _hint(self, "Markiere den Befehl, der deinen Wert aendert, und waehle ein PRESET (zum Beispiel: Wert sinkt nicht mehr).")
-        r4 = tk.Frame(self, bg=BG); r4.pack(fill="x", padx=10, pady=4)
+        r4 = tk.Frame(self, bg=BG); r4.pack(fill="x", padx=12, pady=4)
         button(r4, "PRESET…", self.to_preset, accent=True).pack(side="left")
         button(r4, "IM DISASSEMBLER", self.to_disasm).pack(side="left", padx=4)
 

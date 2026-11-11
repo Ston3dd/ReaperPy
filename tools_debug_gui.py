@@ -19,7 +19,7 @@ class DebugTab(BaseTab):
         top = tk.Frame(self, bg=BG); top.pack(fill="x", padx=8, pady=(8, 4))
         button(top, "ATTACH", self.attach, accent=True).pack(side="left", padx=2)
         button(top, "DETACH", self.detach).pack(side="left", padx=2)
-        self.lbl = label(top, "nicht attached"); self.lbl.pack(side="left", padx=10)
+        self.lbl = label(top, "nicht attached"); self.lbl.pack(side="left", padx=12)
 
         run = tk.Frame(self, bg=BG); run.pack(fill="x", padx=8, pady=2)
         button(run, "▶ WEITER", lambda: self._do(lambda: self.sess.resume()), accent=True).pack(side="left", padx=2)
@@ -45,18 +45,18 @@ class DebugTab(BaseTab):
         row = tk.Frame(left, bg=BG); row.pack(fill="x")
         label(row, "BREAKPOINT @").pack(side="left")
         self.v_bp = tk.StringVar()
-        entry(row, self.v_bp, 20).pack(side="left", padx=6)
+        entry(row, self.v_bp, 20).pack(side="left", padx=8)
         button(row, "SETZEN", self.add_bp, accent=True).pack(side="left", padx=2)
         button(row, "ENTFERNEN", self.del_bp).pack(side="left", padx=2)
         self.bpt = tree(left, [("i", "#"), ("a", "ADRESSE"), ("o", "OFFSET"), ("on", "AN")],
                         [40, 170, 100, 50], height=5)
-        self.bpt.pack(fill="x", pady=(2, 6))
+        self.bpt.pack(fill="x", pady=(2, 8))
 
         # Watchpoints
         row = tk.Frame(left, bg=BG); row.pack(fill="x")
         label(row, "WATCHPOINT @").pack(side="left")
         self.v_wp = tk.StringVar()
-        entry(row, self.v_wp, 20).pack(side="left", padx=6)
+        entry(row, self.v_wp, 20).pack(side="left", padx=8)
         self.v_wsize = tk.StringVar(value="4")
         ttk.Combobox(row, textvariable=self.v_wsize, values=["1", "2", "4", "8"],
                      width=3, state="readonly").pack(side="left")
@@ -67,7 +67,7 @@ class DebugTab(BaseTab):
         button(row, "ENTFERNEN", self.del_wp).pack(side="left", padx=2)
         self.wpt = tree(left, [("i", "#"), ("a", "ADRESSE"), ("s", "GRÖSSE"), ("t", "TYP")],
                         [40, 170, 70, 130], height=4)
-        self.wpt.pack(fill="x", pady=(2, 6))
+        self.wpt.pack(fill="x", pady=(2, 8))
 
         # Treffer
         label(left, "TREFFER (Klick = Register dieses Treffers)").pack(anchor="w")

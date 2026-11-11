@@ -54,21 +54,21 @@ class SectionPanel(tk.Frame):
         r1 = tk.Frame(self, bg=bg); r1.pack(fill="x")
         tk.Label(r1, text="AUSBLENDEN", bg=bg, fg=TEXT_DIM, font=FONT_LABEL).pack(side="left")
         self.b_hide = tk.Button(r1, text="", command=self._popup_hide, bg=BG_CARD_HVR, fg=TEXT, font=FONT_LABEL,
-                                relief="flat", bd=0, padx=8, pady=3, cursor="hand2", anchor="w",
+                                relief="flat", bd=0, padx=8, pady=4, cursor="hand2", anchor="w",
                                 activebackground=BG_CARD_HVR, activeforeground=ACCENT)
-        self.b_hide.pack(side="left", fill="x", expand=True, padx=(6, 0))
+        self.b_hide.pack(side="left", fill="x", expand=True, padx=(8, 0))
 
         r2 = tk.Frame(self, bg=bg); r2.pack(fill="x", pady=(4, 0))
         tk.Label(r2, text="EIGENE MUSTER", bg=bg, fg=TEXT_DIM, font=FONT_LABEL).pack(side="left")
         self.v_custom = tk.StringVar(value=self.state.custom)
         e = entry(r2, self.v_custom, 18)
-        e.pack(side="left", fill="x", expand=True, padx=(6, 0))
+        e.pack(side="left", fill="x", expand=True, padx=(8, 0))
         e.bind("<KeyRelease>", lambda _e: self._custom_changed())
         e.bind("<FocusOut>", lambda _e: self._custom_changed())
         tk.Label(self, text="z. B.  libSce*, SDL, Shm   (* = beliebig; ohne * = Namensteil)", bg=bg, fg=TEXT_DIM,
                  font=FONT_LABEL, anchor="w").pack(fill="x")
 
-        r3 = tk.Frame(self, bg=bg); r3.pack(fill="x", pady=(6, 4))
+        r3 = tk.Frame(self, bg=bg); r3.pack(fill="x", pady=(8, 4))
         for text, fn in (("ALLE", self.sel_all), ("KEINE", self.sel_none), ("NUR EBOOT", self.sel_eboot),
                          ("NUR SPIEL", self.sel_game)):
             self._small(r3, text, fn).pack(side="left", padx=(0, 4))
@@ -103,14 +103,14 @@ class SectionPanel(tk.Frame):
         self.tv.bind("<<TreeviewClose>>", lambda _e: self._remember_open())
 
         self.lbl_sum = tk.Label(self, text="", bg=bg, fg=TEXT, font=FONT_LABEL, anchor="w", justify="left")
-        self.lbl_sum.pack(fill="x", pady=(6, 0))
+        self.lbl_sum.pack(fill="x", pady=(8, 0))
         self.lbl_est = tk.Label(self, text="", bg=bg, fg=TEXT_DIM, font=FONT_LABEL, anchor="w", justify="left")
         self.lbl_est.pack(fill="x")
         self._hide_title()
 
     def _small(self, parent, text, cmd):
         return tk.Button(parent, text=text, command=cmd, bg=BG_CARD_HVR, fg=TEXT, font=FONT_LABEL, relief="flat",
-                         bd=0, padx=7, pady=2, cursor="hand2", activebackground=BG_CARD_HVR, activeforeground=ACCENT)
+                         bd=0, padx=8, pady=2, cursor="hand2", activebackground=BG_CARD_HVR, activeforeground=ACCENT)
 
     # ------------------------------------------------------------------
     # Daten laden

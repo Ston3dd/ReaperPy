@@ -3,6 +3,7 @@ Cheat-Editor, AOB/Update-Scan, Debugger).  Wird aus gui.py über den Button
 "WERKZEUGE" geöffnet und nutzt eine EIGENE Verbindung zur PS5, damit die
 Haupt-Verbindung (Patches an/aus) nie durcheinanderkommt."""
 import tools_i18n
+import tools_ui
 import howto
 import json
 import os
@@ -26,7 +27,7 @@ from reapatch import ReapPatch
 from patch_engine import apply_patch, deactivate_patch, is_cave_patch, asm_to_bytes
 from tools_groups import GroupTab
 from tools_common import (BG, BG_BAR, BG_CARD, ACCENT, TEXT, TEXT_DIM, WARN,
-                          ERROR, FONT_LABEL, FONT_HEAD, BaseTab, style_ttk,
+                          ERROR, FONT_LABEL, FONT_HEAD, FONT_TEXT, BaseTab, style_ttk, refresh_empty,
                           button, label, entry, textbox, tree, with_scroll, hexs)
 
 
@@ -42,11 +43,11 @@ class MemoryTab(BaseTab):
         bar = tk.Frame(self, bg=BG); bar.pack(fill="x", padx=8, pady=(8, 4))
         label(bar, "ADRESSE").pack(side="left")
         self.v_addr = tk.StringVar(value="base")
-        e = entry(bar, self.v_addr, 22); e.pack(side="left", padx=6)
+        e = entry(bar, self.v_addr, 22); e.pack(side="left", padx=8)
         e.bind("<Return>", lambda _e: self.read())
         label(bar, "LÄNGE").pack(side="left")
         self.v_len = tk.StringVar(value="0x200")
-        entry(bar, self.v_len, 8).pack(side="left", padx=6)
+        entry(bar, self.v_len, 8).pack(side="left", padx=8)
         button(bar, "LESEN", self.read, accent=True).pack(side="left", padx=2)
         button(bar, "◀", lambda: self.page(-1)).pack(side="left", padx=2)
         button(bar, "▶", lambda: self.page(1)).pack(side="left", padx=2)
@@ -70,7 +71,7 @@ class MemoryTab(BaseTab):
         self.snap = None
         self.last = (0, b"")
         self.lbl_insp = label(self, "Klick auf ein Byte -> Werte-Inspektor")
-        self.lbl_insp.pack(fill="x", padx=10)
+        self.lbl_insp.pack(fill="x", padx=12)
         self.txt.bind("<ButtonRelease-1>", self._inspect)
         tl = tk.Frame(self, bg=BG); tl.pack(fill="x", padx=8, pady=(4, 0))
         label(tl, "WERKZEUGE").pack(side="left")
@@ -83,9 +84,9 @@ class MemoryTab(BaseTab):
         wr = tk.Frame(self, bg=BG); wr.pack(fill="x", padx=8, pady=8)
         label(wr, "SCHREIBEN @").pack(side="left")
         self.v_waddr = tk.StringVar()
-        entry(wr, self.v_waddr, 20).pack(side="left", padx=6)
+        entry(wr, self.v_waddr, 20).pack(side="left", padx=8)
         self.v_wbytes = tk.StringVar()
-        entry(wr, self.v_wbytes, 40).pack(side="left", padx=6)
+        entry(wr, self.v_wbytes, 40).pack(side="left", padx=8)
         button(wr, "SCHREIBEN", self.write, accent=True).pack(side="left", padx=2)
         button(wr, "→ DISASM", lambda: self.win.goto_disasm(self._cur_addr())).pack(side="right")
 
@@ -264,11 +265,11 @@ class DisasmTab(BaseTab):
         bar = tk.Frame(self, bg=BG); bar.pack(fill="x", padx=8, pady=(8, 4))
         label(bar, "ADRESSE").pack(side="left")
         self.v_addr = tk.StringVar(value="base")
-        e = entry(bar, self.v_addr, 22); e.pack(side="left", padx=6)
+        e = entry(bar, self.v_addr, 22); e.pack(side="left", padx=8)
         e.bind("<Return>", lambda _e: self.run())
         label(bar, "ANZAHL").pack(side="left")
         self.v_n = tk.StringVar(value="64")
-        entry(bar, self.v_n, 5).pack(side="left", padx=6)
+        entry(bar, self.v_n, 5).pack(side="left", padx=8)
         button(bar, "DISASM", self.run, accent=True).pack(side="left", padx=2)
         button(bar, "▶ WEITER", self.next_page).pack(side="left", padx=2)
         button(bar, "FOLGEN", self.follow).pack(side="left", padx=2)
@@ -282,7 +283,7 @@ class DisasmTab(BaseTab):
         self.tv.bind("<Double-1>", lambda _e: self.follow())
         self.tv.bind("<<TreeviewSelect>>", lambda _e: self._explain())
         self.lbl_exp = tk.Label(self, text="", bg=BG, fg=ACCENT, font=FONT_LABEL, justify="left", wraplength=1000, anchor="w")
-        self.lbl_exp.pack(fill="x", padx=10)
+        self.lbl_exp.pack(fill="x", padx=12)
 
         act = tk.Frame(self, bg=BG); act.pack(fill="x", padx=8, pady=8)
         button(act, "NOP", self.nop).pack(side="left", padx=2)
@@ -291,7 +292,7 @@ class DisasmTab(BaseTab):
         button(act, "XREFS AUF ADRESSE", self.xrefs).pack(side="left", padx=2)
         button(act, "→ HEX", self.to_hex).pack(side="left", padx=2)
         button(act, "→ CHEAT-EDITOR", self.to_cheat, accent=True).pack(side="right")
-        button(act, "ALS CAVE-HOOK", self.to_cave_hook, accent=True).pack(side="right", padx=(0, 6))
+        button(act, "ALS CAVE-HOOK", self.to_cave_hook, accent=True).pack(side="right", padx=(0, 8))
 
     def goto(self, address):
         self.v_addr.set(hexs(address))
@@ -487,7 +488,7 @@ class ConverterTab(BaseTab):
         row = tk.Frame(l, bg=BG); row.pack(fill="x", pady=4)
         label(row, "BASIS").pack(side="left")
         self.v_base = tk.StringVar(value="0")
-        entry(row, self.v_base, 16).pack(side="left", padx=6)
+        entry(row, self.v_base, 16).pack(side="left", padx=8)
         button(row, "→ BYTES", self.to_bytes, accent=True).pack(side="left")
 
         label(r, "BYTES (hex)").pack(anchor="w")
@@ -500,7 +501,7 @@ class ConverterTab(BaseTab):
         self.v_val = tk.StringVar(value="0x3F800000")
         e = entry(row, self.v_val, 26); e.pack(side="left")
         e.bind("<Return>", lambda _e: self.conv())
-        button(row, "KONVERTIEREN", self.conv, accent=True).pack(side="left", padx=6)
+        button(row, "KONVERTIEREN", self.conv, accent=True).pack(side="left", padx=8)
         self.res = tree(self, [("k", "TYP"), ("v", "WERT")], [180, 420], height=9)
         self.res.pack(fill="x", padx=8, pady=(0, 8))
 
@@ -578,7 +579,8 @@ class CheatTab(BaseTab):
         tk.Checkbutton(top, text="ERWEITERTE OPTIONEN", variable=self.v_adv, command=self._toggle_mode,
                        bg=BG, fg=TEXT, selectcolor=BG_CARD, activebackground=BG, activeforeground=ACCENT,
                        font=FONT_LABEL).pack(side="right")
-        self.lbl_mode = label(top, "", justify="left", wraplength=760)
+        self.lbl_mode = tk.Label(top, text="", bg=BG, fg=TEXT_DIM, font=FONT_TEXT, justify="left", anchor="w",
+                                 wraplength=760)
         self.lbl_mode.pack(side="left", fill="x", expand=True)
 
         g = tk.Frame(self, bg=BG); g.pack(fill="x", padx=8, pady=(4, 2))
@@ -586,6 +588,7 @@ class CheatTab(BaseTab):
                                         ("offset", "OFFSET (ab Image-Base)", 16)]):
             label(g, t).grid(row=0, column=i * 2, sticky="w", padx=(0, 4))
             entry(g, self.v[k], w).grid(row=0, column=i * 2 + 1, padx=(0, 12))
+        tools_ui.help_chip(g, "OFFSET (ab Image-Base)", bg=BG).grid(row=0, column=6)
         t = tk.Frame(self, bg=BG); t.pack(fill="x", padx=8, pady=2)
         for val, txt in (("patch", "EINFACHER PATCH / NOP"), ("cave", "CODE-CAVE")):
             tk.Radiobutton(t, text=txt, variable=self.v_type, value=val, command=self._type,
@@ -593,6 +596,7 @@ class CheatTab(BaseTab):
                            activeforeground=ACCENT, font=FONT_LABEL).pack(side="left", padx=(0, 12))
         label(t, "OriginReturn (Bytes, leer = automatisch)").pack(side="left", padx=(12, 4))
         entry(t, self.v["ret"], 6).pack(side="left")
+        tools_ui.help_chip(t, "OriginReturn", bg=BG).pack(side="left", padx=2)
 
         self._row_type = t
         cols = tk.Frame(self, bg=BG); cols.pack(fill="both", expand=True, padx=8, pady=4)
@@ -606,17 +610,20 @@ class CheatTab(BaseTab):
 
         self._cave_box = tk.Frame(self, bg=BG)
         self._cave_box.pack(fill="both", expand=True, padx=8)
-        label(self._cave_box, "CAVE-CODE (nur bei Code-Cave) – neue Labels mit  'Name:'  in eigener Zeile")\
-            .pack(anchor="w")
+        hdr = tk.Frame(self._cave_box, bg=BG)
+        hdr.pack(anchor="w")
+        label(hdr, "CAVE-CODE (nur bei Code-Cave) – neue Labels mit  'Name:'  in eigener Zeile").pack(side="left")
+        tools_ui.help_chip(hdr, "CAVE-CODE", bg=BG).pack(side="left", padx=4)
         self.t_cave = textbox(self._cave_box, height=7, width=80)
         self.t_cave.pack(fill="both", expand=True)
         self.t_cave.insert("1.0", tools_i18n.translate(CAVE_TEMPLATE))
 
         s = tk.Frame(self, bg=BG); s.pack(fill="x", padx=8, pady=4)
         label(s, "SIGNATUR").pack(side="left")
-        entry(s, self.v["aob"], 62).pack(side="left", padx=6)
+        tools_ui.help_chip(s, "SIGNATUR", bg=BG).pack(side="left", padx=(2, 0))
+        entry(s, self.v["aob"], 62).pack(side="left", padx=8)
         label(s, "OFFSET").pack(side="left")
-        entry(s, self.v["aoboff"], 5).pack(side="left", padx=6)
+        entry(s, self.v["aoboff"], 5).pack(side="left", padx=8)
         button(s, "ERZEUGEN", self.make_sig).pack(side="left")
 
         self._row_sig = s
@@ -958,7 +965,7 @@ class AobTab(BaseTab):
         top = tk.Frame(self, bg=BG); top.pack(fill="x", padx=8, pady=(8, 2))
         label(top, "MUSTER").pack(side="left")
         self.v_pat = tk.StringVar()
-        entry(top, self.v_pat, 60).pack(side="left", padx=6)
+        entry(top, self.v_pat, 60).pack(side="left", padx=8)
         self.v_scope = tk.StringVar(value="exec")
         ttk.Combobox(top, textvariable=self.v_scope, values=["exec", "alle lesbaren"],
                      width=14, state="readonly").pack(side="left", padx=4)
@@ -968,19 +975,20 @@ class AobTab(BaseTab):
         sig = tk.Frame(self, bg=BG); sig.pack(fill="x", padx=8, pady=2)
         label(sig, "SIGNATUR AUS ADRESSE").pack(side="left")
         self.v_addr = tk.StringVar()
-        entry(sig, self.v_addr, 20).pack(side="left", padx=6)
+        entry(sig, self.v_addr, 20).pack(side="left", padx=8)
         label(sig, "HOOK-LÄNGE").pack(side="left")
         self.v_hl = tk.StringVar(value="8")
-        entry(sig, self.v_hl, 4).pack(side="left", padx=6)
+        entry(sig, self.v_hl, 4).pack(side="left", padx=8)
         self.v_wild = tk.BooleanVar(value=True)
         tk.Checkbutton(sig, text="Hook-Bytes wildcarden", variable=self.v_wild, bg=BG, fg=TEXT_DIM,
                        selectcolor=BG_CARD, activebackground=BG, activeforeground=ACCENT,
-                       font=FONT_LABEL).pack(side="left", padx=6)
+                       font=FONT_LABEL).pack(side="left", padx=8)
         button(sig, "ERZEUGEN", self.make_sig).pack(side="left", padx=2)
         button(sig, "→ CHEAT-EDITOR", self.sig_to_cheat).pack(side="left", padx=2)
 
         fr = tk.Frame(self, bg=BG); fr.pack(fill="x", padx=8, pady=4)
-        self.res = tree(fr, [("addr", "TREFFER"), ("off", "OFFSET")], [200, 120], height=5)
+        self.res = tree(fr, [("addr", "TREFFER"), ("off", "OFFSET")], [200, 120], height=5,
+                        empty="Noch keine Treffer. Gib ein MUSTER ein und klicke SERVER-SCAN.")
         with_scroll(fr, self.res)
         self.res.bind("<Double-1>", self._dbl)
 
@@ -1203,16 +1211,23 @@ class ToolsWindow(tk.Toplevel):
         self.q = queue.Queue()
         self.net_lock = threading.RLock()
         self.dbg_tab = None
+        self._jobs = 0                      # laufende Hintergrund-Jobs (fuer den "arbeitet ..."-Hinweis)
+        self._busy_shown = False
+        self._busy_pending = False
+        self._connecting = False
+        self._was_ready = tools_ui.console_ready(app)
 
         head = tk.Frame(self, bg=BG_BAR); head.pack(fill="x")
         tk.Label(head, text="▸  WERKZEUGE", bg=BG_BAR, fg=ACCENT, font=FONT_HEAD).pack(side="left", padx=12, pady=8)
         self.lbl_state = tk.Label(head, text="verbinde ...", bg=BG_BAR, fg=WARN, font=FONT_LABEL)
         self.lbl_state.pack(side="right", padx=12)
+        self.busy = ttk.Progressbar(head, mode="indeterminate", length=70, style="Reaper.Horizontal.TProgressbar")
+        self.lbl_busy = tk.Label(head, text="arbeitet …", bg=BG_BAR, fg=TEXT_DIM, font=FONT_TEXT)
         button(head, "SESSION LADEN…", self.session_load).pack(side="right", padx=2, pady=4)
         button(head, "SESSION SPEICHERN…", self.session_save).pack(side="right", padx=2, pady=4)
-        button(head, "? HILFE", self.open_howto).pack(side="right", padx=(2, 10), pady=4)
+        button(head, "? HILFE", self.open_howto).pack(side="right", padx=(2, 12), pady=4)
 
-        self.nb = ttk.Notebook(self); self.nb.pack(fill="both", expand=True, padx=6, pady=6)
+        self.nb = ttk.Notebook(self); self.nb.pack(fill="both", expand=True, padx=8, pady=8)
         # Anfaenger-Tabs liegen oben, alles Spezielle im Tab FORTGESCHRITTEN (eigenes Notebook)
         self.adv_frame = tk.Frame(self.nb, bg=BG)
         self.adv_nb = ttk.Notebook(self.adv_frame)
@@ -1353,7 +1368,7 @@ class ToolsWindow(tk.Toplevel):
                 self.after(200, lambda msg=msg: self.log(msg, "err"))
 
         self.logbox = textbox(self, height=6, width=80)
-        self.logbox.pack(fill="x", padx=6, pady=(0, 6))
+        self.logbox.pack(fill="x", padx=8, pady=(0, 8))
         self.logbox.configure(state="disabled")
         self.logbox._is_log = True
         self.logbox._save_log = self.save_log
@@ -1372,8 +1387,9 @@ class ToolsWindow(tk.Toplevel):
             g.nb.bind("<<NotebookTabChanged>>", lambda _e: self.after(30, self.apply_language))
         self.after(200, self.apply_language)
         self.after(80, self._poll)
-        self.bg(self._connect, lambda _r: self._set_state("verbunden", ACCENT),
-                lambda e: self._set_state(f"Fehler: {e}", ERROR))
+        self.bg(self._connect, self._connected_ok, self._connected_fail)
+        self.after(300, self._net_update)
+        self.after(700, self._ui_tick)
 
     # ---- Verbindung ----
     def _connect(self):
@@ -1389,9 +1405,50 @@ class ToolsWindow(tk.Toplevel):
     def _set_state(self, text, color):
         self.lbl_state.configure(text=text, fg=color)
 
+    def _connected_ok(self, _r=None):
+        self._connecting = False
+        self._set_state("verbunden", ACCENT)
+        self._net_update()
+
+    def _connected_fail(self, e):
+        self._connecting = False
+        self._set_state(f"Fehler: {e}", ERROR)
+        self._net_update()
+
+    def _net_update(self):
+        """Knoepfe und Tooltips an den Verbindungsstatus anpassen."""
+        try:
+            if self.winfo_exists():
+                tools_ui.decorate(self)
+        except Exception:  # noqa: BLE001 - reine Komfortfunktion
+            pass
+
+    def _ui_tick(self):
+        """Alle 0,7 s: folgt dem Hauptfenster (verbunden / getrennt) und zeigt Hinweise in leeren Tabellen."""
+        try:
+            if not self.winfo_exists():
+                return
+            ready = tools_ui.console_ready(self.app)
+            if ready != self._was_ready:
+                self._was_ready = ready
+                tools_ui.set_net_state(self, ready)
+                if ready and not self._connecting:           # Hauptfenster wurde (neu) verbunden: Werkzeuge nachziehen
+                    self._connecting = True
+                    self.bg(self._connect, self._connected_ok, self._connected_fail)
+            refresh_empty()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            self.after(700, self._ui_tick)
+        except Exception:  # noqa: BLE001
+            pass
+
     # ---- Hintergrund-Jobs ----
     def bg(self, fn, ok=None, err=None, lock=True):
         """Job im Hintergrund. lock=False für Jobs mit eigener Verbindung (z.B. Scanner)."""
+        self._jobs += 1
+        self._busy_changed()
+
         def run():
             try:
                 if lock:
@@ -1403,7 +1460,41 @@ class ToolsWindow(tk.Toplevel):
                 self.q.put((err or self._log_err, e))
             else:
                 self.q.put((ok, res))
+            self.q.put((self._job_done, None))               # nach dem Ergebnis: Zaehler runter
         threading.Thread(target=run, daemon=True).start()
+
+    # ---- "arbeitet ..." (erst nach 0,25 s, damit kurze Jobs nicht flackern) ----
+    def _job_done(self, _v=None):
+        self._jobs = max(0, self._jobs - 1)
+        self._busy_changed()
+
+    def _busy_changed(self):
+        if self._jobs > 0 and not self._busy_shown and not self._busy_pending:
+            self._busy_pending = True
+            self.after(250, self._busy_show)
+        elif self._jobs == 0:
+            self._busy_hide()
+
+    def _busy_show(self):
+        self._busy_pending = False
+        try:
+            if self._jobs > 0 and not self._busy_shown and self.winfo_exists():
+                self.busy.pack(side="right", padx=(0, 4), after=self.lbl_state)
+                self.lbl_busy.pack(side="right", after=self.busy)
+                self.busy.start(14)
+                self._busy_shown = True
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _busy_hide(self):
+        if self._busy_shown:
+            try:
+                self.busy.stop()
+                self.busy.pack_forget()
+                self.lbl_busy.pack_forget()
+            except Exception:  # noqa: BLE001
+                pass
+            self._busy_shown = False
 
     def _log_err(self, e):
         self.log(f"{type(e).__name__}: {e}", "err")
@@ -1448,6 +1539,7 @@ class ToolsWindow(tk.Toplevel):
             if not self.winfo_exists():
                 return
             tools_i18n.apply_to(self)
+            tools_ui.decorate(self)                             # Tooltips + gesperrte Knoepfe auch an neuen Tabs
             if tools_i18n.lang() == "en" and not getattr(self, "_i18n_tick", False):
                 self._i18n_tick = True
                 self.after(2000, self._i18n_loop)

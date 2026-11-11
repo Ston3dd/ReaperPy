@@ -44,9 +44,9 @@ def card(parent, title, bg=BG_CARD):
     outer = tk.Frame(parent, bg=bg, highlightthickness=1, highlightbackground=BORDER)
     head = tk.Frame(outer, bg=BG_BAR)
     head.pack(fill="x")
-    tk.Label(head, text=title, bg=BG_BAR, fg=ACCENT_DIM, font=FONT_LABEL).pack(side="left", padx=8, pady=3)
+    tk.Label(head, text=title, bg=BG_BAR, fg=ACCENT_DIM, font=FONT_LABEL).pack(side="left", padx=8, pady=4)
     body = tk.Frame(outer, bg=bg)
-    body.pack(fill="both", expand=True, padx=8, pady=6)
+    body.pack(fill="both", expand=True, padx=8, pady=8)
     return outer, body, head
 
 
@@ -58,8 +58,8 @@ def pbtn(parent, text, cmd, primary=False, **kw):
     """Knopf im Karten-Stil: primaer = gefuellt in der Akzentfarbe, sonst dezent mit Hover."""
     bg, fg = (ACCENT, INK_ON_ACCENT) if primary else (BG_CARD_HVR, TEXT)
     hov = ACCENT_HI if primary else BTN_HVR
-    b = tk.Button(parent, text=text, command=cmd, bg=bg, fg=fg, font=FONT_LABEL, relief="flat", bd=0, padx=10,
-                  pady=5, cursor="hand2", highlightthickness=0, activebackground=hov,
+    b = tk.Button(parent, text=text, command=cmd, bg=bg, fg=fg, font=FONT_LABEL, relief="flat", bd=0, padx=12,
+                  pady=4, cursor="hand2", highlightthickness=0, activebackground=hov,
                   activeforeground=INK_ON_ACCENT if primary else ACCENT, **kw)
     b.bind("<Enter>", lambda _e: b.configure(bg=hov))
     b.bind("<Leave>", lambda _e: b.configure(bg=bg))
@@ -126,13 +126,14 @@ class ScanTab(BaseTab):
         outer, body, head = card(parent, "TREFFER")
         outer.pack(fill="both", expand=True)
         self.lbl_res = tk.Label(head, text="GEFUNDEN: 0", bg=BG_BAR, fg=TEXT, font=FONT_LABEL)
-        self.lbl_res.pack(side="left", padx=(10, 0))
+        self.lbl_res.pack(side="left", padx=(12, 0))
         pbtn(head, "▶", lambda: self._page(1)).pack(side="right", padx=(2, 4), pady=2)
         pbtn(head, "◀", lambda: self._page(-1)).pack(side="right", padx=2, pady=2)
         fr = tk.Frame(body, bg=BG_CARD)
         fr.pack(fill="both", expand=True)
         self.rt = tree(fr, [("a", "ADRESSE"), ("c", "AKTUELL"), ("p", "VORHER"), ("f", "ERSTER")],
                        [140, 100, 100, 100], height=12, anchors={},
+                       empty="Noch keine Treffer. Gib einen Wert ein und klicke ERSTER SCAN.",
                        actions=[("→ Zur Adressliste hinzufügen", self.add_selected),
                                 ("→ Alle (Seite) hinzufügen", self.add_all),
                                 (None, None),
@@ -141,9 +142,9 @@ class ScanTab(BaseTab):
         with_scroll(fr, self.rt)
         self.rt.bind("<Double-1>", lambda _e: self.add_selected())
         lb = tk.Frame(body, bg=BG_CARD)
-        lb.pack(fill="x", pady=(6, 0))
+        lb.pack(fill="x", pady=(8, 0))
         pbtn(lb, "→ AUSGEWÄHLTE HINZUFÜGEN", self.add_selected, primary=True).pack(side="left")
-        pbtn(lb, "→ ALLE (SEITE)", self.add_all).pack(side="left", padx=6)
+        pbtn(lb, "→ ALLE (SEITE)", self.add_all).pack(side="left", padx=8)
         clabel(lb, "Doppelklick oder Rechtsklick", dim=True).pack(side="right")
 
     def _build_scan(self, parent):
@@ -183,8 +184,8 @@ class ScanTab(BaseTab):
         self.b_first.grid(row=6, column=0, sticky="ew", pady=(12, 0))
         self.b_next = pbtn(g, "NÄCHSTER SCAN", self.scan_next, primary=True)
         self.b_next.grid(row=6, column=1, sticky="ew", padx=(8, 0), pady=(12, 0))
-        pbtn(g, "NEUER SCAN", self.new_scan).grid(row=7, column=0, sticky="ew", pady=(6, 0))
-        pbtn(g, "ABBRECHEN", self.cancel).grid(row=7, column=1, sticky="ew", padx=(8, 0), pady=(6, 0))
+        pbtn(g, "NEUER SCAN", self.new_scan).grid(row=7, column=0, sticky="ew", pady=(8, 0))
+        pbtn(g, "ABBRECHEN", self.cancel).grid(row=7, column=1, sticky="ew", padx=(8, 0), pady=(8, 0))
 
         self.pb = ttk.Progressbar(g, orient="horizontal", mode="determinate", length=200, maximum=100)
         self.pb.grid(row=8, column=0, columnspan=2, sticky="ew", pady=(12, 0))
@@ -193,7 +194,7 @@ class ScanTab(BaseTab):
         self.lbl.grid(row=9, column=0, columnspan=2, sticky="w", pady=(4, 0))
         self.lbl_mode = clabel(g, "")
         self.lbl_mode.grid(row=10, column=0, columnspan=2, sticky="w")
-        pbtn(g, "⚙ OPTIONEN …", self.open_options).grid(row=11, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        pbtn(g, "⚙ OPTIONEN …", self.open_options).grid(row=11, column=0, columnspan=2, sticky="ew", pady=(12, 0))
 
     def _build_sections(self, parent):
         from tools_sections_gui import SectionPanel
@@ -212,6 +213,7 @@ class ScanTab(BaseTab):
         fr2.pack(fill="both", expand=True)
         self.lt = tree(fr2, [("z", "❄"), ("d", "BESCHREIBUNG"), ("a", "ADRESSE"), ("t", "TYP"), ("v", "WERT")],
                        [30, 220, 160, 80, 140], height=6, anchors={"z": "center"},
+                       empty="Die Adressliste ist leer. Rechtsklick auf einen Treffer → Zur Adressliste hinzufügen.",
                        actions=[("Wert setzen ...", self.set_value),
                                 ("Einfrieren / Freigeben", self.toggle_freeze),
                                 ("Beschreibung ...", self.rename),
@@ -226,12 +228,12 @@ class ScanTab(BaseTab):
         self.lt.bind("<Double-1>", lambda _e: self.set_value())
         self.lt.bind("<Delete>", lambda _e: self.remove())
         ac = tk.Frame(body, bg=BG_CARD)
-        ac.pack(fill="x", pady=(6, 0))
+        ac.pack(fill="x", pady=(8, 0))
         pbtn(ac, "WERT SETZEN", self.set_value, primary=True).pack(side="left")
         pbtn(ac, "❄ FREEZE", self.toggle_freeze).pack(side="left", padx=4)
         pbtn(ac, "BESCHREIBUNG", self.rename).pack(side="left")
         pbtn(ac, "ENTFERNEN", self.remove).pack(side="left", padx=4)
-        pbtn(ac, "WER SCHREIBT?", self.who_writes).pack(side="left", padx=(14, 4))
+        pbtn(ac, "WER SCHREIBT?", self.who_writes).pack(side="left", padx=(16, 4))
         pbtn(ac, "→ HEX", self.to_hex).pack(side="left")
         pbtn(ac, "→ POINTER-SCAN", self.to_pointer).pack(side="left", padx=4)
 
@@ -254,18 +256,18 @@ class ScanTab(BaseTab):
         except Exception:
             pass
         outer, body, _h = card(dlg, "SCAN-OPTIONEN")
-        outer.pack(fill="both", expand=True, padx=10, pady=10)
+        outer.pack(fill="both", expand=True, padx=12, pady=12)
         clabel(body, "Tempo").pack(anchor="w")
         ttk.Combobox(body, textvariable=self.slow_sel, values=list(SLOW_CHOICES), width=30,
-                     state="readonly").pack(anchor="w", pady=(0, 6))
+                     state="readonly").pack(anchor="w", pady=(0, 8))
         for text, var in (("Float vereinfachen", self.o_float), ("Parallel (schneller)", self.o_par),
                           ("Aliasing (experimentell)", self.o_alias),
                           ("kleine Segmente (<256 KB) auslassen", self.o_small), ("Debug-Log", self.o_debug)):
             _check(body, text, var).pack(anchor="w")
-        clabel(body, "SNAPSHOT-RAM").pack(anchor="w", pady=(10, 0))
+        clabel(body, "SNAPSHOT-RAM").pack(anchor="w", pady=(12, 0))
         ttk.Combobox(body, textvariable=self.ram_sel, values=list(RAM_CHOICES), width=30,
                      state="readonly").pack(anchor="w")
-        clabel(body, "AUSLAGERN NACH").pack(anchor="w", pady=(6, 0))
+        clabel(body, "AUSLAGERN NACH").pack(anchor="w", pady=(8, 0))
         ttk.Combobox(body, textvariable=self.spill_sel, values=list(SPILL_CHOICES), width=40,
                      state="readonly").pack(anchor="w")
         clabel(body, "(nur 'Unbekannter Startwert': mehr RAM = viel schneller, belegt aber PS5-Speicher)",
@@ -273,7 +275,7 @@ class ScanTab(BaseTab):
         row = tk.Frame(body, bg=BG_CARD)
         row.pack(fill="x")
         pbtn(row, "SELBSTTEST", self.selftest).pack(side="left")
-        pbtn(row, "REGIONEN-BERICHT", self.region_report).pack(side="left", padx=6)
+        pbtn(row, "REGIONEN-BERICHT", self.region_report).pack(side="left", padx=8)
         pbtn(row, "SCHLIESSEN", dlg.destroy, primary=True).pack(side="right")
 
     def scope_key(self):

@@ -21,6 +21,12 @@ Siehe das Ende von [Einen Wert finden](howto:find-value): probiere *Float*, stel
 - Der Trainer ging gestern und heute nicht: Ein mit altem ReaperPy gespeicherter Trainer hat eine feste Objektadresse. Drücke **ITEMS FINDEN** und **TRAINER SPEICHERN** erneut (ab Version 6.0.1 finden Trainer das Objekt selbst).
 - Das Spiel wurde aktualisiert: Nimm einen Dump der neuen Version, finde und speichere neu.
 
+## Knöpfe sind abgegraut
+Knöpfe, die am laufenden Spiel arbeiten (zum Beispiel **LESEN**, **SCHREIBEN**, **TEST AN**), sind abgegraut, solange das Hauptfenster nicht mit der Konsole verbunden ist. Fahre mit der Maus darüber: Der Tooltip sagt, warum. Klicke im Hauptfenster auf **VERBINDEN** - die Knöpfe werden von selbst frei und die Werkzeuge verbinden nach, du musst sie nicht neu öffnen. Knöpfe für Dateien und Exporte sind nie abgegraut.
+
+## Was bedeuten das kleine „?“ und der Fragezeichen-Mauszeiger?
+Fahre mit der Maus über einen Begriff wie OFFSET, SIGNATUR, OriginReturn oder NOP: Nach einem Moment erscheint eine kurze Erklärung. Ein „?“ neben einem Feld tut dasselbe.
+
 ## Der Cheat erscheint nicht in GoldHEN / etaHEN
 - Liegt die Datei im richtigen Ordner? Siehe [Export](howto:export).
 - Passen Titel-ID und Version genau zum Spiel? Nutze **TITEL-ID/VERSION VOM SPIEL**.

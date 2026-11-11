@@ -1,5 +1,6 @@
 """tools_common.py – Theme + Hilfen für das Werkzeug-Fenster."""
 import re
+import weakref
 import tkinter as tk
 from tkinter import ttk
 
@@ -29,6 +30,10 @@ ERROR       = T.ERROR
 FONT_MONO  = ("Consolas", 10)
 FONT_LABEL = ("Consolas", 9)
 FONT_HEAD  = ("Consolas", 11, "bold")
+# Erklärtexte (Hinweise, Schritte, Status) in einer Proportionalschrift - Consolas bleibt für Adressen, Bytes und Code.
+# Unter Windows Segoe UI; wo es sie nicht gibt, nimmt Tk automatisch die Standardschrift.
+FONT_TEXT  = ("Segoe UI", 9)
+FONT_TEXT_B = ("Segoe UI", 9, "bold")
 
 
 def style_ttk(root):
@@ -98,11 +103,17 @@ def style_ttk(root):
 
 
 def button(parent, text, cmd, accent=False, **kw):
-    return tk.Button(parent, text=text, command=cmd, bg=BG_CARD,
-                     fg=ACCENT if accent else TEXT, font=FONT_LABEL, relief="flat",
-                     bd=0, padx=10, pady=4, cursor="hand2", highlightthickness=1,
-                     highlightbackground=BORDER, highlightcolor=ACCENT_DIM,
-                     activebackground=BG_CARD_HVR, activeforeground=ACCENT, **kw)
+    """Knopf im Theme.  Mit der Tab-Taste erreichbar: der Fokus zeigt einen hellen Rahmen (ACCENT), Leertaste UND Return
+    lösen aus; gesperrte Knöpfe (state="disabled") werden abgedunkelt."""
+    b = tk.Button(parent, text=text, command=cmd, bg=BG_CARD,
+                  fg=ACCENT if accent else TEXT, font=FONT_LABEL, relief="flat",
+                  bd=0, padx=12, pady=4, cursor="hand2", highlightthickness=1,
+                  highlightbackground=BORDER, highlightcolor=ACCENT,
+                  activebackground=BG_CARD_HVR, activeforeground=ACCENT,
+                  disabledforeground=TEXT_DIM2, **kw)
+    for seq in ("<Return>", "<KP_Enter>"):
+        b.bind(seq, lambda _e, b=b: b.invoke())
+    return b
 
 
 def label(parent, text, dim=True, **kw):
@@ -125,10 +136,35 @@ def textbox(parent, height=8, width=40, **kw):
                    highlightcolor=ACCENT_DIM, wrap="none", undo=True, **kw)
 
 
-def tree(parent, columns, widths, height=12, anchors=None, actions=None, details=None):
+_EMPTY = []          # (weakref auf die Tabelle, Overlay-Label) fuer Tabellen mit Leerzustand
+
+
+def refresh_empty():
+    """Zeigt/versteckt den Hinweis in leeren Tabellen (vom Werkzeug-Fenster regelmaessig aufgerufen)."""
+    alive = []
+    for ref, lbl in _EMPTY:
+        t = ref()
+        if t is None:
+            continue
+        alive.append((ref, lbl))
+        try:
+            empty = not t.get_children()
+            shown = bool(lbl.winfo_manager())
+            if empty and not shown:
+                lbl.place(relx=0.5, rely=0.5, anchor="center")
+                lbl.lift()
+            elif not empty and shown:
+                lbl.place_forget()
+        except Exception:  # noqa: BLE001 - Widget schon zerstoert
+            alive.pop()
+    _EMPTY[:] = alive
+
+
+def tree(parent, columns, widths, height=12, anchors=None, actions=None, details=None, empty=None):
     """Treeview mit Spalten.  Optional:
     actions  - Liste (Text, Funktion) fuer das Rechtsklick-Menue; (None, None) = Trennlinie.
     details  - Funktion(iid) -> Liste (Name, Wert); wird im Menuepunkt "Eigenschaften..." angehaengt.
+    empty    - Text, der in der leeren Tabelle steht (z. B. "Noch keine Treffer - ..."); verschwindet mit der ersten Zeile.
     """
     t = ttk.Treeview(parent, columns=[c[0] for c in columns], show="headings",
                      height=height, selectmode="extended")
@@ -138,6 +174,9 @@ def tree(parent, columns, widths, height=12, anchors=None, actions=None, details
                  stretch=(i == len(columns) - 1))
     if actions or details:
         _attach_context_menu(t, columns, actions or [], details)
+    if empty:
+        lbl = tk.Label(t, text=empty, bg=BG_CARD, fg=TEXT_DIM2, font=FONT_TEXT, justify="center", wraplength=420)
+        _EMPTY.append((weakref.ref(t), lbl))
     return t
 
 

@@ -45,10 +45,10 @@ class ValuesTab(BaseTab):
         self.v_engine = tk.StringVar(value=self.fixed or ENGINES[0])
         self.v_xp = tk.StringVar(value=VA.XP_DEFAULT)
 
-        tk.Label(self, text="▸  WERTE  →  PATCHES", bg=BG, fg=ACCENT, font=FONT_HEAD).pack(anchor="w", padx=14, pady=(10, 0))
+        tk.Label(self, text="▸  WERTE  →  PATCHES", bg=BG, fg=ACCENT, font=FONT_HEAD).pack(anchor="w", padx=16, pady=(12, 0))
         tk.Label(self, text="Leben, Ausdauer, Gold, Erfahrung, Munition ... als fertige Patches - für Unreal Engine und "
-                            "Unity, ohne Vorkenntnisse.", bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(anchor="w", padx=14,
-                                                                                                  pady=(0, 6))
+                            "Unity, ohne Vorkenntnisse.", bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(anchor="w", padx=16,
+                                                                                                  pady=(0, 8))
         self._build_step1()
         self._build_step3()
         self._build_step2()
@@ -61,7 +61,7 @@ class ValuesTab(BaseTab):
     # ------------------------------------------------------------------
     def _build_step1(self):
         outer, body, _h = card(self, "①  SPIEL")
-        outer.pack(fill="x", padx=12, pady=(0, 6))
+        outer.pack(fill="x", padx=12, pady=(0, 8))
         r1 = tk.Frame(body, bg=BG_CARD)
         if self.fixed != ENGINES[2]:
             r1.pack(fill="x")
@@ -79,13 +79,13 @@ class ValuesTab(BaseTab):
 
     def _build_step2(self):
         outer, body, _h = card(self, "②  WICHTIGES FINDEN")
-        outer.pack(fill="both", expand=True, padx=12, pady=(0, 6))
+        outer.pack(fill="both", expand=True, padx=12, pady=(0, 8))
         top = tk.Frame(body, bg=BG_CARD)
         top.pack(fill="x")
         self.b_find = pbtn(top, "🔎  WICHTIGES FINDEN", self.find, primary=True)
         self.b_find.pack(side="left")
         if not self.fixed:
-            clabel(top, "Spiel-Typ").pack(side="left", padx=(14, 4))
+            clabel(top, "Spiel-Typ").pack(side="left", padx=(16, 4))
             ttk.Combobox(top, textvariable=self.v_engine, values=list(ENGINES), width=14, state="readonly").pack(side="left")
         self.lbl_found = tk.Label(top, text="Klicke WICHTIGES FINDEN - Leben, Gold, Ausdauer, Munition, Erfahrung ...",
                                   bg=BG_CARD, fg=TEXT_DIM, font=FONT_LABEL, anchor="w", justify="left", wraplength=640)
@@ -116,15 +116,15 @@ class ValuesTab(BaseTab):
         row.pack(fill="x")
         if self.fixed != ENGINES[2]:                         # nur Unreal schreibt die Erfahrung fest
             clabel(row, "Erfahrung festschreiben auf (Unreal)").pack(side="left")
-            entry(row, self.v_xp, 8).pack(side="left", padx=(6, 12))
+            entry(row, self.v_xp, 8).pack(side="left", padx=(8, 12))
         self.lbl_plan = tk.Label(row, text="", bg=BG_CARD, fg=TEXT, font=FONT_LABEL, anchor="w")
         self.lbl_plan.pack(side="left", fill="x", expand=True)
         self.b_save = pbtn(row, "💾  PATCHES SPEICHERN", self.save, primary=True)
         self.b_save.pack(side="right")
-        pbtn(row, "ORDNER ÖFFNEN", self.open_folder).pack(side="right", padx=6)
+        pbtn(row, "ORDNER ÖFFNEN", self.open_folder).pack(side="right", padx=8)
         self.lbl_done = tk.Label(body, text="", bg=BG_CARD, fg=TEXT_DIM, font=FONT_LABEL, anchor="w", justify="left",
                                  wraplength=1100)
-        self.lbl_done.pack(fill="x", pady=(6, 0))
+        self.lbl_done.pack(fill="x", pady=(8, 0))
 
     # ------------------------------------------------------------------
     # Schritt 1: Spiel

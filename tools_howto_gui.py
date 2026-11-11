@@ -33,12 +33,12 @@ class HowToTab(BaseTab):
         self.v_search = tk.StringVar(value="")
         self.v_found = tk.StringVar(value="")
 
-        tk.Label(self, text="ANLEITUNGEN", bg=BG, fg=ACCENT, font=FONT_HEAD).pack(anchor="w", padx=16, pady=(14, 2))
+        tk.Label(self, text="ANLEITUNGEN", bg=BG, fg=ACCENT, font=FONT_HEAD).pack(anchor="w", padx=16, pady=(16, 2))
         tk.Label(self, text="Schritt für Schritt erklärt - die Sprache folgt der Umschaltung DE / EN.", bg=BG, fg=TEXT_DIM,
                  font=FONT_LABEL).pack(anchor="w", padx=16)
 
         body = tk.Frame(self, bg=BG)
-        body.pack(fill="both", expand=True, padx=16, pady=10)
+        body.pack(fill="both", expand=True, padx=16, pady=12)
         left = tk.Frame(body, bg=BG, width=270)
         left.pack(side="left", fill="y")
         left.pack_propagate(False)
@@ -46,7 +46,7 @@ class HowToTab(BaseTab):
         row.pack(fill="x")
         tk.Label(row, text="Suchen:", bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(side="left")
         self.e_search = entry(row, self.v_search, width=24)
-        self.e_search.pack(side="left", padx=6, fill="x", expand=True)
+        self.e_search.pack(side="left", padx=8, fill="x", expand=True)
         tk.Label(left, textvariable=self.v_found, bg=BG, fg=TEXT_DIM, font=FONT_LABEL, anchor="w").pack(fill="x", pady=(4, 2))
         self.lb = tk.Listbox(left, bg=BG_CARD, fg=TEXT, selectbackground=SELECT, selectforeground=TEXT, activestyle="none",
                              relief="flat", highlightthickness=1, highlightbackground=BORDER, font=BODY, exportselection=False)
@@ -55,7 +55,7 @@ class HowToTab(BaseTab):
 
         right = tk.Frame(body, bg=BG)
         right.pack(side="left", fill="both", expand=True, padx=(12, 0))
-        self.txt = tk.Text(right, wrap="word", bg=BG_CARD, fg=TEXT, insertbackground=TEXT, relief="flat", padx=18, pady=12,
+        self.txt = tk.Text(right, wrap="word", bg=BG_CARD, fg=TEXT, insertbackground=TEXT, relief="flat", padx=16, pady=12,
                            font=BODY, highlightthickness=1, highlightbackground=BORDER, cursor="arrow", spacing1=2, spacing3=2)
         sb = ttk.Scrollbar(right, orient="vertical", command=self.txt.yview)
         self.txt.configure(yscrollcommand=sb.set)

@@ -65,7 +65,7 @@ class UeLiveTab(BaseTab):
             self, "① Spiel-Ordner wählen   ② links einen Namen suchen (z. B. Health, Money, Ammo) und anklicken   "
             "③ rechts Zeile wählen → neuen Wert eintippen → SETZEN"
         )
-        self.lbl.pack(anchor="w", padx=10, pady=(0, 2))
+        self.lbl.pack(anchor="w", padx=12, pady=(0, 2))
 
         pan = ttk.PanedWindow(self, orient="horizontal")
         pan.pack(fill="both", expand=True, padx=8, pady=4)
@@ -156,9 +156,9 @@ class UeLiveTab(BaseTab):
         self.v_scope = tk.StringVar(value="Auswahl")
         ttk.Combobox(
             edit_row, textvariable=self.v_scope, values=("Auswahl", "alle Instanzen"), width=14, state="readonly"
-        ).pack(side="left", padx=6)
+        ).pack(side="left", padx=8)
         self.quick = tk.Frame(edit_row, bg=BG)
-        self.quick.pack(side="left", padx=6)
+        self.quick.pack(side="left", padx=8)
         self.btn_max = button(edit_row, "= MAX", self.set_to_max)
         self.btn_max.pack(side="left", padx=2)
         freeze_row = tk.Frame(bottom, bg=BG)
@@ -172,7 +172,7 @@ class UeLiveTab(BaseTab):
             "Doppelklick ändert den Wert, Rechtsklick öffnet weitere Aktionen. '+100' und '*2' rechnen "
             "vom aktuellen Wert aus.",
             dim=True,
-        ).pack(anchor="w", padx=10, pady=(0, 4))
+        ).pack(anchor="w", padx=12, pady=(0, 4))
 
         self._build_quick(None)
         self.after(300, self._autoload)
@@ -308,8 +308,8 @@ class UeLiveTab(BaseTab):
             self.btn_max.pack_forget()
             return
         if target.is_bool:
-            button(self.quick, "AN", lambda: self._quick("an"), accent=True).pack(side="left", padx=1)
-            button(self.quick, "AUS", lambda: self._quick("aus")).pack(side="left", padx=1)
+            button(self.quick, "AN", lambda: self._quick("an"), accent=True).pack(side="left", padx=2)
+            button(self.quick, "AUS", lambda: self._quick("aus")).pack(side="left", padx=2)
         else:
             for txt, val in (
                 ("×2", "*2"),
@@ -320,7 +320,7 @@ class UeLiveTab(BaseTab):
                 ("0", "0"),
                 ("99999", "99999"),
             ):
-                button(self.quick, txt, lambda v=val: self._quick(v)).pack(side="left", padx=1)
+                button(self.quick, txt, lambda v=val: self._quick(v)).pack(side="left", padx=2)
         if self._companions(target):
             self.btn_max.pack(side="left", padx=2)
         else:

@@ -108,7 +108,7 @@ class UnityTab(BaseTab):
             "③ SPIEL SCANNEN - danach zeigt WERTE nur, was im Spiel wirklich existiert",
             justify="left", anchor="w",
         )
-        self.lbl.pack(fill="x", padx=10, pady=2)
+        self.lbl.pack(fill="x", padx=12, pady=2)
         self._wrap_to_width(self.lbl)
         self.info = tk.Text(self, height=4, bg=BG_CARD, fg=TEXT_DIM, font=FONT_LABEL, relief="flat", wrap="word",
                             highlightthickness=1, highlightbackground=BORDER_HVR, state="disabled")
@@ -311,7 +311,7 @@ class UnityTab(BaseTab):
         q.pack(side="bottom", fill="x", pady=2)
         label(q, "SCHNELL").pack(side="left")
         for txt, val in (("×2", "*2"), ("+100", "+100"), ("+1000", "+1000"), ("99999", "99999")):
-            button(q, txt, lambda v=val: self.set_value(v)).pack(side="left", padx=1)
+            button(q, txt, lambda v=val: self.set_value(v)).pack(side="left", padx=2)
         sc = tk.Frame(ctl, bg=BG)
         sc.pack(side="bottom", fill="x", pady=2)
         label(sc, "WIRKT AUF").pack(side="left")
@@ -369,12 +369,12 @@ class UnityTab(BaseTab):
         with_scroll(at, self.al)
         label(page, "ANGEWENDET").pack(side="bottom", anchor="w")
         act2 = tk.Frame(page, bg=BG)
-        act2.pack(side="bottom", fill="x", pady=1)
+        act2.pack(side="bottom", fill="x", pady=2)
         button(act2, "gibt Wert zurück…", lambda: self.apply_patch("value")).pack(side="left", padx=2)
         button(act2, "Methode leer machen (void)", lambda: self.apply_patch("noop")).pack(side="left", padx=2)
         label(act2, "wirkt sofort im laufenden Spiel", dim=True).pack(side="left", padx=8)
         act = tk.Frame(page, bg=BG)
-        act.pack(side="bottom", fill="x", pady=1)
+        act.pack(side="bottom", fill="x", pady=2)
         button(act, "gibt immer TRUE", lambda: self.apply_patch("true"), accent=True).pack(side="left", padx=2)
         button(act, "gibt immer FALSE", lambda: self.apply_patch("false")).pack(side="left", padx=2)
 

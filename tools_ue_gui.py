@@ -82,13 +82,13 @@ class UeTab(BaseTab):
         top.pack(fill="x", padx=8, pady=(8, 2))
         self.v = {k: tk.StringVar() for k, _t, _f in FILE_KEYS}
         self.v["game"] = tk.StringVar()
-        button(top, "SPIEL-ORDNER…", self._pick_game, accent=True).grid(row=0, column=0, sticky="we", padx=2, pady=1)
-        entry(top, self.v["game"], 70).grid(row=0, column=1, sticky="we", padx=2, pady=1)
+        button(top, "SPIEL-ORDNER…", self._pick_game, accent=True).grid(row=0, column=0, sticky="we", padx=2, pady=2)
+        entry(top, self.v["game"], 70).grid(row=0, column=1, sticky="we", padx=2, pady=2)
         for i, (k, txt, _f) in enumerate(FILE_KEYS, start=1):
             button(top, txt, self._pick_dir if k == "sdk" else (lambda k=k: self._pick_file(k))).grid(
-                row=i, column=0, sticky="we", padx=2, pady=1
+                row=i, column=0, sticky="we", padx=2, pady=2
             )
-            entry(top, self.v[k], 70).grid(row=i, column=1, sticky="we", padx=2, pady=1)
+            entry(top, self.v[k], 70).grid(row=i, column=1, sticky="we", padx=2, pady=2)
         top.grid_columnconfigure(1, weight=1)
         row = tk.Frame(self, bg=BG)
         row.pack(fill="x", padx=8, pady=2)
@@ -111,10 +111,10 @@ class UeTab(BaseTab):
             "automatisch gefunden. Ohne dump.bin gibt es Kandidaten und Funktionsliste, aber keine "
             "Instruktionssuche.",
         )
-        self.lbl.pack(anchor="w", padx=10)
+        self.lbl.pack(anchor="w", padx=12)
 
         pan = ttk.PanedWindow(self, orient="horizontal")
-        pan.pack(fill="both", expand=True, padx=8, pady=6)
+        pan.pack(fill="both", expand=True, padx=8, pady=8)
         left = tk.Frame(pan, bg=BG)
         pan.add(left, weight=2)
         label(left, "CHEAT-KANDIDATEN (SDK)").pack(anchor="w")
@@ -158,7 +158,7 @@ class UeTab(BaseTab):
         import ue_instr
 
         ttk.Combobox(bar2, textvariable=self.v_mode, values=tuple(ue_instr.RET_MODES), width=7, state="readonly").pack(
-            side="left", padx=(10, 2)
+            side="left", padx=(12, 2)
         )
         button(bar2, "FUNKTIONS-PATCH", self.func_patch).pack(side="left", padx=2)
         button(bar2, "NATIVE ADR. (live)", self.func_entry).pack(side="left", padx=2)
@@ -173,7 +173,7 @@ class UeTab(BaseTab):
             "z.B. TimeDilation=0.3 WorldContextObject=0x…  | Objekt = gewählte Instanz (Tab INSTANZEN), "
             "bei statischen Funktionen das Default-Objekt",
             dim=True,
-        ).pack(side="left", padx=6)
+        ).pack(side="left", padx=8)
         self.tf = tree(
             func_page,
             [
@@ -206,7 +206,7 @@ class UeTab(BaseTab):
         button(bar3, "→ SPEICHER", self.inst_mem).pack(side="left", padx=2)
         button(bar3, "→ SCHREIBER FINDEN", self.inst_watch).pack(side="left", padx=2)
         self.v_set = tk.StringVar()
-        entry(bar3, self.v_set, 10).pack(side="left", padx=(10, 2))
+        entry(bar3, self.v_set, 10).pack(side="left", padx=(12, 2))
         button(bar3, "WERT SETZEN", self.inst_set).pack(side="left", padx=2)
         self.ti = tree(
             live_page,

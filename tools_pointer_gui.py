@@ -22,21 +22,21 @@ class PointerTab(BaseTab):
         r1 = tk.Frame(self, bg=BG); r1.pack(fill="x", padx=8, pady=(8, 2))
         label(r1, "ZIELADRESSE").pack(side="left")
         self.v_target = tk.StringVar()
-        entry(r1, self.v_target, 20).pack(side="left", padx=(6, 12))
+        entry(r1, self.v_target, 20).pack(side="left", padx=(8, 12))
         label(r1, "TIEFE").pack(side="left")
         self.v_depth = tk.StringVar(value="4")
         ttk.Combobox(r1, textvariable=self.v_depth, values=["1", "2", "3", "4", "5", "6"],
-                     width=3, state="readonly").pack(side="left", padx=(6, 12))
+                     width=3, state="readonly").pack(side="left", padx=(8, 12))
         label(r1, "MAX. OFFSET").pack(side="left")
         self.v_off = tk.StringVar(value="0x400")
-        entry(r1, self.v_off, 8).pack(side="left", padx=(6, 12))
+        entry(r1, self.v_off, 8).pack(side="left", padx=(8, 12))
         label(r1, "STATISCH (Name)").pack(side="left")
         self.v_static = tk.StringVar(value="eboot")
-        entry(r1, self.v_static, 12).pack(side="left", padx=(6, 12))
+        entry(r1, self.v_static, 12).pack(side="left", padx=(8, 12))
         label(r1, "TYP").pack(side="left")
         self.v_type = tk.StringVar(value="Int32")
         ttk.Combobox(r1, textvariable=self.v_type, values=list(SC.VTYPES), width=8,
-                     state="readonly").pack(side="left", padx=6)
+                     state="readonly").pack(side="left", padx=8)
 
         r2 = tk.Frame(self, bg=BG); r2.pack(fill="x", padx=8, pady=2)
         button(r2, "1) KARTE ERSTELLEN", self.build, accent=True).pack(side="left", padx=2)
@@ -53,14 +53,15 @@ class PointerTab(BaseTab):
         self.lbl = label(r3, "Ablauf: 1) Karte (einmal pro Spielzustand)  2) Pfade suchen  "
                              "3) Spiel neu starten, neue Adresse suchen, hier eintragen, PRÜFEN",
                          dim=True)
-        self.lbl.pack(side="left", padx=10)
+        self.lbl.pack(side="left", padx=12)
 
         fr = tk.Frame(self, bg=BG); fr.pack(fill="both", expand=True, padx=8, pady=4)
         self.tv = tree(fr, [("p", "PFAD  (Basis+Root → Offsets)"), ("d", "TIEFE"), ("l", "LIVE-ZIEL")],
-                       [560, 60, 160], height=18)
+                       [560, 60, 160], height=18,
+                       empty="Noch keine Pfade. Erst 1) KARTE ERSTELLEN, dann 2) PFADE SUCHEN.")
         with_scroll(fr, self.tv)
 
-        r4 = tk.Frame(self, bg=BG); r4.pack(fill="x", padx=8, pady=6)
+        r4 = tk.Frame(self, bg=BG); r4.pack(fill="x", padx=8, pady=8)
         button(r4, "→ CHEAT-LISTE", self.to_list, accent=True).pack(side="left", padx=2)
         button(r4, "TOP 10 → CHEAT-LISTE", lambda: self.to_list(top=10)).pack(side="left", padx=2)
         button(r4, "LIVE AUFLÖSEN", self.live).pack(side="left", padx=(12, 2))

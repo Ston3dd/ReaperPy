@@ -6,6 +6,29 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 
 **A guided assistant from a number in the game to a finished cheat, and ReapPatch export.**
 
+### Added (look and feel of the tools window)
+- **Status lights on START.** "Connected?" and "Codes loaded?" show a green / red / grey dot instead of a ✓/✗ character in running text.
+- **CHECK CONNECTION in colour.** Each step of the result is green (ok), red (problem), yellow (note) or grey (skipped); the explanation sits
+  indented under the failed step.
+- **Buttons that need the console are greyed out while the main window is not connected** (READ, WRITE, DISASM, TEST ON, FIRST SCAN, WATCH,
+  debugger and live-game buttons ...); the tooltip says why. They unlock by themselves when you press CONNECT: the tools window now follows the
+  main window and **reconnects automatically** (before, you had to reopen it). File and export buttons are never greyed out. The list is
+  `tools_ui.NET_BUTTONS`; a test checks that every name in it still exists.
+- **Tooltips for technical terms** (OFFSET (from image base), OriginReturn, SIGNATURE, PATTERN, CAVE CODE, NOP, SNAPSHOT, UPDATE SCAN, WATCHPOINT,
+  pointer depth ...): hover for a moment, German and English. Labels with an explanation show a question-mark cursor; EDIT CHEATS has small "?"
+  chips next to OFFSET, OriginReturn, CAVE CODE and SIGNATURE.
+- **Empty tables explain what to do** ("No hits yet. Enter a value and click FIRST SCAN.") in the scanner, the address list, the assistant, the
+  pointer tab and the pattern search; the hint disappears with the first row.
+- **"working ..." indicator** with a thin progress bar in the tools window header while a background job runs (shown after 0.25 s so short
+  jobs do not flicker).
+- **Keyboard:** buttons show a bright focus ring when reached with the Tab key, and Return presses the focused button (before: only Space).
+
+### Changed
+- Explanation texts (START, ASSISTANT, the hint line in EDIT CHEATS, tooltips) use a proportional font (Segoe UI); Consolas stays for addresses,
+  bytes and code (`FONT_TEXT` in `tools_common.py`).
+- **One spacing scale.** All `padx` / `pady` values in the tools windows now come from 0, 2, 4, 8, 12 and 16 px (before: 1, 3, 5, 6, 7, 10, 14,
+  18 ... mixed). A test keeps it that way. Gaps change by at most 2 px.
+
 ### Fixed
 - **OriginReturn was a fixed 8 unless the disassembler filled it.** A cave written by hand (or loaded without the value) returned to the wrong
   place whenever the overwritten instructions did not end exactly at byte 8 - the game then crashed or ran garbage. The field is now **empty =

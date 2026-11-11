@@ -11,7 +11,12 @@ from tkinter import messagebox
 
 import conncheck
 import tools_i18n
-from tools_common import ACCENT, BG, BG_CARD, FONT_HEAD, FONT_LABEL, TEXT, TEXT_DIM, BaseTab, button
+import tools_ui
+from tools_common import (ACCENT, BG, BG_CARD, ERROR, FONT_HEAD, FONT_LABEL, FONT_TEXT, OK, TEXT, TEXT_DIM, TEXT_DIM2, WARN, BaseTab,
+                          button)
+
+# Ampel-Farben der Statuszeilen
+STATE_COLOR = {"ok": OK, "fail": ERROR, "warn": WARN, "info": TEXT_DIM2}
 
 STEPS = [
     ("1", "Spiel verbinden",
@@ -59,36 +64,45 @@ class StartTab(BaseTab):
         self.buttons = {}
         self._checking = False
         self._check_steps = None            # letztes Ergebnis der Pruefung
-        tk.Label(self, text="▸  WILLKOMMEN BEI REAPERPY", bg=BG, fg=ACCENT, font=FONT_HEAD).pack(anchor="w", padx=16, pady=(14, 2))
+        tk.Label(self, text="▸  WILLKOMMEN BEI REAPERPY", bg=BG, fg=ACCENT, font=FONT_HEAD).pack(anchor="w", padx=16, pady=(16, 2))
         tk.Label(self, text="In drei Schritten zum eigenen Cheat - ohne Vorkenntnisse.", bg=BG, fg=TEXT_DIM,
-                 font=FONT_LABEL).pack(anchor="w", padx=16)
+                 font=FONT_TEXT).pack(anchor="w", padx=16)
         box = tk.Frame(self, bg=BG_CARD)
-        box.pack(fill="x", padx=16, pady=10)
-        tk.Label(box, textvariable=self.v_status, bg=BG_CARD, fg=TEXT, font=FONT_LABEL, justify="left",
-                 anchor="w").pack(fill="x", padx=12, pady=(8, 2))
+        box.pack(fill="x", padx=16, pady=12)
+        self._dots = []                                     # (Punkt, Text) je Statuszeile
+        for _i in range(2):
+            line = tk.Frame(box, bg=BG_CARD)
+            line.pack(fill="x", padx=12, pady=(8 if _i == 0 else 2, 0))
+            dot = tk.Label(line, text="●", bg=BG_CARD, fg=TEXT_DIM2, font=FONT_TEXT)
+            dot.pack(side="left")
+            txt = tk.Label(line, text="", bg=BG_CARD, fg=TEXT, font=FONT_TEXT, justify="left", anchor="w")
+            txt.pack(side="left", padx=8, fill="x", expand=True)
+            self._dots.append((dot, txt))
         row = tk.Frame(box, bg=BG_CARD)
-        row.pack(fill="x", padx=12, pady=(0, 4))
+        row.pack(fill="x", padx=12, pady=(8, 4))
         self.btn_check = button(row, "VERBINDUNG PRÜFEN", self.run_check, accent=True)
         self.btn_check.pack(side="left")
         tk.Label(row, text="Prüft IP, PS5, Payload und Spiel - ohne etwas zu verändern.", bg=BG_CARD, fg=TEXT_DIM,
-                 font=FONT_LABEL).pack(side="left", padx=10)
-        tk.Label(box, textvariable=self.v_check, bg=BG_CARD, fg=TEXT, font=FONT_LABEL, justify="left",
-                 anchor="w", wraplength=780).pack(fill="x", padx=12, pady=(0, 8))
+                 font=FONT_TEXT).pack(side="left", padx=12)
+        self.txt_check = tk.Text(box, height=1, wrap="word", bg=BG_CARD, fg=TEXT, font=FONT_TEXT, relief="flat",
+                                 bd=0, highlightthickness=0, cursor="arrow", padx=0, pady=0)
+        self.txt_check.pack(fill="x", padx=12, pady=(0, 8))
+        self.txt_check.configure(state="disabled")
         for num, title, text, btn, target in STEPS:
             self._card(num, title, text, btn, target)
-        tk.Label(self, text="Mehr", bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(anchor="w", padx=16, pady=(10, 0))
+        tk.Label(self, text="Mehr", bg=BG, fg=TEXT_DIM, font=FONT_TEXT).pack(anchor="w", padx=16, pady=(12, 0))
         for title, text, btn, target in EXTRAS:
             self._card("•", title, text, btn, target)
-        tk.Label(self, text=HINT, bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(anchor="w", padx=16, pady=(12, 0))
+        tk.Label(self, text=HINT, bg=BG, fg=TEXT_DIM, font=FONT_TEXT).pack(anchor="w", padx=16, pady=(12, 0))
         # Notizen je Spiel (Spiel-Profil)
         head = tk.Frame(self, bg=BG)
         head.pack(fill="x", padx=16, pady=(12, 0))
-        tk.Label(head, text="Notizen zu diesem Spiel", bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(side="left")
+        tk.Label(head, text="Notizen zu diesem Spiel", bg=BG, fg=TEXT_DIM, font=FONT_TEXT).pack(side="left")
         self.v_prof = tk.StringVar(value="")
-        tk.Label(head, textvariable=self.v_prof, bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(side="left", padx=10)
+        tk.Label(head, textvariable=self.v_prof, bg=BG, fg=TEXT_DIM, font=FONT_TEXT).pack(side="left", padx=12)
         button(head, "LOG-ORDNER ÖFFNEN", self.open_logs).pack(side="right")
-        button(head, "AUF UPDATES PRÜFEN", self.check_updates).pack(side="right", padx=6)
-        button(head, "NOTIZEN SPEICHERN", self.save_notes).pack(side="right", padx=6)
+        button(head, "AUF UPDATES PRÜFEN", self.check_updates).pack(side="right", padx=8)
+        button(head, "NOTIZEN SPEICHERN", self.save_notes).pack(side="right", padx=8)
         self.notes = tk.Text(self, height=5, wrap="word", bg=BG_CARD, fg=TEXT, insertbackground=TEXT, relief="flat", font=FONT_LABEL)
         self.notes.pack(fill="x", padx=16, pady=(4, 8))
         self.notes.bind("<FocusOut>", lambda _e: self.save_notes(quiet=True))
@@ -98,15 +112,15 @@ class StartTab(BaseTab):
 
     def _card(self, num, title, text, btn, target):
         row = tk.Frame(self, bg=BG_CARD)
-        row.pack(fill="x", padx=16, pady=3)
+        row.pack(fill="x", padx=16, pady=4)
         tk.Label(row, text=num, bg=BG_CARD, fg=ACCENT, font=FONT_HEAD, width=3).pack(side="left", padx=4)
         mid = tk.Frame(row, bg=BG_CARD)
-        mid.pack(side="left", fill="x", expand=True, pady=6)
+        mid.pack(side="left", fill="x", expand=True, pady=8)
         tk.Label(mid, text=title, bg=BG_CARD, fg=TEXT, font=FONT_HEAD, anchor="w").pack(fill="x")
-        tk.Label(mid, text=text, bg=BG_CARD, fg=TEXT_DIM, font=FONT_LABEL, anchor="w", justify="left",
+        tk.Label(mid, text=text, bg=BG_CARD, fg=TEXT_DIM, font=FONT_TEXT, anchor="w", justify="left",
                  wraplength=720).pack(fill="x")
         b = button(row, btn, lambda t=target: self.go(t), accent=True)
-        b.pack(side="right", padx=10)
+        b.pack(side="right", padx=12)
         self.buttons[target] = b
 
     # ------------------------------------------------------------------
@@ -149,6 +163,7 @@ class StartTab(BaseTab):
         self._checking = True
         self._check_steps = None
         self.v_check.set("Prüfe die Verbindung ...")
+        tools_ui.paint_message(self.txt_check, "info", tools_i18n.translate("Prüfe die Verbindung ..."))
         self.win.bg(lambda: conncheck.diagnose(host, port, process_name=proc, lang=lang),
                     self._check_done, self._check_failed, lock=False)
 
@@ -156,28 +171,41 @@ class StartTab(BaseTab):
         self._checking = False
         self._check_steps = steps
         self.v_check.set(conncheck.render(steps, tools_i18n.lang()))
+        tools_ui.paint_steps(self.txt_check, steps)
 
     def _check_failed(self, exc):
         self._checking = False
         self.v_check.set(f"{type(exc).__name__}: {exc}")
+        tools_ui.paint_message(self.txt_check, "fail", f"{type(exc).__name__}: {exc}")
 
-    def status_text(self):
-        """Klartext-Status (rein lesend)."""
+    def status_items(self):
+        # Klartext-Status als Ampel: [(zustand, text)], zustand = ok | fail | info (rein lesend).  Die Texte tragen
+        # weiter das Zeichen (✓ / ✗ / •) - so passen die vorhandenen englischen Eintraege, und status_text() bleibt gleich.
         app = self.win.app
         be = app.backend
         if not getattr(be, "client", None) or be.pid is None:
-            conn = "✗  Nicht verbunden - im Hauptfenster auf VERBINDEN klicken."
+            conn = ("fail", "✗  Nicht verbunden - im Hauptfenster auf VERBINDEN klicken.")
         else:
-            conn = f"✓  Verbunden mit der PS5 (Spiel-Prozess {be.pid})."
+            conn = ("ok", f"✓  Verbunden mit der PS5 (Spiel-Prozess {be.pid}).")
         proj = getattr(app, "current_project", None)
         n = len(getattr(app, "patches", {}) or {})
         if proj and n:
-            codes = f"✓  Codes: {n} für „{proj}“ geladen."
+            codes = ("ok", f"✓  Codes: {n} für „{proj}“ geladen.")
         elif proj:
-            codes = f"•  Projekt „{proj}“ ist offen, enthält aber keine Codes."
+            codes = ("info", f"•  Projekt „{proj}“ ist offen, enthält aber keine Codes.")
         else:
-            codes = "•  Keine Codes geladen (das Spiel hat keine oder es ist noch nichts gewählt)."
-        return conn + "\n" + codes
+            codes = ("info", "•  Keine Codes geladen (das Spiel hat keine oder es ist noch nichts gewählt).")
+        return [conn, codes]
+
+    def status_text(self):
+        # dieselben Zeilen als Text (mit ✓ / ✗ / •)
+        return "\n".join(t for _s, t in self.status_items())
+
+    def _paint_status(self):
+        for (dot, txt), (state, text) in zip(self._dots, self.status_items()):
+            dot.configure(fg=STATE_COLOR.get(state, TEXT_DIM2))
+            shown = tools_i18n.translate(text).lstrip("✓✗•! ")      # das Zeichen ersetzt der farbige Punkt
+            txt.configure(text=shown)
 
     def _gp(self):
         return getattr(self.win.app, "gp", None)
@@ -245,6 +273,7 @@ class StartTab(BaseTab):
     def refresh(self):
         try:
             self.v_status.set(self.status_text())
+            self._paint_status()
             self.load_notes()
         except Exception:  # noqa: BLE001
             pass

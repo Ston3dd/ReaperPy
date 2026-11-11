@@ -67,10 +67,10 @@ class ItemsTab(BaseTab):
         self.results = {}                                 # Item-Index -> item_check.Result
         self.diag = ""                                    # Zaehlerstand der Filter (fuer "nichts gefunden")
 
-        tk.Label(self, text="▸  ITEMS  →  TRAINER", bg=BG, fg=ACCENT, font=FONT_HEAD).pack(anchor="w", padx=14,
-                                                                                         pady=(10, 0))
+        tk.Label(self, text="▸  ITEMS  →  TRAINER", bg=BG, fg=ACCENT, font=FONT_HEAD).pack(anchor="w", padx=16,
+                                                                                         pady=(12, 0))
         tk.Label(self, text="Alle Items deines Unreal-Spiels als fertiger Trainer - in drei Schritten, ohne "
-                            "Vorkenntnisse.", bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(anchor="w", padx=14, pady=(0, 6))
+                            "Vorkenntnisse.", bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(anchor="w", padx=16, pady=(0, 8))
         self._build_step1()
         self._build_step3()
         self._build_step2()
@@ -83,7 +83,7 @@ class ItemsTab(BaseTab):
     # ------------------------------------------------------------------
     def _build_step1(self):
         outer, body, _h = card(self, "①  SPIEL")
-        outer.pack(fill="x", padx=12, pady=(0, 6))
+        outer.pack(fill="x", padx=12, pady=(0, 8))
         row = tk.Frame(body, bg=BG_CARD)
         row.pack(fill="x")
         self.lbl_game = tk.Label(row, text="", bg=BG_CARD, fg=TEXT, font=FONT_LABEL, anchor="w", justify="left")
@@ -94,15 +94,15 @@ class ItemsTab(BaseTab):
 
     def _build_step2(self):
         outer, body, _h = card(self, "②  ITEMS FINDEN")
-        outer.pack(fill="both", expand=True, padx=12, pady=(0, 6))
+        outer.pack(fill="both", expand=True, padx=12, pady=(0, 8))
         top = tk.Frame(body, bg=BG_CARD)
         top.pack(fill="x")
         self.b_find = pbtn(top, "🔎  ITEMS FINDEN", self.find_items, primary=True)
         self.b_find.pack(side="left")
         self.b_one = pbtn(top, "🧪  1 ITEM TESTEN", self.test_item)
-        self.b_one.pack(side="left", padx=(6, 0))
+        self.b_one.pack(side="left", padx=(8, 0))
         self.b_live = pbtn(top, "⚡  JETZT GEBEN", self.give_live)
-        self.b_live.pack(side="left", padx=(6, 0))
+        self.b_live.pack(side="left", padx=(8, 0))
         self.b_expand = pbtn(top, "📦  INVENTAR AUF MAX", self.expand_inventory)      # nur sichtbar, wenn das Spiel so etwas anbietet
         self.lbl_found = tk.Label(top, text="Klicke ITEMS FINDEN - alles Weitere passiert automatisch.", bg=BG_CARD,
                                   fg=TEXT_DIM, font=FONT_LABEL, anchor="w", justify="left", wraplength=820)
@@ -118,11 +118,11 @@ class ItemsTab(BaseTab):
         sel = self.sel
         clabel(sel, "Item-Liste").pack(side="left")
         self.cb_table = ttk.Combobox(sel, textvariable=self.v_table, values=[], width=30, state="readonly")
-        self.cb_table.pack(side="left", padx=(6, 12))
+        self.cb_table.pack(side="left", padx=(8, 12))
         self.cb_table.bind("<<ComboboxSelected>>", lambda _e: self.pick_table())
         clabel(sel, "Geben-Funktion").pack(side="left")
         self.cb_func = ttk.Combobox(sel, textvariable=self.v_func, values=[], width=52, state="readonly")
-        self.cb_func.pack(side="left", padx=6)
+        self.cb_func.pack(side="left", padx=8)
         self.cb_func.bind("<<ComboboxSelected>>", lambda _e: self.pick_func())
         self.chk_all = _check(sel, "auch unpassende zeigen", self.v_all)
         self.chk_all.configure(command=self._fill_choices)
@@ -139,11 +139,11 @@ class ItemsTab(BaseTab):
         flt.pack(fill="x", pady=(8, 4))
         clabel(flt, "Suche").pack(side="left")
         q = entry(flt, self.v_q, 22)
-        q.pack(side="left", padx=(6, 12))
+        q.pack(side="left", padx=(8, 12))
         q.bind("<KeyRelease>", lambda _e: self.fill())
         clabel(flt, "Kategorie").pack(side="left")
         self.cb_cat = ttk.Combobox(flt, textvariable=self.v_cat, values=[ALL_CATS], width=22, state="readonly")
-        self.cb_cat.pack(side="left", padx=(6, 12))
+        self.cb_cat.pack(side="left", padx=(8, 12))
         self.cb_cat.bind("<<ComboboxSelected>>", lambda _e: self.fill())
         pbtn(flt, "ALLE AN", lambda: self.set_visible(True)).pack(side="left")
         pbtn(flt, "ALLE AUS", lambda: self.set_visible(False)).pack(side="left", padx=4)
@@ -175,7 +175,7 @@ class ItemsTab(BaseTab):
         row.pack(fill="x")
         clabel(row, "Menge je Item").pack(side="left")
         e = entry(row, self.v_amount, 8)
-        e.pack(side="left", padx=(6, 12))
+        e.pack(side="left", padx=(8, 12))
         e.bind("<KeyRelease>", lambda _e: self.update_summary())
         self.chk_fresh = _check(row, "Neu beginnen (nichts Gespeichertes übernehmen)", self.v_fresh)
         self.chk_fresh.pack(side="left", padx=(0, 12))
@@ -183,11 +183,11 @@ class ItemsTab(BaseTab):
         self.lbl_plan.pack(side="left", fill="x", expand=True)
         self.b_save = pbtn(row, "💾  TRAINER SPEICHERN", self.save, primary=True)
         self.b_save.pack(side="right")
-        pbtn(row, "ORDNER ÖFFNEN", self.open_folder).pack(side="right", padx=6)
+        pbtn(row, "ORDNER ÖFFNEN", self.open_folder).pack(side="right", padx=8)
         pbtn(row, "TRAINER PRÜFEN / ANPASSEN …", self.check_trainer).pack(side="right")
         self.lbl_done = tk.Label(body, text="", bg=BG_CARD, fg=TEXT_DIM, font=FONT_LABEL, anchor="w", justify="left",
                                  wraplength=1100)
-        self.lbl_done.pack(fill="x", pady=(6, 0))
+        self.lbl_done.pack(fill="x", pady=(8, 0))
 
     # ------------------------------------------------------------------
     # Schritt 1: Spiel
@@ -393,7 +393,7 @@ class ItemsTab(BaseTab):
     def _update_expand(self):
         """Den Max-Level-Knopf nur zeigen, wenn das Spiel eine passende Funktion hat."""
         if self.expand_funcs:
-            self.b_expand.pack(side="left", padx=(6, 0), after=self.b_live)
+            self.b_expand.pack(side="left", padx=(8, 0), after=self.b_live)
         else:
             self.b_expand.pack_forget()
 

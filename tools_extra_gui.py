@@ -33,23 +33,23 @@ class CallerTab(BaseTab):
         top = tk.Frame(self, bg=BG); top.pack(fill="x", padx=8, pady=(8, 2))
         label(top, "FUNKTION").pack(side="left")
         self.v_fn = tk.StringVar(value="base+")
-        e = entry(top, self.v_fn, 26); e.pack(side="left", padx=6)
+        e = entry(top, self.v_fn, 26); e.pack(side="left", padx=8)
         e.bind("<Return>", lambda _e: self.run())
         self.v_safe = tk.BooleanVar(value=True)
-        _chk(top, "Trampolin (sicher)", self.v_safe).pack(side="left", padx=6)
+        _chk(top, "Trampolin (sicher)", self.v_safe).pack(side="left", padx=8)
         button(top, "AUFRUFEN", self.run, accent=True).pack(side="left", padx=4)
         button(top, "→ DISASM", self._to_dis).pack(side="right")
 
         grid = tk.Frame(self, bg=BG); grid.pack(fill="x", padx=8, pady=2)
         self.v_args = []
         for i, reg in enumerate(("rdi", "rsi", "rdx", "rcx", "r8", "r9")):
-            label(grid, reg.upper()).grid(row=i // 3, column=(i % 3) * 2, sticky="e", padx=(6, 2), pady=2)
+            label(grid, reg.upper()).grid(row=i // 3, column=(i % 3) * 2, sticky="e", padx=(8, 2), pady=2)
             v = tk.StringVar(value="0"); self.v_args.append(v)
             entry(grid, v, 24).grid(row=i // 3, column=(i % 3) * 2 + 1, padx=2, pady=2)
         label(self, "Argumente: 0x1234 | 123 | -5 | base+0x10 | @puffer | @puffer+8 | \"Text\"   "
-                    "(Float-Argumente gehen nicht - nur Ganzzahl-Register)").pack(anchor="w", padx=14)
+                    "(Float-Argumente gehen nicht - nur Ganzzahl-Register)").pack(anchor="w", padx=16)
 
-        mid = tk.Frame(self, bg=BG); mid.pack(fill="both", expand=True, padx=8, pady=6)
+        mid = tk.Frame(self, bg=BG); mid.pack(fill="both", expand=True, padx=8, pady=8)
         left = tk.Frame(mid, bg=BG); left.pack(side="left", fill="both", expand=True)
         label(left, "ERGEBNIS (RAX)").pack(anchor="w")
         self.out = textbox(left, height=12, width=60)
@@ -75,7 +75,7 @@ class CallerTab(BaseTab):
         button(row3, "→ SPEICHER", self.buf_goto).pack(side="left", padx=2)
         button(row3, "ALLE FREIGEBEN", self.buf_free).pack(side="left", padx=2)
         label(right, "Aufruf haelt einen Spiel-Thread kurz an.\nNICHT parallel zum Debugger\n"
-                     "benutzen, wenn das Spiel angehalten ist.", dim=True).pack(anchor="w", pady=6)
+                     "benutzen, wenn das Spiel angehalten ist.", dim=True).pack(anchor="w", pady=8)
 
     # ---- Hilfen ----
     def _bufs(self):
@@ -201,22 +201,22 @@ class LoggerTab(BaseTab):
         top = tk.Frame(self, bg=BG); top.pack(fill="x", padx=8, pady=(8, 2))
         label(top, "FUNKTION").pack(side="left")
         self.v_fn = tk.StringVar(value="base+")
-        entry(top, self.v_fn, 24).pack(side="left", padx=6)
+        entry(top, self.v_fn, 24).pack(side="left", padx=8)
         label(top, "RING").pack(side="left")
         self.v_ring = tk.StringVar(value="1024")
         ttk.Combobox(top, textvariable=self.v_ring, values=("256", "1024", "4096"), width=6,
                      state="readonly").pack(side="left", padx=4)
         self.v_thr = tk.BooleanVar(value=False)
-        _chk(top, "Thread-ID", self.v_thr).pack(side="left", padx=6)
+        _chk(top, "Thread-ID", self.v_thr).pack(side="left", padx=8)
         self.b_start = button(top, "▶ START", self.start, accent=True); self.b_start.pack(side="left", padx=2)
         self.b_stop = button(top, "■ STOP", self.stop); self.b_stop.pack(side="left", padx=2)
         button(top, "LEEREN", self.clear).pack(side="left", padx=2)
         button(top, "CSV…", self.export).pack(side="right")
         self.lbl = label(self, "Aus. Hook: erste ≥8 Byte der Funktion werden durch einen Sprung ersetzt, "
                                "STOP stellt sie zurueck.")
-        self.lbl.pack(anchor="w", padx=10)
+        self.lbl.pack(anchor="w", padx=12)
 
-        pan = ttk.PanedWindow(self, orient="horizontal"); pan.pack(fill="both", expand=True, padx=8, pady=6)
+        pan = ttk.PanedWindow(self, orient="horizontal"); pan.pack(fill="both", expand=True, padx=8, pady=8)
         lf = tk.Frame(pan, bg=BG); pan.add(lf, weight=3)
         cols = [("n", "#"), ("ret", "RUECKSPRUNG"), ("rdi", "RDI"), ("rsi", "RSI"), ("rdx", "RDX"),
                 ("rcx", "RCX"), ("r8", "R8"), ("r9", "R9"), ("th", "THREAD")]
@@ -354,8 +354,8 @@ class JournalTab(BaseTab):
         button(top, "ALLES ZURUECK", self.undo_all).pack(side="left", padx=2)
         button(top, "LEEREN", lambda: (self.j.clear(), self.refresh())).pack(side="left", padx=2)
         label(self, "Jeder Schreibzugriff der Werkzeuge (Hex-Editor, Searcher, Skripte, Aufrufe ...) wird mit den "
-                    "alten Bytes gemerkt. Freeze-Ticks und Schreibzugriffe > 64 KB nicht.").pack(anchor="w", padx=10)
-        box = tk.Frame(self, bg=BG); box.pack(fill="both", expand=True, padx=8, pady=6)
+                    "alten Bytes gemerkt. Freeze-Ticks und Schreibzugriffe > 64 KB nicht.").pack(anchor="w", padx=12)
+        box = tk.Frame(self, bg=BG); box.pack(fill="both", expand=True, padx=8, pady=8)
         self.tv = tree(box, [("t", "ZEIT"), ("a", "ADRESSE"), ("n", "LAENGE"), ("o", "ALT"), ("w", "NEU"),
                              ("s", "QUELLE")], [80, 130, 60, 200, 200, 120], height=20)
         with_scroll(box, self.tv)

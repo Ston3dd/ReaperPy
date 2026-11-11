@@ -10,7 +10,7 @@ class UniversalAnalyzerTab(tk.Frame):
         top=tk.Frame(self,bg=BG);top.pack(fill='x',padx=8,pady=8)
         label(top,'DUMP / SDK').pack(side='left')
         self.path=tk.StringVar()
-        tk.Entry(top,textvariable=self.path,bg=BG_CARD,fg=TEXT,insertbackground=TEXT,width=62,relief='flat').pack(side='left',fill='x',expand=True,padx=6,ipady=5)
+        tk.Entry(top,textvariable=self.path,bg=BG_CARD,fg=TEXT,insertbackground=TEXT,width=62,relief='flat').pack(side='left',fill='x',expand=True,padx=8,ipady=5)
         button(top,'ORDNER…',self.pick_folder).pack(side='left',padx=2)
         button(top,'ZIP…',self.pick_zip).pack(side='left',padx=2)
         button(top,'SCAN / FORTSETZEN',self.scan,accent=True).pack(side='left',padx=2)
@@ -22,7 +22,7 @@ class UniversalAnalyzerTab(tk.Frame):
         button(row,'JSON EXPORT',self.save_json).pack(side='right',padx=2)
         button(row,'CSV EXPORT',self.save_csv).pack(side='right',padx=2)
         self.progress=ttk.Progressbar(self,mode='determinate',maximum=100)
-        self.progress.pack(fill='x',padx=8,pady=(3,0))
+        self.progress.pack(fill='x',padx=8,pady=(4, 0))
         cols=[('score','PRIO'),('status','STATUS'),('category','KATEGORIE'),('kind','TYP'),('class_context','KLASSE'),('file','DATEI'),('line','ZEILE'),('symbol','TREFFER / SIGNATUR')]
         self.tbl=ttk.Treeview(self,columns=[x[0] for x in cols],show='headings',height=19)
         for key,title in cols:self.tbl.heading(key,text=title);self.tbl.column(key,width={'score':50,'status':175,'category':185,'kind':145,'class_context':190,'file':230,'line':55,'symbol':430}[key],anchor='w')

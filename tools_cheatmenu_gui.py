@@ -46,7 +46,7 @@ class CheatMenuTab(BaseTab):
         label(self, "", dim=False)
         self.lbl_info = label(self, "", dim=False)
         self.lbl_info.configure(textvariable=self.v_info)
-        self.lbl_info.pack(anchor="w", padx=10)
+        self.lbl_info.pack(anchor="w", padx=12)
 
         mid = tk.Frame(self, bg=BG)
         mid.pack(fill="both", expand=True, padx=8, pady=4)
@@ -66,15 +66,15 @@ class CheatMenuTab(BaseTab):
         label(bar, "  Wert").pack(side="left")
         entry(bar, self.v_val, 12).pack(side="left", padx=4)
         button(bar, "WERT SETZEN", self.set_value).pack(side="left", padx=2)
-        button(bar, "CODE CAVE BAUEN", self.cave_auto).pack(side="left", padx=(14, 2))
+        button(bar, "CODE CAVE BAUEN", self.cave_auto).pack(side="left", padx=(16, 2))
         button(bar, "CAVE: TREFFER WÄHLEN", self.cave_pick).pack(side="left", padx=2)
         tk.Checkbutton(bar, text="festhalten", variable=self.v_hold, bg=BG, fg=TEXT_DIM, selectcolor=BG,
                        activebackground=BG).pack(side="left", padx=8)
         self.lbl_note = label(self, "", dim=True)
         self.lbl_note.configure(textvariable=self.v_note, justify="left", wraplength=900)
-        self.lbl_note.pack(anchor="w", padx=10, pady=(4, 8))
+        self.lbl_note.pack(anchor="w", padx=12, pady=(4, 8))
         label(self, "Alles sind Speicherwerte der Figur - kein CheatManager, kein Code-Patch. Wechselt die Figur "
-                    "(Tod/Ladebildschirm), werden alle Eintraege automatisch freigegeben.", dim=True).pack(anchor="w", padx=10)
+                    "(Tod/Ladebildschirm), werden alle Eintraege automatisch freigegeben.", dim=True).pack(anchor="w", padx=12)
         self._n = 0
         self.after(TICK_MS, self._tick)
 
@@ -439,12 +439,12 @@ class CavePickDialog(tk.Toplevel):
         self._rev = {text: key for key, text in CV.MODE_TEXT.items()}
 
         label(self, f"{len(opts)} Instruktion(en) im Spiel-Code schreiben diesen Wert: {e.label}", dim=False
-              ).pack(anchor="w", padx=12, pady=(10, 2))
+              ).pack(anchor="w", padx=12, pady=(12, 2))
         label(self, "Treffer wählen, Art der Cave einstellen, CAVE BAUEN. Die oberste Zeile passt am wahrscheinlichsten. "
                     "Die Cave gilt für ALLE Objekte, die diesen Code benutzen (auch Gegner).", dim=True
               ).pack(anchor="w", padx=12)
         mid = tk.Frame(self, bg=BG)
-        mid.pack(fill="both", expand=True, padx=12, pady=6)
+        mid.pack(fill="both", expand=True, padx=12, pady=8)
         self.tv = tree(mid, [("score", "SCORE"), ("rva", "ADRESSE"), ("insn", "INSTRUKTION"), ("can", "CAVE MÖGLICH"),
                              ("note", "HINWEIS")], [60, 90, 330, 230, 170], height=14)
         with_scroll(mid, self.tv)
@@ -461,13 +461,13 @@ class CavePickDialog(tk.Toplevel):
         label(bar, "Art").pack(side="left")
         self.cb = ttk.Combobox(bar, textvariable=self.v_mode, values=tuple(CV.MODE_TEXT.values()), width=34,
                                state="readonly")
-        self.cb.pack(side="left", padx=6)
-        label(bar, "Wert (nur bei 'festschreiben')").pack(side="left", padx=(10, 0))
-        entry(bar, self.v_value, 10).pack(side="left", padx=6)
+        self.cb.pack(side="left", padx=8)
+        label(bar, "Wert (nur bei 'festschreiben')").pack(side="left", padx=(12, 0))
+        entry(bar, self.v_value, 10).pack(side="left", padx=8)
         self.lbl = label(self, "", dim=True)
         self.lbl.pack(anchor="w", padx=12)
         bar2 = tk.Frame(self, bg=BG)
-        bar2.pack(fill="x", padx=12, pady=(4, 10))
+        bar2.pack(fill="x", padx=12, pady=(4, 12))
         button(bar2, "CAVE BAUEN", self.build, accent=True).pack(side="left", padx=2)
         button(bar2, "IM DISASSEMBLER ZEIGEN", self.goto).pack(side="left", padx=2)
         button(bar2, "SCHLIESSEN", self.destroy).pack(side="right", padx=2)

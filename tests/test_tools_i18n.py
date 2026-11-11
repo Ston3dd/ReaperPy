@@ -349,6 +349,70 @@ class StartTabAndNavigation(unittest.TestCase):
         t, *_ = self.make_start(project="Leer", n=0)
         self.assertIn("enthält aber keine Codes", t.status_text())
 
+    class _Rec:
+        """Merkt sich configure(...) - Ersatz fuer ein Label."""
+        def __init__(self):
+            self.opts = {}
+
+        def configure(self, **kw):
+            self.opts.update(kw)
+
+    def test_status_lights_follow_the_state(self):
+        import tools_common as TC
+        t, _s, _l = self.make_start()
+        t._dots = [(self._Rec(), self._Rec()), (self._Rec(), self._Rec())]
+        t._paint_status()
+        self.assertEqual([d.opts["fg"] for d, _x in t._dots], [TC.OK, TC.OK])               # verbunden, Codes da: zweimal gruen
+        self.assertIn("Verbunden mit der PS5", t._dots[0][1].opts["text"])
+        self.assertFalse(t._dots[0][1].opts["text"].startswith(("✓", "✗", "•")))            # das Zeichen ersetzt der Punkt
+        t, *_ = self.make_start(connected=False, project=None, n=0)
+        t._dots = [(self._Rec(), self._Rec()), (self._Rec(), self._Rec())]
+        t._paint_status()
+        self.assertEqual([d.opts["fg"] for d, _x in t._dots], [TC.ERROR, TC.TEXT_DIM2])     # rot, grau
+        self.assertIn("Nicht verbunden", t._dots[0][1].opts["text"])
+
+    def test_status_lights_in_english(self):
+        t, _s, _l = self.make_start(connected=False, project=None, n=0)
+        t._dots = [(self._Rec(), self._Rec()), (self._Rec(), self._Rec())]
+        with Lang("en"):
+            t._paint_status()
+        self.assertEqual(t._dots[0][1].opts["text"], "Not connected - click CONNECT in the main window.")
+
+    def test_check_result_is_painted_in_colours(self):
+        import conncheck
+        import tools_common as TC
+        t, _s, _l = self.make_start(connected=False)
+        painted = {"tags": {}, "parts": []}
+
+        class Txt:
+            def configure(self, **k):
+                pass
+
+            def delete(self, a, b):
+                painted["parts"].clear()
+
+            def insert(self, i, text, tags=()):
+                painted["parts"].append((text, tuple(tags)))
+
+            def tag_configure(self, name, **kw):
+                painted["tags"][name] = kw
+        t.txt_check = Txt()
+        t.win.app.ip_var = types.SimpleNamespace(get=lambda: "192.168.1.20")
+        t.win.app.port_var = types.SimpleNamespace(get=lambda: "744")
+        t.win.app.backend.process_name = "eboot.bin"
+        t.win.bg = lambda fn, ok=None, err=None, lock=True: ok(fn())
+        old = conncheck.diagnose
+        conncheck.diagnose = lambda host, port, **kw: [conncheck.Step("ok", "Adresse"),
+                                                        conncheck.Step("fail", "PS5 erreichbar", "Keine Antwort")]
+        try:
+            t.run_check()
+        finally:
+            conncheck.diagnose = old
+        self.assertEqual(painted["tags"]["ok"]["foreground"], TC.OK)
+        self.assertEqual(painted["tags"]["fail"]["foreground"], TC.ERROR)
+        self.assertIn(("✗  ", ("fail",)), painted["parts"])
+        self.assertIn(("✓  ", ("ok",)), painted["parts"])
+
     def test_buttons_lead_to_the_right_tabs(self):
         t, shown, logs = self.make_start()
         for target, expect in (("scan_tab", "SCAN"), ("t_cheat", "CHEAT"), ("discover_tab", "DISC"), ("adv_frame", "ADV")):

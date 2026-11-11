@@ -4,6 +4,13 @@ Wird am Ende von tools_i18n_en.py in EN eingemischt. Schluessel = deutscher Text
 """
 
 EN_MORE = {
+    'Noch keine Treffer. Gib oben die Zahl ein und klicke SUCHEN.': 'No hits yet. Enter the number above and click SEARCH.',
+    'Noch nichts beobachtet. Klicke BEOBACHTEN und ändere den Wert im Spiel.': 'Nothing watched yet. Click WATCH and change the value in the game.',
+    'Noch keine Treffer. Gib einen Wert ein und klicke ERSTER SCAN.': 'No hits yet. Enter a value and click FIRST SCAN.',
+    'Die Adressliste ist leer. Rechtsklick auf einen Treffer → Zur Adressliste hinzufügen.': 'The address list is empty. Right-click a hit → Add to address list.',
+    'Noch keine Pfade. Erst 1) KARTE ERSTELLEN, dann 2) PFADE SUCHEN.': 'No paths yet. First 1) CREATE MAP, then 2) FIND PATHS.',
+    'Noch keine Treffer. Gib ein MUSTER ein und klicke SERVER-SCAN.': 'No hits yet. Enter a PATTERN and click SERVER SCAN.',
+    'arbeitet …': 'working …',
     'OriginReturn (Bytes, leer = automatisch)': 'OriginReturn (bytes, empty = automatic)',
     'OriginReturn automatisch: {} Bytes (aus den ORIGINAL-Bytes, ganze Befehle).': 'OriginReturn automatic: {} bytes (from the ORIGINAL bytes, whole instructions).',
     'OriginReturn nicht angegeben und ORIGINAL hat weniger als 8 Bytes - ich nehme {}. Das stimmt nur, wenn dort ein Befehl endet; sicherer ist DISASSEMBLER → CHEAT-EDITOR.': 'OriginReturn not given and ORIGINAL has fewer than 8 bytes - I use {}. That is only right if an instruction ends there; safer is DISASSEMBLER → CHEAT EDITOR.',
