@@ -33,6 +33,31 @@ class UnityCheatMenuTab(CheatMenuTab):
     def _game(self):
         return getattr(self._unity(), "game", None)
 
+    # -- Cave fuer ein beliebiges Feld (aus dem Tab MANUELL) ------------------------------------------------
+    def cave_for_field(self, target, amount_text):
+        """MANUELL: ausgewaehltes Feld + feste Menge (z. B. 999) -> Eintrag 'Manuell' im Menue, dann die Cave bauen."""
+        un = self._unity()
+        game, client = self._game(), self.win.client
+        if game is None or client is None or un is None:
+            return self.log("Cheat-Menü: erst Spiel-Ordner laden und verbinden (Tab MANUELL)", "err")
+        try:
+            e = UM.entry_from_target(game, target, amount_text)
+        except UM.MenuError as ex:
+            return self.log(f"Cheat-Menü: {ex}", "err")
+        if self.menu is None:
+            self.menu = UM.UnityMenu(game, client, getattr(un, "live", None), entries=[], log=lambda m: self.log(m, "warn"))
+        old = self.menu.by_key.get(e.key)
+        if old is not None:
+            self.menu.entries.remove(old)
+        self.menu.entries.insert(0, e)
+        self.menu.by_key[e.key] = e
+        self._fill()
+        self.tv.selection_set("0" if self.view and self.view[0] is e else str(self.view.index(e)))
+        self.v_val.set(e.default)
+        self.v_hold.set(True)
+        self.log(f"Cheat-Menü: baue Cave für {e.label} = {e.default} ...", "info")
+        self.cave_auto()
+
     # -- Aufbau --------------------------------------------------------------------------------------
     def build(self):
         if self._busy:
@@ -142,6 +167,8 @@ class UnityCheatMenuTab(CheatMenuTab):
         import ue_instr as U
         un = self._unity()
         base = getattr(un, "mod_base", None) or getattr(self.menu.live, "base", None)
+        if not base:
+            raise CV.CaveError("Modul-Basis unbekannt - im Tab MANUELL einmal ein Feld anklicken (Instanzen laden), dann nochmal")
         key = (base, id(self.menu))
         if self._code is not None and self._code[0] == key:
             return self._code[1], self._code[2]

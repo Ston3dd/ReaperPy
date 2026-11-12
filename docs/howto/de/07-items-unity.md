@@ -30,6 +30,9 @@ Unter Schritt 3 gibt es die Zeile **Sofort im laufenden Spiel**. Klicke ein Item
 
 > **Tipp:** Wird keine Geben-Methode gefunden, stelle den **Filter der Geben-Methoden** auf *normal* oder *aus*. *Aus* zeigt jede Methode mit Item-Parameter - dann immer zuerst mit **1 ITEM TESTEN** prüfen.
 
+## Viele Items auf einmal mit Menge
+Mit **Strg+A** (oder Rechtsklick → *Alles Sichtbare markieren*) wählst du alle angezeigten Items aus, **UMKEHREN** dreht die Haken um, **ALLE ITEMS AN** hakt alles an. In der Zeile *Menge für viele Items auf einmal* trägst du z. B. `999` ein und drückst **AUSWAHL**, **SICHTBARE**, **ANGEHAKTE** oder **ALLE**: Die Menge landet in der Spalte MENGE jedes dieser Items (AUSWAHL, SICHTBARE und ALLE haken sie dabei an). Eine leere Menge nimmt das Item wieder aus; **MENGEN LÖSCHEN** entfernt alle eigenen Mengen. Items ohne eigene Menge bekommen die allgemeine Menge aus Schritt 3. Das gilt für **TRAINER SPEICHERN** genauso wie für **JETZT GEBEN**.
+
 ## Weitere Unity-Seiten
 Für einzelne Werte und Methoden-Patches siehe [Werte, Live-Werte und das Cheat-Menü](howto:values-and-live).
 

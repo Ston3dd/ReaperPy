@@ -150,21 +150,41 @@ class UnityItemsTab(BaseTab):
         self.cb_cat.bind("<<ComboboxSelected>>", lambda _e: self.fill())
         pbtn(flt, "ALLE AN", lambda: self.set_visible(True)).pack(side="left")
         pbtn(flt, "ALLE AUS", lambda: self.set_visible(False)).pack(side="left", padx=4)
+        pbtn(flt, "UMKEHREN", self.invert_visible).pack(side="left")
+        pbtn(flt, "ALLE ITEMS AN", lambda: self.set_all(True)).pack(side="left", padx=4)
         self.lbl_count = clabel(flt, "")
         self.lbl_count.pack(side="right")
 
+        am = tk.Frame(body, bg=BG_CARD)
+        am.pack(fill="x", pady=(0, 4))
+        clabel(am, "Menge für viele Items auf einmal").pack(side="left")
+        self.v_set = tk.StringVar(value="999")
+        es = entry(am, self.v_set, 8)
+        es.pack(side="left", padx=(8, 8))
+        es.bind("<Return>", lambda _e: self.apply_amount("visible"))
+        pbtn(am, "AUSWAHL", lambda: self.apply_amount("selected")).pack(side="left")
+        pbtn(am, "SICHTBARE", lambda: self.apply_amount("visible")).pack(side="left", padx=4)
+        pbtn(am, "ANGEHAKTE", lambda: self.apply_amount("checked")).pack(side="left")
+        pbtn(am, "ALLE", lambda: self.apply_amount("all")).pack(side="left", padx=4)
+        pbtn(am, "MENGEN LÖSCHEN", self.clear_amounts).pack(side="left", padx=(8, 0))
+        clabel(am, "AUSWAHL / SICHTBARE / ALLE haken die Items dabei an; leere MENGE = die allgemeine Menge aus Schritt ③").pack(
+            side="left", padx=12)
+
         fr = tk.Frame(body, bg=BG_CARD)
         fr.pack(fill="both", expand=True)
-        self.tv = tree(fr, [("c", "✓"), ("n", "ITEM"), ("k", "KATEGORIE"), ("i", "ID")], [40, 320, 180, 80], height=9,
-                       anchors={"c": "center"},
+        self.tv = tree(fr, [("c", "✓"), ("n", "ITEM"), ("k", "KATEGORIE"), ("i", "ID"), ("m", "MENGE")],
+                       [40, 300, 170, 70, 90], height=9, anchors={"c": "center", "m": "e"},
                        actions=[("Auswahl anhaken", lambda: self.set_selected(True)),
                                 ("Auswahl abhaken", lambda: self.set_selected(False)),
+                                ("Alles Sichtbare markieren", self.select_all_rows),
                                 (None, None),
+                                ("Menge für Auswahl setzen…", lambda: self.apply_amount("selected")),
                                 ("Nur diese Kategorie anhaken", self.only_category_of_selected),
                                 ("Kategorie abhaken", self.uncheck_category_of_selected)])
         with_scroll(fr, self.tv)
         self.tv.bind("<Button-1>", self._click)
         self.tv.bind("<space>", lambda _e: self.set_selected(None))
+        self.tv.bind("<Control-a>", lambda _e: self.select_all_rows() or "break")
         self.tv.bind("<Double-1>", self._double)
 
     def _build_step3(self):
@@ -465,7 +485,7 @@ class UnityItemsTab(BaseTab):
     # --- Liste ----------------------------------------------------------------------------------
     def _row(self, i):
         it = self.items[i]
-        return (CHK[self.on[i]], it["name"], it["category"], it["id"])
+        return (CHK[self.on[i]], it["name"], it["category"], it["id"], it["amount"] if it.get("amount") else "–")
 
     def fill(self):
         self.tv.delete(*self.tv.get_children())
@@ -529,6 +549,68 @@ class UnityItemsTab(BaseTab):
         for i in self.view:
             self.on[i] = flag
         self.fill()
+
+    def select_all_rows(self):
+        """Alle sichtbaren Zeilen markieren (Strg+A) - danach AUSWAHL anhaken oder eine Menge setzen."""
+        rows = self.tv.get_children()
+        self.tv.selection_set(rows)
+        return "break"
+
+    def invert_visible(self):
+        for i in self.view:
+            self.on[i] = not self.on[i]
+        self.fill()
+
+    def set_all(self, flag):
+        self.on = [flag] * len(self.items)
+        self.fill()
+
+    def _amount_value(self):
+        """Eingabe 'Menge für viele Items' -> int (>= 1) oder None (leer); wirft ValueError mit lesbarer Meldung."""
+        t = self.v_set.get().strip()
+        if not t:
+            return None
+        try:
+            v = int(t, 0)
+        except ValueError:
+            raise ValueError("Die Menge muss eine ganze Zahl sein (z. B. 999)") from None
+        if not 1 <= v <= 0x7FFFFFFF:
+            raise ValueError("Die Menge muss zwischen 1 und 2147483647 liegen")
+        return v
+
+    def apply_amount(self, scope):
+        """Menge für viele Items auf einmal.  scope: selected | visible | checked | all.  Auswahl/sichtbar/alle werden dabei
+        angehakt; 'angehakte' ändert nur die schon angehakten."""
+        try:
+            v = self._amount_value()
+        except ValueError as e:
+            return self._found(str(e), ERROR)
+        if scope == "selected":
+            idx = self._sel_idx()
+        elif scope == "visible":
+            idx = list(self.view)
+        elif scope == "checked":
+            idx = [i for i, f in enumerate(self.on) if f]
+        else:
+            idx = list(range(len(self.items)))
+        if not idx:
+            return self._found("Keine Items für diese Menge: erst Items auswählen oder anhaken.", ERROR)
+        for i in idx:
+            if v is None:
+                self.items[i].pop("amount", None)
+            else:
+                self.items[i]["amount"] = v
+            if scope != "checked":
+                self.on[i] = True
+        self.fill()
+        self._found(f"✔ {len(idx)} Items: Menge {v if v else 'wie allgemein'} gesetzt" + ("" if scope == "checked" else " und angehakt"),
+                    ACCENT)
+
+    def clear_amounts(self):
+        for it in self.items:
+            it.pop("amount", None)
+        self.fill()
+        self._found("Alle eigenen Mengen gelöscht - es gilt wieder die allgemeine Menge aus Schritt ③.", ACCENT)
 
     def _cat_of_selected(self):
         idx = self._sel_idx()

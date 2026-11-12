@@ -17,6 +17,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 import il2cpp_dump as D
 import ue_quick as Q
+import unity_objects as UO
 import tools_i18n
 from tools_common import (ACCENT, BG, BG_CARD, BORDER_HVR, ERROR, FONT_LABEL, TEXT_DIM, WARN, BaseTab,
                           button, entry, label, tree, with_scroll)
@@ -76,6 +77,9 @@ class UnityTab(BaseTab):
         self.counts = None          # Ergebnis des Spiel-Scans: {Klasse: Objekte inkl. Unterklassen}
         self.inited = set()         # Klassen, die im Spiel schon initialisiert sind
         self.freezer = Q.Freezer()
+        self._scan_busy = False     # ein einziger Speicher-Scan gleichzeitig (jeder Klick scannte frueher fuer sich)
+        self._scan_stop = False
+        self._rerun = False         # Feld wurde angeklickt, waehrend der Scan lief: danach neu laden
         self.applied = []
         self.mshown = []
         self._busy = False
@@ -294,6 +298,7 @@ class UnityTab(BaseTab):
                        command=lambda: setattr(self, "_fast", bool(self.v_fast.get())),
                        bg=BG, fg=TEXT_DIM, selectcolor=BG, activebackground=BG, font=FONT_LABEL).pack(side="left", padx=4)
         button(bar, "↻ INSTANZEN NEU", lambda: self.refind(force=True)).pack(side="right", padx=2)
+        button(bar, "SCAN ABBRECHEN", self.stop_scan).pack(side="right", padx=2)
 
         ctl = tk.Frame(right, bg=BG)
         ctl.pack(side="bottom", fill="x")
@@ -312,6 +317,13 @@ class UnityTab(BaseTab):
         label(q, "SCHNELL").pack(side="left")
         for txt, val in (("×2", "*2"), ("+100", "+100"), ("+1000", "+1000"), ("99999", "99999")):
             button(q, txt, lambda v=val: self.set_value(v)).pack(side="left", padx=2)
+        cv = tk.Frame(ctl, bg=BG)
+        cv.pack(side="bottom", fill="x", pady=2)
+        label(cv, "CAVE MIT MENGE").pack(side="left")
+        self.v_cave = tk.StringVar(value="999")
+        entry(cv, self.v_cave, 9).pack(side="left", padx=4)
+        button(cv, "CODE CAVE BAUEN", self.build_cave_for_selected, accent=True).pack(side="left", padx=2)
+        label(cv, "(Wert dauerhaft festschreiben, als Patch gespeichert)", dim=True).pack(side="left", padx=4)
         sc = tk.Frame(ctl, bg=BG)
         sc.pack(side="bottom", fill="x", pady=2)
         label(sc, "WIRKT AUF").pack(side="left")
@@ -659,19 +671,44 @@ class UnityTab(BaseTab):
             return
         is_static = cur.key in self.static_keys
 
+        if self._scan_busy and not is_static:
+            self._rerun = True
+            return self.lbl_cur.configure(text=f"{cur.key}: der einmalige Speicher-Scan läuft noch - das Feld wird danach "
+                                               "automatisch geladen (oder SCAN ABBRECHEN).", fg=WARN)
+
         def job():
             live = self._ensure_base(client)
             if force:
                 live.drop_cache()
                 live.set_maps(self._maps(client))
             cls = self.game.by_full.get(cur.cls)
-            self.win.ui(lambda: self.log("UNITY: suche Klasse/Instanzen im Speicher (beim ersten Mal etwas Geduld) …", "info"))
             if is_static:
                 sb = live.static_base(cls)
-                return [{"addr": sb, "vaddr": sb + cur.offset, "val": None, "txt": "?"}] if sb else []
-            return [{"addr": a, "vaddr": a + cur.offset, "val": None, "txt": "?"} for a in live.instances(cls, use_cache=not force)]
+                return [{"addr": sb, "vaddr": sb + cur.offset, "val": None, "txt": "?"}] if sb else [], "static"
+            # Cache -> (Singleton) -> EIN Scan fuer alle Klassen; danach sind alle weiteren Felder sofort da
+            need_scan = not UO.has_cache(live, self.game, cls)
+            if need_scan:
+                self._scan_stop = False
+                self.win.ui(lambda: self.log("UNITY: einmaliger Speicher-Scan für alle Klassen (danach geht jedes Feld sofort) …",
+                                             "info"))
 
-        def ok(rows):
+            def prog(done, total):
+                self.win.ui(lambda: self.lbl_cur.configure(
+                    text=f"{cur.key}: Speicher-Scan {done * 100 // max(total, 1)}% ({done >> 20} / {total >> 20} MB) - "
+                         "nur dieses eine Mal", fg=WARN))
+            self._scan_busy = need_scan
+            try:
+                addrs, how = UO.find(live, self.game, cls, mode="all" if force else "any", progress=prog,
+                                     cancel=lambda: self._scan_stop)
+            finally:
+                self._scan_busy = False
+            return [{"addr": a, "vaddr": a + cur.offset, "val": None, "txt": "?"} for a in addrs], how
+
+        def ok(res):
+            rows, how = res
+            if self._rerun:
+                self._rerun = False
+                self.after(50, self.refind)
             if cur is not self.cur:
                 return
             self.rows = rows
@@ -682,13 +719,33 @@ class UnityTab(BaseTab):
                     pass
             self._render()
             if rows:
-                src = {"cache": "sofort aus dem Scan", "scan": "Speicher durchsucht"}.get(getattr(self.live, "last_source", ""), "")
+                src = {"cache": "sofort aus dem Scan", "scan": "Speicher durchsucht", "census": "Speicher einmal durchsucht",
+                       "singleton": "Singleton, ohne Scan", "static": ""}.get(how, "")
                 self.lbl_cur.configure(text=f"{cur.key}  [{cur.type}]  - {len(rows)} Instanz(en)" + (f" ({src})" if src else ""),
                                        fg=ACCENT)
             else:
                 self.lbl_cur.configure(text=self._why_none(cur, is_static), fg=WARN)
 
         self.bg(job, ok, lambda e: (self.log(f"UNITY: {e}", "err"), self.lbl_cur.configure(text=f"Fehler: {e}", fg=ERROR)))
+
+    def build_cave_for_selected(self):
+        """Das links gewaehlte Feld dauerhaft auf die Menge festschreiben: Cave im Spiel-Code (Hilfe vom Cheat-Menue)."""
+        cur = self.cur
+        if cur is None:
+            return self.log("UNITY: erst links ein Feld anklicken (z. B. gold)", "warn")
+        if cur.key in self.static_keys:
+            return self.log("UNITY: statische Felder haben keinen Objekt-Offset - für die Cave ein Instanz-Feld wählen", "warn")
+        if self._need_client() is None:
+            return
+        for t in getattr(self.win, "extra_tabs", []):
+            if t.__class__.__name__ == "UnityCheatMenuTab":
+                return t.cave_for_field(cur, self.v_cave.get())
+        self.log("UNITY: Tab CHEAT-MENÜ fehlt - Cave nicht möglich", "err")
+
+    def stop_scan(self):
+        """Bricht einen laufenden Speicher-Scan ab (der Cache bleibt dann leer, Felder zeigen 'keine Instanzen')."""
+        self._scan_stop = True
+        self.log("UNITY: Scan wird abgebrochen …", "warn")
 
     def _why_none(self, t, is_static):
         if is_static:

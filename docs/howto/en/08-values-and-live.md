@@ -34,4 +34,8 @@ In **UNITY → MANUAL**:
 2. Start the game, load a save, connect, and press **DETECT MODULE**.
 3. Press **SCAN GAME** once. Then you can search `Class.field` (gold, hp, money ...), see all live objects and change or freeze the value. *Methods* lets you make a method return true / false / a fixed number or empty. *Names* lists enums such as item IDs.
 
+The memory is scanned **only once** (progress in %, stoppable with **CANCEL SCAN**); after that every field you click loads instantly. Classes with an `Instance` field are even found without any scan.
+
+**Cave with a fixed amount:** pick an instance field on the left (e.g. `gold`), type `999` into **CAVE WITH AMOUNT** and press **BUILD CODE CAVE**. ReaperPy builds the same permanent cave as in the CHEAT MENU and saves the patch.
+
 All of this is for single-player games on your own console. For the next step see [Export](howto:export).

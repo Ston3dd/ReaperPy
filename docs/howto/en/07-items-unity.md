@@ -30,6 +30,9 @@ Under step 3 there is a row **Right now in the running game**. Click an item and
 
 > **Tip:** If no give method is found, set **Give-method filter** to *normal* or *off*. *Off* shows every method with an item parameter - then always test with **TEST 1 ITEM** first.
 
+## Many items at once, with an amount
+Press **Ctrl+A** (or right-click → *Select all visible*) to select every shown item, **INVERT** flips the ticks, **ALL ITEMS ON** ticks everything. In the row *Set the amount for many items at once* type e.g. `999` and press **SELECTION**, **VISIBLE**, **TICKED** or **ALL**: the amount goes into the QUANTITY column of those items (SELECTION, VISIBLE and ALL tick them as well). An empty amount removes it again; **CLEAR AMOUNTS** removes all own amounts. Items without their own amount get the general amount from step 3. This applies to **SAVE TRAINER** and to **GIVE NOW** alike.
+
 ## Other Unity pages
 For single values and method patches see [Values, live values and the cheat menu](howto:values-and-live).
 

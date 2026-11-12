@@ -2,6 +2,15 @@
 
 Older release notes (German) are in [`docs/history/`](docs/history/).
 
+## Unreleased
+
+### Fixed (Unity scanning itself to death)
+- Every field click in **UNITY → MANUAL** started its own full memory scan, several at once. The memory is now scanned **once** (progress in %, **CANCEL SCAN**), after that all fields are instant; classes with an `Instance` field need no scan at all. The live give and the cheat menu use the same finder (`unity_objects.py`).
+
+### Added
+- **UNITY → ITEMS:** select all or many items (Ctrl+A, INVERT, ALL ITEMS ON) and set an amount for them at once (new QUANTITY column; SELECTION / VISIBLE / TICKED / ALL, CLEAR AMOUNTS). Works for the trainer and for GIVE NOW.
+- **UNITY → MANUAL:** CAVE WITH AMOUNT + BUILD CODE CAVE builds a permanent cave for the selected field with a fixed value such as 999.
+
 ## 6.3.0 - 2026-11-12
 
 **Easier from the first number to a finished cheat: a guided assistant, fuzzy value search, items found without relying on names, Unity on par with Unreal, and a calmer tools window.** Please update - nothing else changes for existing projects.

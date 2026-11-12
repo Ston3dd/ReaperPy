@@ -13,6 +13,7 @@ import struct
 from dataclasses import dataclass, field, replace
 
 import il2cpp_dump as D
+import unity_objects as UO
 import uecheat as UC
 import values_auto as VA
 
@@ -155,6 +156,16 @@ class UnityMenu:
         self.game, self.client, self.live, self.log = game, client, live, log
         self.entries = entries if entries is not None else build_entries(game)
         self.by_key = {e.key: e for e in self.entries}
+        self._seen = {}                                   # Klasse -> Objektadressen (nicht bei jedem Eintrag neu suchen)
+        self.progress = self.cancel = None                # vom Tab gesetzt: Scan-Fortschritt / Abbruch
+
+    def _alive(self, e, addr):
+        """Steht an addr noch ein Objekt der Klasse? (Klassenzeiger lesbar und unveraendert)"""
+        try:
+            kps = {k for k in (self.live.klass_ptr(c, by_name=(c is e.cls_obj)) for c in self.game.family(e.cls_obj, cap=24)) if k}
+            return bool(kps) and self.live._header_ok(addr, kps)
+        except Exception:  # noqa: BLE001
+            return True                                    # Ersatz-Live ohne Pruefung: Adresse behalten
 
     # -- Methoden-Patch ----------------------------------------------------------------------------
     def _patch_on(self, e):
@@ -168,8 +179,13 @@ class UnityMenu:
         e.orig = {addr: orig}
 
     # -- Feld ------------------------------------------------------------------------------------------
-    def objects(self, e):
-        objs = self.live.instances(e.cls_obj, limit=MAX_OBJECTS)
+    def objects(self, e, progress=None, cancel=None):
+        """Lebende Objekte der Klasse: erst die schon bekannten (kurz geprueft), sonst Cache/Singleton/ein einziger Scan."""
+        known = [a for a in self._seen.get(e.cls, ()) if self._alive(e, a)]
+        if known:
+            return known
+        objs, _how = UO.find(self.live, self.game, e.cls_obj, mode="any", limit=MAX_OBJECTS, progress=progress, cancel=cancel)
+        self._seen[e.cls] = list(objs)
         if not objs:
             raise MenuError(f"Kein lebendes Objekt der Klasse {e.cls} gefunden - im Spiel muss es gerade existieren")
         return objs
@@ -177,7 +193,7 @@ class UnityMenu:
     def write_field(self, e, text=None, hold=True):
         data = encode(e.type, text if text is not None else e.default, e.default)
         n = 0
-        for o in self.objects(e):
+        for o in self.objects(e, self.progress, self.cancel):
             a = o + e.offset
             if a not in e.orig:
                 e.orig[a] = bytes(self.client.read_memory(a, len(data)))
@@ -227,6 +243,23 @@ class UnityMenu:
                 e.held = e.active = False
                 msgs.append(f"{e.label}: Festhalten beendet ({ex})")
         return msgs
+
+
+def entry_from_target(game, target, amount_text):
+    """Beliebiges Feld aus dem MANUELL-Tab (ue_quick.Target) + feste Menge -> UEntry fuer die Cave.  Wirft MenuError mit
+    verstaendlicher Meldung (statisches Feld, kein Zahlenfeld, Menge unpassend)."""
+    cls = game.by_full.get(target.cls)
+    if cls is None:
+        raise MenuError(f"Klasse {target.cls} nicht im Dump")
+    t = (target.type or "").lower()
+    if t not in D.SIZES:
+        raise MenuError(f"{target.key}: Typ {target.type} - eine Cave geht nur bei Zahlen-, Bool- und Enum-Feldern")
+    if target.offset is None or target.offset <= 0 or getattr(target, "bit", -1) >= 0:
+        raise MenuError(f"{target.key}: Feld ohne festen Objekt-Offset (statisch oder Bitfeld) - dafür gibt es keine Cave")
+    encode(t, amount_text)                                  # Menge zum Typ pruefen (wirft MenuError)
+    return UEntry(key=f"manuell:{target.key}@{target.offset:x}", cat="Manuell", label=target.key, kind="field", cls=cls.full,
+                  member=target.member, type=t, offset=target.offset, cls_obj=cls, toggle=t == "bool",
+                  default=str(amount_text).strip())
 
 
 def cave_entry(e):

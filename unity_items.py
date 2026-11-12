@@ -793,8 +793,10 @@ def fit_options(options, code_capacity, max_options=None, max_rows=None, stolen_
 
 
 def make_options(pkgs, call, amount, log=lambda _m: None):
-    """Pakete [(Name, [Item])] -> [Option] mit je einer Zeile je Item."""
-    amount = int(amount) if call.count_i is not None else 1        # ohne Mengen-Parameter gibt die Methode immer 1 Stueck
+    """Pakete [(Name, [Item])] -> [Option] mit je einer Zeile je Item.  Hat ein Item eine eigene Menge (it['amount']), gilt sie
+    statt der allgemeinen."""
+    has_count = call.count_i is not None
+    amount = int(amount) if has_count else 1                       # ohne Mengen-Parameter gibt die Methode immer 1 Stueck
     options, skipped = [], 0
     for name, items in pkgs:
         rows = []
@@ -802,7 +804,8 @@ def make_options(pkgs, call, amount, log=lambda _m: None):
             if it.get("id") is None:
                 skipped += 1
                 continue
-            rows.append(UnityRow(TR.clean_name(it["name"]), call, it["id"], amount))
+            own = it.get("amount")
+            rows.append(UnityRow(TR.clean_name(it["name"]), call, it["id"], int(own) if own and has_count else amount))
         if rows:
             options.append(Option(name, rows))
     return options, skipped

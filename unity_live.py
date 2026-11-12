@@ -9,6 +9,7 @@ Das Ergebnis "getestet" (verified) merkt sich, welche Methoden wirklich Items ge
 """
 import ps5_more
 import unity_items as U
+import unity_objects as UO
 
 VERIFIED_OK, VERIFIED_BAD = "ok", "bad"
 BONUS = {VERIFIED_OK: 4.0, VERIFIED_BAD: -8.0}
@@ -49,20 +50,21 @@ def register_args(give, this, item_value, amount):
     return {U.INT_REGS[i][3]: v & 0xFFFFFFFFFFFFFFFF for i, v in enumerate(vals)}
 
 
-def find_this(live, give):
-    """Adresse eines lebenden Objekts der Klasse der Geben-Methode (0 bei static)."""
+def find_this(live, give, progress=None, cancel=None):
+    """Adresse eines lebenden Objekts der Klasse der Geben-Methode (0 bei static).  Cache -> Singleton -> ein einziger Scan."""
     if give.method.static:
         return 0
-    found = live.instances(give.method.cls, limit=8)
+    found, _how = UO.find(live, getattr(live, "game", None), give.method.cls, mode="any", limit=8, progress=progress,
+                          cancel=cancel)
     if not found:
         raise LiveError(f"Kein lebendes Objekt der Klasse {give.method.cls.full} gefunden - im Spiel muss es gerade "
                         "existieren (Inventar/Spielwelt geladen, nicht im Hauptmenue)")
     return found[0]
 
 
-def give_one(client, live, give, item_value, amount, this=None):
+def give_one(client, live, give, item_value, amount, this=None, progress=None, cancel=None):
     """Ein Item geben -> RAX der Methode.  this kann vorab ermittelt werden (find_this)."""
-    this = find_this(live, give) if this is None else this
+    this = find_this(live, give, progress, cancel) if this is None else this
     regs = register_args(give, this, item_value, amount)
     try:
         return ps5_more.call(client, live.base + give.method.rva, **regs)
@@ -70,13 +72,20 @@ def give_one(client, live, give, item_value, amount, this=None):
         raise LiveError(str(e)) from e
 
 
-def give_many(client, live, give, items, amount, progress=None, log=lambda _m: None):
-    """Mehrere Items nacheinander -> (gegeben, [(Item, Fehlertext)]).  Beim ersten Verbindungs-/Aufruffehler Abbruch."""
-    this = find_this(live, give)
+def item_amount(it, default):
+    """Menge dieses Items: eigene Menge (it['amount'], vom Nutzer gesetzt) oder die allgemeine."""
+    a = it.get("amount")
+    return int(a) if a else int(default)
+
+
+def give_many(client, live, give, items, amount, progress=None, log=lambda _m: None, scan_progress=None, cancel=None):
+    """Mehrere Items nacheinander -> (gegeben, [(Item, Fehlertext)]).  Beim ersten Verbindungs-/Aufruffehler Abbruch.
+    Jedes Item nimmt seine eigene Menge (item_amount), sonst `amount`."""
+    this = find_this(live, give, scan_progress, cancel)
     done, errors = 0, []
     for k, it in enumerate(items):
         try:
-            give_one(client, live, give, it["id"], amount, this)
+            give_one(client, live, give, it["id"], item_amount(it, amount), this)
             done += 1
         except LiveError as e:
             errors.append((it, str(e)))

@@ -34,4 +34,8 @@ In **UNITY → MANUELL**:
 2. Starte das Spiel, lade einen Spielstand, verbinde und drücke **MODUL ERKENNEN**.
 3. Drücke einmal **SPIEL SCANNEN**. Danach suchst du `Klasse.Feld` (gold, hp, money ...), siehst alle lebenden Objekte und änderst oder frierst den Wert ein. *Methoden* lässt eine Methode true / false / eine feste Zahl liefern oder leer laufen. *Namen* listet Enums wie Item-IDs.
 
+Der Speicher wird dabei **nur einmal** durchsucht (Fortschritt in %, mit **SCAN ABBRECHEN** stoppbar); danach lädt jedes angeklickte Feld sofort. Klassen mit einem `Instance`-Feld werden sogar ganz ohne Scan gefunden.
+
+**Cave mit fester Menge:** Wähle links ein Instanz-Feld (z. B. `gold`), trage bei **CAVE MIT MENGE** `999` ein und drücke **CODE CAVE BAUEN**. ReaperPy baut daraus dieselbe dauerhafte Cave wie im CHEAT-MENÜ und speichert den Patch.
+
 Das alles ist für Einzelspieler-Spiele auf deiner eigenen Konsole. Für den nächsten Schritt siehe [Export](howto:export).
