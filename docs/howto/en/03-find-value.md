@@ -18,6 +18,11 @@ Health bars and percentages have no number you can type. Use the compare mode *U
 
 > **Note:** An unknown-value scan keeps a copy of the game's memory. Under **OPTIONS …** you choose how much of it stays in the console's RAM and where the rest goes.
 
+## Rounded numbers: fuzzy search
+Games often show a rounded number (health 75 while the game holds 74.6), so an exact search finds nothing. Type the number with a tolerance instead: **75~5** means "75 plus or minus 5", **75~10%** means "within ten percent", **~75** or **ca. 75** uses the standard 5 %. In the tab **FIND VALUE** choose the comparison *Fuzzy (± tolerance)*; the field **TOLERANCE** takes `5` or `5%`. Whole numbers always get at least plus or minus 1, so `ca. 10` also finds 9 and 11. In the **ASSISTANT** tick **Approximate (fuzzy)** or just type `75~5`; **NARROW DOWN** accepts the same forms.
+
+If you cannot see a number at all, choose "Number unknown" (tick **Decimal number** if the value is a decimal one) and then narrow down with **DROPPED**, **ROSE**, **STAYED THE SAME** or **CHANGED** after each change in the game.
+
 ## Scan less, find faster
 The area **MEMORY SECTIONS** shows what is in the game's memory and what gets scanned. Every row has a checkbox.
 - By default the system libraries are hidden, which is normally safe for game values.

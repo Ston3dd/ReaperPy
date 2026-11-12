@@ -46,7 +46,9 @@ class AssistTab(BaseTab):
         # ---- 1 ----
         _head(self, "1  WERT FINDEN")
         _hint(self, "Lies im Spiel eine Zahl ab (zum Beispiel dein Leben oder dein Geld) und trage sie hier ein. "
-                    "Kommazahlen mit Punkt. Siehst du nur eine Leiste ohne Zahl, waehle 'Zahl unbekannt'.")
+                    "Kommazahlen mit Punkt. Ist die Anzeige gerundet, hilft 'Ungefaehr' (Fuzzy): tippe zum Beispiel 75~5 "
+                    "(75 plus/minus 5) oder 75~10%. Siehst du nur eine Leiste ohne Zahl, waehle 'Zahl unbekannt' "
+                    "(bei Kommazahlen zusaetzlich 'Kommazahl').")
         r1 = tk.Frame(self, bg=BG); r1.pack(fill="x", padx=12, pady=4)
         self.v_unknown = tk.BooleanVar(value=False)
         tk.Radiobutton(r1, text="Ich kenne die Zahl", value=False, variable=self.v_unknown, bg=BG, fg=ACCENT,
@@ -59,6 +61,16 @@ class AssistTab(BaseTab):
         e.pack(side="left")
         e.bind("<Return>", lambda _e: self.start_search())
         button(r1, "SUCHEN", self.start_search, accent=True).pack(side="left", padx=8)
+        r1b = tk.Frame(self, bg=BG); r1b.pack(fill="x", padx=12, pady=(0, 4))
+        self.v_approx = tk.BooleanVar(value=False)
+        self.v_float = tk.BooleanVar(value=False)
+        self.v_tol = tk.StringVar(value="5%")
+        for text, var in (("Ungefähr (Fuzzy)", self.v_approx), ("Kommazahl (bei unbekannter Zahl)", self.v_float)):
+            tk.Checkbutton(r1b, text=text, variable=var, bg=BG, fg=ACCENT, selectcolor=BG, activebackground=BG,
+                           activeforeground=ACCENT, font=FONT_LABEL).pack(side="left", padx=(0, 12))
+        label(r1b, "TOLERANZ").pack(side="left", padx=(8, 4))
+        entry(r1b, self.v_tol, 7).pack(side="left")
+        label(r1b, "(5 oder 5 %; leer = 5 %)").pack(side="left", padx=8)
 
         # ---- 2 ----
         _head(self, "2  EINGRENZEN")
@@ -75,6 +87,7 @@ class AssistTab(BaseTab):
         button(r2, "GEFALLEN", lambda: self.narrow("down")).pack(side="left", padx=(12, 2))
         button(r2, "GESTIEGEN", lambda: self.narrow("up")).pack(side="left", padx=2)
         button(r2, "GLEICH GEBLIEBEN", lambda: self.narrow("same")).pack(side="left", padx=2)
+        button(r2, "VERÄNDERT", lambda: self.narrow("changed")).pack(side="left", padx=2)
         button(r2, "NEU STARTEN", self.restart).pack(side="right", padx=2)
         self.lbl_count = label(self, "Noch nicht gesucht.")
         self.lbl_count.pack(anchor="w", padx=12)
@@ -131,7 +144,8 @@ class AssistTab(BaseTab):
         if st is None:
             return
         try:
-            plan = A.value_plan(self.v_num.get(), unknown=self.v_unknown.get())
+            plan = A.value_plan(self.v_num.get(), unknown=self.v_unknown.get(), approx=self.v_approx.get(),
+                                tol=self.v_tol.get(), float_unknown=self.v_float.get())
         except ValueError as e:
             return self.log(str(e), "warn")
         if st.running:
@@ -142,6 +156,7 @@ class AssistTab(BaseTab):
         st.ct.set(plan["ctype"])
         st._ct_changed()
         st.v1.set(plan["text"])
+        st.v2.set(plan.get("text2", ""))
         self.writers = A.Writers()
         self._fill_writers()
         st.scan_first()
@@ -159,14 +174,21 @@ class AssistTab(BaseTab):
             return self.log("Es läuft schon ein Scan", "warn")
         if kind == "exact":
             try:
-                plan = A.value_plan(self.v_new.get())
+                plan = A.value_plan(self.v_new.get(), approx=self.v_approx.get(), tol=self.v_tol.get(), vname=st.sc.vname)
             except ValueError as e:
                 return self.log(str(e), "warn")
-            st.ct.set("Ungefähr (Float)" if st.sc.vname == "Float" else "Genau")
+            if plan["ctype"] == SC.FUZZY:
+                st.ct.set(SC.FUZZY)
+                st.v2.set(plan["text2"])
+            else:
+                st.ct.set("Ungefähr (Float)" if st.sc.vname == "Float" else "Genau")
+                st.v2.set("")
             st.v1.set(plan["text"])
         else:
-            st.ct.set({"down": "Kleiner geworden", "up": "Größer geworden", "same": "Unverändert"}[kind])
+            st.ct.set({"down": "Kleiner geworden", "up": "Größer geworden", "same": "Unverändert",
+                       "changed": "Verändert"}[kind])
             st.v1.set("")
+            st.v2.set("")
         st._ct_changed()
         st.scan_next()
         if st.running:

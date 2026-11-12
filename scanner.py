@@ -5,6 +5,7 @@ import threading
 import time
 from array import array
 
+import fuzzy
 from ps5_client import PS5DebugClient, STATUS_SUCCESS, STATUS_ERROR, STATUS_DATA_NULL
 
 SENT64 = 0xFFFFFFFFFFFFFFFF
@@ -43,6 +44,8 @@ CTYPES = {
     "Kleiner geworden": (7, 0), "Kleiner geworden um": (8, 1), "Verändert": (9, 0),
     "Unverändert": (10, 0), "Unbekannter Startwert": (11, 0),
 }
+FUZZY = "Fuzzy (± Toleranz)"      # Zielwert +- Toleranz: laeuft als Bereichs-Vergleich ("Zwischen"), siehe fuzzy.py
+CTYPES[FUZZY] = CTYPES["Zwischen"]
 FIRST_ONLY = {"Unbekannter Startwert"}
 NEXT_ONLY = {"Größer geworden", "Größer geworden um", "Kleiner geworden",
              "Kleiner geworden um", "Verändert", "Unverändert"}
@@ -70,6 +73,20 @@ def encode_value(vname, text):
         if not -(1 << (bits - 1)) <= v < (1 << (bits - 1)):
             raise ValueError(f"{vname}: Wert außerhalb Bereich")
     return struct.pack("<" + code, v)
+
+
+def check_values(vname, ctype, t1, t2):
+    """Eingaben vor dem Scan pruefen (wirft ValueError/FuzzyError mit lesbarer Meldung)."""
+    need = CTYPES[ctype][1]
+    if ctype == FUZZY:
+        lo, hi = fuzzy.to_range(vname, t1, t2)
+        encode_value(vname, lo)
+        encode_value(vname, hi)
+        return
+    if need >= 1:
+        encode_value(vname, t1)
+    if need >= 2:
+        encode_value(vname, t2)
 
 
 def decode_value(vname, data):
@@ -512,6 +529,8 @@ class Scanner:
 
     def _values(self, vname, ctype, t1, t2):
         need = CTYPES[ctype][1]
+        if ctype == FUZZY:
+            t1, t2 = fuzzy.to_range(vname, t1, t2)
         v = b""
         if need >= 1:
             v += encode_value(vname, t1)

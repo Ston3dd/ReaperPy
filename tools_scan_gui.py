@@ -165,7 +165,8 @@ class ScanTab(BaseTab):
             row=1, column=1, sticky="ew", padx=(8, 0))
 
         clabel(g, "VERGLEICH").grid(row=2, column=0, sticky="w", pady=(8, 0))
-        clabel(g, "BIS").grid(row=2, column=1, sticky="w", padx=(8, 0), pady=(8, 0))
+        self.lbl_v2 = clabel(g, "BIS")
+        self.lbl_v2.grid(row=2, column=1, sticky="w", padx=(8, 0), pady=(8, 0))
         self.ct = tk.StringVar(value="Genau")
         self.cb_ct = ttk.Combobox(g, textvariable=self.ct, width=20, state="readonly")
         self.cb_ct.grid(row=3, column=0, sticky="ew")
@@ -294,6 +295,7 @@ class ScanTab(BaseTab):
         need = SC.CTYPES[self.ct.get()][1]
         self.e1.configure(state="normal" if need >= 1 else "disabled")
         self.e2.configure(state="normal" if need >= 2 else "disabled")
+        self.lbl_v2.configure(text="TOLERANZ" if self.ct.get() == SC.FUZZY else "BIS")
 
     def _opts(self):
         return {"float_simple": self.o_float.get(), "aliasing": self.o_alias.get(), "parallel": self.o_par.get(),
@@ -358,10 +360,7 @@ class ScanTab(BaseTab):
         pick = self.panel.make_pick(scope)       # Bereichsfilter: nur angehakte, nicht ausgeblendete Regionen
         try:        # früh validieren (Meldung im UI-Thread)
             if ctype not in SC.FIRST_ONLY:
-                if SC.CTYPES[ctype][1] >= 1:
-                    SC.encode_value(vname, t1)
-                if SC.CTYPES[ctype][1] >= 2:
-                    SC.encode_value(vname, t2)
+                SC.check_values(vname, ctype, t1, t2)
         except Exception as e:
             return messagebox.showerror("Wert", str(e))
 
@@ -387,10 +386,7 @@ class ScanTab(BaseTab):
         ctype, t1, t2 = self.ct.get(), self.v1.get(), self.v2.get()
         opts = self._opts()
         try:
-            if SC.CTYPES[ctype][1] >= 1:
-                SC.encode_value(self.sc.vname, t1)
-            if SC.CTYPES[ctype][1] >= 2:
-                SC.encode_value(self.sc.vname, t2)
+            SC.check_values(self.sc.vname, ctype, t1, t2)
         except Exception as e:
             return messagebox.showerror("Wert", str(e))
 

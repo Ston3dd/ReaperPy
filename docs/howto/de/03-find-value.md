@@ -18,6 +18,11 @@ Lebensbalken und Prozentwerte haben keine Zahl zum Eintippen. Nimm beim ersten S
 
 > **Hinweis:** Ein Scan mit unbekanntem Startwert merkt sich eine Kopie des Spielspeichers. Unter **OPTIONEN …** stellst du ein, wie viel davon im RAM der Konsole bleibt und wohin der Rest geht.
 
+## Gerundete Zahlen: Fuzzy-Suche
+Spiele zeigen oft eine gerundete Zahl (Leben 75, im Spiel steht 74,6) - eine genaue Suche findet dann nichts. Tippe die Zahl stattdessen mit Toleranz: **75~5** heißt „75 plus/minus 5“, **75~10%** „innerhalb von zehn Prozent“, **~75** oder **ca. 75** nimmt die Standard-Toleranz von 5 %. Im Tab **WERT SUCHEN** wählst du den Vergleich *Fuzzy (± Toleranz)*; das Feld **TOLERANZ** nimmt `5` oder `5%`. Ganze Zahlen bekommen immer mindestens plus/minus 1, `ca. 10` findet also auch 9 und 11. Im **ASSISTENT** hakst du **Ungefähr (Fuzzy)** an oder tippst einfach `75~5`; **EINGRENZEN** versteht dieselben Formen.
+
+Siehst du gar keine Zahl, wähle „Zahl unbekannt“ (bei einer Kommazahl zusätzlich **Kommazahl** anhaken) und grenze nach jeder Änderung im Spiel mit **GEFALLEN**, **GESTIEGEN**, **GLEICH GEBLIEBEN** oder **VERÄNDERT** ein.
+
 ## Weniger scannen, schneller finden
 Der Bereich **SPEICHERBEREICHE** zeigt, was im Spielspeicher liegt und was gescannt wird. Jede Zeile hat ein Kästchen.
 - Standardmäßig sind die System-Bibliotheken ausgeblendet. Für Spielwerte ist das normalerweise sicher.

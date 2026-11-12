@@ -13,15 +13,50 @@ den Befehl, dessen Speicheroperand (mit den Registern des Treffers) wirklich auf
 import re
 
 import asm_explain as AX
+import fuzzy as FZ
+import scanner as SC
 
 STEP_COUNT_GOOD = 30            # so wenige Treffer: Liste anzeigen, direkt weiter
 STEP_COUNT_TOO_MANY = 5000      # darueber: deutlich auffordern, den Wert zu aendern
 
 
-def value_plan(text, unknown=False):
-    """Eingegebene Zahl -> {'vname','ctype','text'} fuer ScanTab/Scanner.  unknown=True: Zahl unbekannt (Anzeige ist nur eine Leiste)."""
+def _fuzzy_plan(center, tol, vname=None):
+    """Fuzzy: Zielwert + Toleranz -> Plan mit Bereichs-Vergleich.  vname=None: Typ aus der Zahl (Punkt -> Float)."""
+    c = center.strip().replace(",", ".")
+    if vname is None:
+        try:
+            int(c, 0)
+            vname = "Int32"
+        except ValueError:
+            float(c)
+            vname = "Float"
+    try:
+        FZ.to_range(vname, c, tol)                      # Eingaben frueh pruefen (verstaendliche Meldung)
+    except FZ.FuzzyError as e:
+        raise ValueError(str(e)) from None
+    return {"vname": vname, "ctype": SC.FUZZY, "text": c, "text2": (tol or "").strip()}
+
+
+def value_plan(text, unknown=False, approx=False, tol="", float_unknown=False, vname=None):
+    """Eingegebene Zahl -> {'vname','ctype','text'} fuer ScanTab/Scanner.  unknown=True: Zahl unbekannt (Anzeige ist nur eine Leiste;
+    float_unknown: eine Kommazahl).  approx=True oder Eingabe wie '75~5' / 'ca. 75': Fuzzy-Suche (+ 'text2' = Toleranz, leer = 5 %).
+    vname erzwingt den Typ (beim Eingrenzen: der Typ der laufenden Suche)."""
     if unknown:
-        return {"vname": "Int32", "ctype": "Unbekannter Startwert", "text": ""}
+        return {"vname": "Float" if float_unknown else "Int32", "ctype": "Unbekannter Startwert", "text": ""}
+    try:
+        parsed = FZ.parse_approx(text)
+    except FZ.FuzzyError as e:
+        raise ValueError(str(e)) from None
+    if parsed is not None or approx:
+        center, ptol = parsed if parsed is not None else ((text or "").strip(), None)
+        if not center.strip():
+            raise ValueError("Zahl fehlt")
+        try:
+            return _fuzzy_plan(center, ptol if ptol is not None else tol, vname)
+        except ValueError as e:
+            if "Keine Zahl" in str(e) or "could not convert" in str(e) or "invalid literal" in str(e):
+                raise ValueError("Keine Zahl") from None
+            raise
     t = (text or "").strip().replace(",", ".")
     if not t:
         raise ValueError("Zahl fehlt")

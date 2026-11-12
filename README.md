@@ -105,7 +105,7 @@ once; from 6.0.0 on files in use are applied when ReaperPy has closed.
 **1. Connect.** Start the game on the console, load the payload, enter the console IP in the main window and press
 **CONNECT** (if it fails, **TOOLS -> START -> CHECK CONNECTION** tells you in plain words why). The app detects the foreground game (title ID) and loads the matching codes from your library.
 
-**2. Find a value and make a cheat.** The easy way: **TOOLS -> ASSISTANT** guides you in four steps (see [Cheat in four steps](docs/howto/en/02-guided-cheat.md)). By hand: open **TOOLS -> FIND VALUE**, type the number you see in the game (health, ammo,
+**2. Find a value and make a cheat.** The easy way: **TOOLS -> ASSISTANT** guides you in four steps (see [Cheat in four steps](docs/howto/en/02-guided-cheat.md)). If the game shows a rounded number, type it as `75~5` (75 plus or minus 5) for a fuzzy search. By hand: open **TOOLS -> FIND VALUE**, type the number you see in the game (health, ammo,
 money), press **FIRST SCAN**, change the number in the game, type the new one, press **NEXT SCAN**. Repeat until a few
 addresses are left. Add them to the address list, set or freeze the value. *Who writes this?* shows the instruction
 that changes it - **EDIT CHEATS** turns it into a NOP patch or a code cave.
@@ -490,6 +490,7 @@ and 3.12, Windows with 3.12, with Keystone and Capstone installed); `ruff` runs 
 | `theme.py` | The one colour palette of the whole interface |
 | `asm_explain.py`, `asm_help.py`, `asm_recipes.py`, `tools_asm_easy_gui.py` | Instruction explanations, friendly errors, recipes, assembler dialogs |
 | `assist.py`, `tools_assist_gui.py` | ASSISTANT: value to cheat in four steps |
+| `fuzzy.py` | Fuzzy value search: `75~5`, `75~10%`, `ca. 75` become a range compare |
 | `reappatch_fmt.py` | `.ReapPatch` export (Reaper format) |
 | `howto.py`, `tools_howto_gui.py`, `docs/howto/` | How-to guides: files, small Markdown parser and search, the HOW TO window |
 | `ps5_client.py`, `ps5_ext.py`, `ps5_more.py`, `ps5_backend.py` | Payload protocol client |

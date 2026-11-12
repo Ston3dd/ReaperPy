@@ -25,7 +25,7 @@ class FakeSc:
 
 class FakeScan:
     def __init__(self):
-        self.vt, self.ct, self.v1 = (ghost_tk.Var(value=x) for x in ("Int32", "Genau", ""))
+        self.vt, self.ct, self.v1, self.v2 = (ghost_tk.Var(value=x) for x in ("Int32", "Genau", "", ""))
         self.running = False
         self.sc = None
         self.calls = []
@@ -35,13 +35,13 @@ class FakeScan:
     def _ct_changed(self): pass
 
     def scan_first(self):
-        self.calls.append(("first", self.vt.get(), self.ct.get(), self.v1.get()))
+        self.calls.append(("first", self.vt.get(), self.ct.get(), self.v1.get()) + ((self.v2.get(),) if self.v2.get() else ()))
         self.sc = FakeSc()
         self.sc.first_scan_done, self.sc.count, self.sc.vname = True, self.n_first, self.vt.get()
         self.running = True                                  # wie das echte ScanTab: laeuft bis zum Ende des Jobs
 
     def scan_next(self):
-        self.calls.append(("next", self.ct.get(), self.v1.get()))
+        self.calls.append(("next", self.ct.get(), self.v1.get()) + ((self.v2.get(),) if self.v2.get() else ()))
         self.sc.count = self.n_next
         self.running = True
 
@@ -145,6 +145,42 @@ class T(unittest.TestCase):
         self.st.running = False
         self.t.narrow("down")
         self.assertEqual(self.st.calls[-1], ("next", "Kleiner geworden", ""))
+
+    def test_fuzzy_search_by_typing_a_range(self):
+        self.t.v_num.set("75~5")
+        self.t.start_search()
+        self.assertEqual(self.st.calls[-1], ("first", "Int32", "Fuzzy (± Toleranz)", "75", "5"))
+
+    def test_fuzzy_search_by_checkbox_and_tolerance_field(self):
+        self.t.v_approx.set(True)
+        self.t.v_tol.set("10%")
+        self.t.v_num.set("0.7")
+        self.t.start_search()
+        self.assertEqual(self.st.calls[-1], ("first", "Float", "Fuzzy (± Toleranz)", "0.7", "10%"))
+
+    def test_fuzzy_unknown_float_and_changed_button(self):
+        self.t.v_unknown.set(True)
+        self.t.v_float.set(True)
+        self.t.start_search()
+        self.assertEqual(self.st.calls[-1][1:3], ("Float", "Unbekannter Startwert"))
+        self.finish(True)
+        self.t.narrow("changed")
+        self.assertEqual(self.st.calls[-1], ("next", "Verändert", ""))
+
+    def test_fuzzy_narrowing_uses_type_of_running_search(self):
+        self.t.v_num.set("100")
+        self.t.start_search()
+        self.finish(True)
+        self.t.v_new.set("90~5")
+        self.t.narrow("exact")
+        self.assertEqual(self.st.calls[-1], ("next", "Fuzzy (± Toleranz)", "90", "5"))
+
+    def test_fuzzy_bad_input_is_reported_not_scanned(self):
+        n = len(self.st.calls)
+        self.t.v_num.set("abc~5")
+        self.t.start_search()
+        self.assertEqual(len(self.st.calls), n)
+        self.assertEqual(self.w.logs[-1][0], "warn")
 
     def test_narrow_needs_first_scan(self):
         self.t.narrow("down")

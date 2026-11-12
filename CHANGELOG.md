@@ -2,9 +2,23 @@
 
 Older release notes (German) are in [`docs/history/`](docs/history/).
 
-## Unreleased
+## 6.3.0 - 2026-11-12
 
-**A guided assistant from a number in the game to a finished cheat, and ReapPatch export.**
+**Easier from the first number to a finished cheat: a guided assistant, fuzzy value search, items found without relying on names, Unity on par with Unreal, and a calmer tools window.** Please update - nothing else changes for existing projects.
+
+### Added (fuzzy value search)
+Games often show rounded numbers (health 75 while the game holds 74.6) or only a bar. The exact search finds nothing then.
+- **Approximate numbers with a tolerance.** Type `75~5` (75 plus or minus 5), `75~10%`, `~75` or `ca. 75` (standard tolerance 5 %). In **FIND VALUE** there
+  is a new comparison **Fuzzy (± tolerance)** (the second field becomes **TOLERANCE**, `5` or `5%`); in the **ASSISTANT** tick **Approximate (fuzzy)**
+  or just type the range - **NARROW DOWN** accepts the same forms. It runs as the scanner's existing range compare, so the console payload needs
+  nothing new. Whole numbers always get at least plus or minus 1; bounds are clamped to the value type (`UInt8` never goes below 0 or above 255).
+- **Unknown number as a decimal number.** The ASSISTANT can start an unknown-value search as *Float* (tick **Decimal number**), and has a new
+  **CHANGED** button next to DROPPED / ROSE / STAYED THE SAME.
+- New module `fuzzy.py`; `scanner.check_values()` validates the inputs before a scan with a readable message. Tests: `tests/test_fuzzy.py` and five new
+  cases in `tests/test_gui_assist.py`. New section "Rounded numbers: fuzzy search" in the how-to guide "Find a value" (German and English).
+
+### Added (guided assistant and ReapPatch export)
+The ASSISTANT tab guides from a number in the game to a finished cheat (see the how-to guide "Cheat in four steps"); cheats can be saved as `.ReapPatch`.
 
 ### Added (finding items without relying on names - UNREAL and UNITY ITEMS)
 Before, the item list was recognised **only by its name** (`DT_ItemParam`, `ItemID` ...). Games with other names (`Mst_Buki`, `E_Obj`,
