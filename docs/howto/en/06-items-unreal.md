@@ -15,6 +15,15 @@ Press **FIND ITEMS**. ReaperPy rates every table and function of the game, picks
 - **Filter** *strict / normal / off* - how strictly tables and functions are filtered. If nothing is found, the log tells where the filter dropped things.
 - Only advanced users need *Change the choice myself*: it lets you pick the item list and the give-function.
 
+## No item list found?
+ReaperPy first recognises the item table by its **name** (Item, Weapon, Loot ...). If the game uses other names, it then looks at the **content** of every table: how many entries, whether the names form groups like `Sword_Iron`, `Potion_Small`, and whether they sound like items. A list found this way is marked with a warning sign and the first names, so you can see at once whether it really contains items.
+
+If nothing is found, a line appears under the buttons:
+- **Type the name of an item you can see in the game** (for example *Potion*) and press **SEARCH IN ALL LISTS**. ReaperPy looks for that name in every table and takes the one it is in as the item list. In games that are translated, the name on screen can differ from the internal one - then try the English name or just a part of it.
+- **CHECK ALL LISTS** rates every table by content and offers the best ones under *Possible item lists*, each with its size and the first names so you can recognise it.
+
+If the strict filter finds no give-function, ReaperPy loosens the filter once by itself and tells you so. Check such a function with **TEST 1 ITEM**.
+
 ## Step 3 - Save the trainer
 Press **SAVE TRAINER**, enter the amount per item and save. The amount is cut to the game's own limit where the table has one. The result is a normal ReaperPy project:
 1. Choose the folder as a project.

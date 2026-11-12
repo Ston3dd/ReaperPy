@@ -15,6 +15,11 @@ Drücke **SPIEL-ORDNER WÄHLEN …** und wähle den Il2CppDumper-Ordner. Bei ein
 ## Schritt 2 - Items finden
 Drücke **ITEMS FINDEN**. ReaperPy wählt die Item-Liste (das Enum mit den Item-IDs), die Methode zum Geben von Items (`AddItem`, `GiveItem` ... mit einer Item-ID und optional einer Menge) und einen Einstiegspunkt von selbst. Hake die gewünschten Items an.
 
+## Keine Item-Liste gefunden?
+ReaperPy erkennt die Item-Liste (ein Enum) am Namen, an einer Geben-Methode, die sie nimmt (`Put(E_Obj id, int n)` - auch wenn das Enum einen unpassenden Namen hat) und als schwächeren Hinweis am **Inhalt** (Namen wie `Sword_Iron`, `Potion_Small`). Nur am Inhalt erkannte Listen sind mit einem Warnzeichen und den ersten Namen markiert.
+
+Wird nichts gefunden, **tippe unter den Knöpfen den Namen eines Items, das du im Spiel siehst**, und drücke **IN ALLEN LISTEN SUCHEN** - das Enum, in dem der Name steht, wird zur Item-Liste. **ALLE LISTEN PRÜFEN** bietet die besten Kandidaten unter *Mögliche Item-Listen* an. Findet der Filter keine Geben-Methode, lockert ReaperPy ihn einmal selbst; prüfe so eine Methode mit **1 ITEM TESTEN**.
+
 ## Schritt 3 - Trainer speichern
 Drücke **TRAINER SPEICHERN**. Das Ergebnis ist ein normales ReaperPy-Projekt, genau wie bei [Items in Unreal-Spielen](howto:items-unreal): Schalte `00 BASIS` einmal ein und klicke dann die Einträge. Kategorien, mehrere Projekte und **TRAINER PRÜFEN …** funktionieren genauso.
 

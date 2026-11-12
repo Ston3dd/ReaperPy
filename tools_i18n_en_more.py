@@ -4,6 +4,17 @@ Wird am Ende von tools_i18n_en.py in EN eingemischt. Schluessel = deutscher Text
 """
 
 EN_MORE = {
+    ') - nehme die nächste': ') - using the next one',
+    ' nicht lesbar (': ' not readable (',
+    'Inhalt geprüft: ': 'Content checked: ',
+    ' (Zeitlimit)': ' (time limit)',
+    '. Beste nach Inhalt: ': '. Best by content: ',
+    'Geben-Funktion: strenger Filter fand keine, mit gelockertem Filter gefunden.': 'Give function: the strict filter found none, found with a loosened filter.',
+    'Keine Item-Tabelle am Namen erkannt - prüfe den Inhalt aller Tabellen …': 'No item table recognised by name - checking the content of all tables …',
+    'Kennst du ein Item aus dem Spiel? Tippe seinen Namen:': 'Do you know an item from the game? Type its name:',
+    'IN ALLEN LISTEN SUCHEN': 'SEARCH IN ALL LISTS',
+    'ALLE LISTEN PRÜFEN': 'CHECK ALL LISTS',
+    'Mögliche Item-Listen': 'Possible item lists',
     'Noch keine Treffer. Gib oben die Zahl ein und klicke SUCHEN.': 'No hits yet. Enter the number above and click SEARCH.',
     'Noch nichts beobachtet. Klicke BEOBACHTEN und ändere den Wert im Spiel.': 'Nothing watched yet. Click WATCH and change the value in the game.',
     'Noch keine Treffer. Gib einen Wert ein und klicke ERSTER SCAN.': 'No hits yet. Enter a value and click FIRST SCAN.',

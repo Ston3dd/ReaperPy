@@ -6,6 +6,30 @@ Older release notes (German) are in [`docs/history/`](docs/history/).
 
 **A guided assistant from a number in the game to a finished cheat, and ReapPatch export.**
 
+### Added (finding items without relying on names - UNREAL and UNITY ITEMS)
+Before, the item list was recognised **only by its name** (`DT_ItemParam`, `ItemID` ...). Games with other names (`Mst_Buki`, `E_Obj`,
+`DT_Param001`) found nothing, and the manual choice was a list of technical names nobody could judge. Now, inside the existing ITEMS cards
+(no new window):
+- **Recognised by content.** If no table / enum is found by name, ReaperPy reads the rows of every table (names only, capped, with a time limit
+  and a cache) and rates them: number of entries, groups of names like `Sword_*` / `Potion_*`, item words, and effect / UI / sound words as a
+  minus. A list found this way is used but flagged with a warning sign and its first names; one uniform prefix alone ("Mst_Buki_0001 ...")
+  is never enough. New module `item_finder.py`.
+- **"Type the name of an item you can see in the game"** + **SEARCH IN ALL LISTS**: the list that contains the name becomes the item list;
+  lists that look like items rank before accidental hits (an effect table with 40 `Potion_Splash_*` does not beat the real item list).
+  All hits are offered under **Possible item lists** (name, size, first names). **CHECK ALL LISTS** does the content rating on demand.
+- **Unity: a give method identifies the item enum even if its name says nothing** (`Put(E_Obj id, int n)`): `give_enum_types()` finds the enum
+  types of give-named methods; before, such an enum was dropped before the give bonus was even considered (chicken-and-egg in
+  `classify_give`). Content-only enums rank below any name match; noise (colours, `UIButtonKind` with B0..B29) stays out.
+- **Filter loosened once automatically** when the strict filter finds no give function / method; the result is marked "fallback - please check
+  with TEST 1 ITEM" instead of silently showing nothing.
+- **Plain reasons instead of a bare "not recognised".** The message says how many tables / lists were checked (and whether the time limit hit)
+  and what to do next. (The two new buttons are deliberately not greyed out without a console: UNITY works from the dump alone, and in UNREAL
+  a clear message says to press FIND ITEMS first.)
+
+### Fixed
+- **One unreadable table aborted UNREAL FIND ITEMS** with a memory error (most likely with the filter on "off", where every table is a
+  candidate). Unreadable tables are now skipped with a log line and the next one is tried.
+
 ### Added (look and feel of the tools window)
 - **Status lights on START.** "Connected?" and "Codes loaded?" show a green / red / grey dot instead of a ✓/✗ character in running text.
 - **CHECK CONNECTION in colour.** Each step of the result is green (ok), red (problem), yellow (note) or grey (skipped); the explanation sits

@@ -19,6 +19,8 @@ from tkinter import filedialog, messagebox, ttk
 import cave_trainer as TR
 import imagebase as IB
 import item_check as IC
+import item_finder as F
+import tools_i18n
 import ue_items as IT
 import ue_profile as P
 import ue_quick as Q
@@ -27,6 +29,13 @@ from tools_common import (BG, BG_CARD, ACCENT, ERROR, FONT_HEAD, FONT_LABEL, TEX
 from tools_scan_gui import _check, card, clabel, pbtn
 
 MAX_SHOWN = 5000
+
+
+def _L(de, en):
+    """Meldung in der gerade gewaehlten Sprache (Texte, die erst zur Laufzeit zusammengesetzt werden)."""
+    return en if tools_i18n.lang() == "en" else de
+
+
 ALL_CATS = "alle Kategorien"
 CHK = {True: "☑", False: "☐"}
 
@@ -45,6 +54,13 @@ class ItemsTab(BaseTab):
         self.expand_funcs = []            # Funktionen 'Inventar/Slots erweitern' (ue_items.find_expand), leer = kein Knopf
         self.verified = {}                # {Klasse.Funktion: 'ok' | 'fail'} - Ergebnis des Tests '1 Item testen'
         self.cands = []                   # Tabellen-Vorschlaege aus dem SDK
+        self.probe_cache = {}             # item_finder: {(addr, name): Probe} - Listen, die schon am Inhalt bewertet wurden
+        self.probe_result = None          # letztes ProbeResult (fuer die Meldung "n von m Listen geprueft")
+        self.cand_probes = []             # Kandidaten-Listen fuer die Auswahl "Mögliche Item-Listen"
+        self.found_by = "name"            # wie die Liste gefunden wurde: name | content | search | manual
+        self.func_loosened = False        # Geben-Funktion nur mit gelockertem Filter gefunden
+        self._note = None                 # einmalige Zusatzmeldung fuer _report
+        self._help_shown = False
         self.table = None                 # (addr, name) der gelesenen Tabelle
         self.items, self.on, self.view = [], [], []
         self.out_dirs = []
@@ -153,6 +169,25 @@ class ItemsTab(BaseTab):
         self.chk_cleanup.pack(side="left", padx=8)
         self.lbl_count = clabel(flt, "")
         self.lbl_count.pack(side="right")
+
+        self._flt = flt
+        # Hilfe, wenn die Liste nicht am Namen erkannt wird (erscheint nur dann; kein eigenes Fenster)
+        self.row_help = tk.Frame(body, bg=BG_CARD)
+        h1 = tk.Frame(self.row_help, bg=BG_CARD)
+        h1.pack(fill="x")
+        clabel(h1, "Kennst du ein Item aus dem Spiel? Tippe seinen Namen:").pack(side="left")
+        self.v_known = tk.StringVar(value="")
+        ek = entry(h1, self.v_known, 22)
+        ek.pack(side="left", padx=(8, 8))
+        ek.bind("<Return>", lambda _e: self.search_known())
+        pbtn(h1, "IN ALLEN LISTEN SUCHEN", self.search_known).pack(side="left")
+        pbtn(h1, "ALLE LISTEN PRÜFEN", self.check_all_lists).pack(side="left", padx=(8, 0))
+        self.h2 = tk.Frame(self.row_help, bg=BG_CARD)               # Kandidaten (erscheint, wenn es welche gibt)
+        clabel(self.h2, "Mögliche Item-Listen").pack(side="left")
+        self.v_cand = tk.StringVar(value="")
+        self.cb_cand = ttk.Combobox(self.h2, textvariable=self.v_cand, values=[], width=95, state="readonly")
+        self.cb_cand.pack(side="left", padx=8)
+        self.cb_cand.bind("<<ComboboxSelected>>", lambda _e: self.pick_candidate())
 
         fr = tk.Frame(body, bg=BG_CARD)
         fr.pack(fill="both", expand=True)
@@ -282,7 +317,11 @@ class ItemsTab(BaseTab):
             table = rows = cols = items = None
             parts, used = [], []
             for s, pick in ranked[:IT.MAX_TABLES if merge else 6]:       # Tabellen, die wirklich Zeilen liefern
-                r, c = P.read_table(live.rd, live.fname_str, pick[0], s.data.get("columns", []))
+                try:
+                    r, c = P.read_table(live.rd, live.fname_str, pick[0], s.data.get("columns", []))
+                except Exception as e:  # noqa: BLE001 - eine nicht lesbare Tabelle darf die Suche nicht abbrechen
+                    self._ilog(f"Tabelle {pick[1]} nicht lesbar ({e}) - nehme die nächste")
+                    continue
                 if r:
                     parts.append((pick[1], r, c))
                     used.append(pick)
@@ -292,8 +331,24 @@ class ItemsTab(BaseTab):
             if merge and parts:
                 table, items = used[0], IT.merge_tables(parts)
                 rows, cols = parts[0][1], parts[0][2]
+            method, probe_res = "name", None
+            if not rows and not items and tables:                         # nichts am Namen / im SDK: am INHALT erkennen
+                self._ilog("Keine Item-Tabelle am Namen erkannt - prüfe den Inhalt aller Tabellen …")
+                probe_res = self._probe_all(live, tables, rated_t)
+                best = probe_res.best()
+                if best is not None:
+                    r, c = P.read_table(live.rd, live.fname_str, best.key[0], self._cols_for(best.key, rated_t, cands))
+                    if r:
+                        table, rows, cols, method = best.key, r, c, "content"
+                        used, parts = [best.key], [(best.key[1], r, c)]
             rated_f = IT.rate_functions(prof, sdk, level, verified, live, live.rd)                  # nur Funktionen, die der Trainer bauen kann
             funcs, bad = IT.give_candidates(prof, sdk, level)
+            loosened = False
+            if not rated_f and level != IT.LEVEL_OFF:                     # strenger Filter fand nichts: einmal gelockert versuchen
+                rated_f2 = IT.rate_functions(prof, sdk, IT.LEVEL_OFF, verified, live, live.rd)
+                if rated_f2:
+                    rated_f, loosened = rated_f2, True
+                    funcs, bad = IT.give_candidates(prof, sdk, IT.LEVEL_OFF)
             try:                                                      # stimmt die Image-Basis mit der Konsole ueberein?
                 bc = IB.check_image_base(client.get_maps_named(), self.base)
             except Exception as e:  # noqa: BLE001
@@ -307,7 +362,8 @@ class ItemsTab(BaseTab):
             return {"expand": expand, "prof": prof, "sig": sig, "fresh": fresh, "live": live, "tables": tables, "cands": cands,
                     "table": table, "rows": rows or [], "cols": cols or [], "funcs": funcs, "bad": bad, "cap": cap, "basecheck": bc,
                     "rated_t": rated_t, "rated_f": rated_f, "items": items, "used": [u[1] for u in used], "level": level,
-                    "n_tables": len(tables), "n_parts": len(parts)}
+                    "n_tables": len(tables), "n_parts": len(parts), "method": method, "probe": probe_res,
+                    "loosened": loosened}
 
         def ok(res):
             self._busy = False
@@ -333,6 +389,11 @@ class ItemsTab(BaseTab):
             self.func = self.func_rating["sug"] if self.func_rating else (self.funcs[0] if self.funcs else None)
             self.table = res["table"]
             self.tables_used = res.get("used") or ([res["table"][1]] if res["table"] else [])
+            self.found_by = res.get("method", "name")
+            self.func_loosened = bool(res.get("loosened"))
+            self.probe_result = res.get("probe")
+            if self.probe_result is not None:
+                self._set_candidates(self.probe_result.ranked(F.CONTENT_MAYBE)[:12])
             self.diag = self._diag_text(res)
             self._fill_choices()
             self.set_items(res["rows"], res["cols"], res.get("items"))
@@ -365,6 +426,13 @@ class ItemsTab(BaseTab):
         if not res.get("items") and not res.get("rows"):
             top = ", ".join(f"{r['name']} ({r['score']})" for r in rt[:5])
             lines.append("Beste Tabellen nach Name: " + (top or "keine") + " - Filter auf 'aus' stellen, um alle zu sehen.")
+        pr = res.get("probe")
+        if pr is not None:
+            top = ", ".join(f"{p.name} ({p.score})" for p in pr.ranked(F.CONTENT_MAYBE)[:5])
+            lines.append(f"Inhalt geprüft: {pr.checked} von {pr.total} Tabellen"
+                         + (" (Zeitlimit)" if pr.timed_out else "") + ". Beste nach Inhalt: " + (top or "keine"))
+        if res.get("loosened"):
+            lines.append("Geben-Funktion: strenger Filter fand keine, mit gelockertem Filter gefunden.")
         if not res.get("rated_f"):
             why = res["bad"][0][1] if res.get("bad") else "keine Funktion mit Item-ID im SDK"
             lines.append("Keine baubare Geben-Funktion: " + why)
@@ -473,33 +541,44 @@ class ItemsTab(BaseTab):
         return f"{s.data.get('owner', '')}.{s.data.get('name', s.title)}" if s is not None else ""
 
     def _report(self):
-        parts = []
+        parts, lang = [], tools_i18n.lang()
+        if self._note:                                                     # Meldung der Suche / Auswahl (einmalig)
+            parts.append(self._note)
+            self._note = None
         if self.table and self.items and len(self.tables_used) > 1:
             parts.append(f"✔ {len(self.items)} Items aus {len(self.tables_used)} Tabellen "
                          f"({', '.join(self.tables_used[:3])}{' …' if len(self.tables_used) > 3 else ''})")
+        elif self.table and self.items and self.found_by == "content":
+            parts.append("⚠ " + F.msg_content_pick(self.table[1], len(self.items), [i["name"] for i in self.items], lang))
         elif self.table and self.items:
             parts.append(f"✔ {len(self.items)} Items aus der Tabelle {self.table[1]}")
         elif self.live_tables:
-            parts.append("✗ Keine Item-Liste automatisch erkannt - oben 'Auswahl selbst ändern' ankreuzen und eine Liste "
-                         "wählen (Namen mit Item / Weapon / Loot stehen oben)")
+            pr = self.probe_result
+            parts.append("✗ " + F.msg_nothing(len(self.live_tables), pr.checked if pr else 0, bool(pr and pr.timed_out),
+                                              "table", lang) + " " + F.msg_next_step(lang))
         else:
             parts.append("✗ Im Spiel wurden keine Tabellen gefunden - Spielstand geladen (nicht im Hauptmenü)?")
-        weak = self.func_rating is not None and not self.func_rating["relevant"]
+        weak = (self.func_rating is not None and not self.func_rating["relevant"]) or (self.func_loosened and bool(self.func))
         if self.func and not weak:
             parts.append(f"✔ Geben-Funktion: {self._func_title(self.func)}"
                          + (" (feste Objekt-Adresse: der Trainer gilt nur bis zum Spielende)"
                             if (self.func_rating or {}).get("reach") == "abs"
                             and not (self.func_rating or {}).get("persistent") else ""))
         elif self.func:
-            parts.append(f"⚠ Geben-Funktion: {self._func_title(self.func)} - {self._weak_reason()}")
+            why = (_L("Notlösung: der strenge Filter fand keine passende Funktion, ich habe ihn gelockert - bitte mit "
+                      "1 ITEM TESTEN prüfen", "fallback: the strict filter found no matching function, so I loosened it - "
+                      "please check it with TEST 1 ITEM") if self.func_loosened else self._weak_reason())
+            parts.append(f"⚠ Geben-Funktion: {self._func_title(self.func)} - {why}")
         else:
             why = self.func_bad[0][1] if self.func_bad else "keine Funktion zum Geben von Items im SDK"
             parts.append("✗ Keine Funktion gefunden, die der Trainer bauen kann (" + why + ") - dafür den Weg über "
                          "UE-ENTDECKER → INVENTAR-EINTRÄGE SUCHEN nutzen")
         if self.basecheck is not None and self.basecheck.status == "shifted":
             parts.insert(0, "✗ " + self.basecheck.message + " → BASIS ÜBERNEHMEN klicken")
-        good = bool(self.items and self.func) and not weak and not (self.basecheck and self.basecheck.status == "shifted")
+        good = (bool(self.items and self.func) and not weak and self.found_by != "content"
+                and not (self.basecheck and self.basecheck.status == "shifted"))
         self._found("   |   ".join(parts), ACCENT if good else WARN)
+        self._show_help(bool(self.live_tables) and (not self.items or self.found_by == "content"))
         self.update_summary()
 
     # --- Test: EIN Item live geben ------------------------------------------------------------
@@ -663,20 +742,27 @@ class ItemsTab(BaseTab):
 
     def pick_table(self):
         name = self.v_table.get()
-        pick = next((t for t in self.live_tables if t[1] == name), None)
-        ue = self._ue()
-        live = getattr(ue, "live", None)
+        self._load_table(next((t for t in self.live_tables if t[1] == name), None), by="manual")
+
+    def _cols_for(self, pick, rated=None, cands=None):
+        """Spalten-Vorschlag (aus dem SDK) fuer eine Tabelle - leer, wenn das SDK sie nicht kennt."""
+        rated = self.rated_tables if rated is None else rated
+        cands = self.cands if cands is None else cands
+        pick = tuple(pick)
+        rt = next((r for r in rated if (r["addr"], r["name"]) == pick), None)
+        if rt is not None and rt["sug"] is not None:
+            return rt["sug"].data.get("columns", [])
+        for s in cands:
+            if P.best_table_for(s, [pick]) == pick:
+                return s.data.get("columns", [])
+        return []
+
+    def _load_table(self, pick, by="manual", note=None):
+        """Eine Tabelle als Item-Liste lesen.  by: manual | search | content (steuert die Meldung); note: Zusatzmeldung."""
+        live = getattr(self._ue(), "live", None)
         if pick is None or live is None or self._busy:
             return
-        cols = []
-        rt = next((r for r in self.rated_tables if (r["addr"], r["name"]) == pick), None)
-        if rt is not None and rt["sug"] is not None:
-            cols = rt["sug"].data.get("columns", [])
-        else:
-            for s in self.cands:
-                if P.best_table_for(s, [pick]) == pick:
-                    cols = s.data.get("columns", [])
-                    break
+        cols = self._cols_for(pick)
         self._busy = True
 
         def job():
@@ -684,12 +770,136 @@ class ItemsTab(BaseTab):
 
         def ok(res):
             self._busy = False
-            self.table = pick
+            self.table, self.tables_used, self.found_by, self._note = pick, [pick[1]], by, note
+            self._fill_choices()
             self.set_items(*res)
             self._report()
 
         def fail(e):
             self._busy = False
+            self.log(str(e), "err")
+        self.bg(job, ok, fail)
+
+    # ------------------------------------------------------------------
+    # Hilfe, wenn die Liste nicht am Namen erkannt wird (alles in dieser Karte, kein eigenes Fenster)
+    # ------------------------------------------------------------------
+    def _probe_all(self, live, tables, rated):
+        """ALLE Tabellen des Spiels am Inhalt bewerten (item_finder).  Laeuft im Hintergrund; schon gelesene kommen aus dem Cache."""
+        order = [(r["addr"], r["name"]) for r in rated or []]               # beste Namen zuerst, Junk zuletzt
+        seen = set(order)
+        order += [tuple(t) for t in tables if tuple(t) not in seen]
+
+        def reader(key):
+            rows, _c = P.read_table(live.rd, live.fname_str, key[0], [], limit=F.PROBE_ROWS)
+            return [r["name"] for r in rows]
+
+        def prog(k, n):
+            self.win.ui(lambda: self._found(_L(f"Prüfe Listen … {k}/{n}", f"Checking lists … {k}/{n}"), WARN))
+        return F.probe_tables([(k, k[1]) for k in order], reader, progress=prog, cache=self.probe_cache)
+
+    def _show_help(self, show):
+        if show and not self._help_shown:
+            self.row_help.pack(fill="x", pady=(4, 0), before=self._flt)
+            self._help_shown = True
+        elif not show and self._help_shown:
+            self.row_help.pack_forget()
+            self._help_shown = False
+
+    def _set_candidates(self, probes, by="content"):
+        self.cand_probes, self.cand_by = list(probes), by
+        lang = tools_i18n.lang()
+        self.cb_cand.configure(values=[p.label(lang) for p in self.cand_probes])
+        self.v_cand.set("")
+        if self.cand_probes:
+            self.h2.pack(fill="x", pady=(4, 0))
+        else:
+            self.h2.pack_forget()
+
+    def pick_candidate(self):
+        i = self.cb_cand.current()
+        if 0 <= i < len(self.cand_probes):
+            self._load_table(self.cand_probes[i].key, by="search" if getattr(self, "cand_by", "") == "search" else "manual")
+
+    def _need_game(self):
+        """(live, True) wenn ITEMS FINDEN schon gelaufen ist; sonst Hinweis und (None, False)."""
+        live = getattr(self._ue(), "live", None)
+        if self._busy:
+            self.log("Es läuft noch ein Auftrag - kurz warten", "warn")
+            return None, False
+        if live is None or not self.live_tables:
+            self._found(_L("Erst ITEMS FINDEN (Spiel laden, verbinden, Spielstand geladen).",
+                           "Press FIND ITEMS first (load the game, connect, save game loaded)."), ERROR)
+            return None, False
+        return live, True
+
+    def check_all_lists(self):
+        """ALLE LISTEN PRÜFEN: jede Tabelle am Inhalt bewerten, die besten als Auswahl anbieten."""
+        live, ok_ = self._need_game()
+        if not ok_:
+            return
+        self._busy = True
+        self._found(_L("Prüfe alle Listen … (kann bis zu einer Minute dauern)",
+                       "Checking all lists … (can take up to a minute)"), WARN)
+        tables, rated = list(self.live_tables), list(self.rated_tables)
+
+        def job():
+            return self._probe_all(live, tables, rated)
+
+        def ok(res):
+            self._busy = False
+            self.probe_result = res
+            lang = tools_i18n.lang()
+            cands = res.ranked(F.CONTENT_MAYBE)[:12]
+            self._set_candidates(cands, "content")
+            best = res.best()
+            if best is not None and not self.items:                        # noch nichts gewaehlt: beste gleich laden
+                self._load_table(best.key, by="content")
+            elif cands:
+                self._found(_L(f"{len(cands)} mögliche Item-Listen gefunden ({res.checked} von {res.total} geprüft) - "
+                               "wähle unten eine aus.", f"{len(cands)} possible item lists found ({res.checked} of "
+                               f"{res.total} checked) - pick one below."), ACCENT)
+            else:
+                self._found("✗ " + F.msg_nothing(res.total, res.checked, res.timed_out, "table", lang) + " "
+                            + F.msg_next_step(lang), WARN)
+
+        def fail(e):
+            self._busy = False
+            self._found(_L("Das hat nicht geklappt: ", "That did not work: ") + (str(e) or e.__class__.__name__), ERROR)
+            self.log(str(e), "err")
+        self.bg(job, ok, fail)
+
+    def search_known(self):
+        """Der Nutzer tippt den Namen eines Items, das er im Spiel sieht: die Liste, in der er steht, wird zur Item-Liste."""
+        q = self.v_known.get().strip()
+        if len(F.norm(q)) < 2:
+            return self._found(_L("Tippe den Namen (oder einen Teil davon) eines Items, das du im Spiel siehst.",
+                                  "Type the name (or part of it) of an item you can see in the game."), ERROR)
+        live, ok_ = self._need_game()
+        if not ok_:
+            return
+        self._busy = True
+        self._found(_L(f"Suche „{q}“ in allen Listen … (kann bis zu einer Minute dauern)",
+                       f"Searching “{q}” in all lists … (can take up to a minute)"), WARN)
+        tables, rated = list(self.live_tables), list(self.rated_tables)
+
+        def job():
+            res = self._probe_all(live, tables, rated)
+            return res, F.search(q, res.probes)
+
+        def ok(out):
+            res, found = out
+            self._busy = False
+            self.probe_result = res
+            lang = tools_i18n.lang()
+            if not found:
+                return self._found("✗ " + F.msg_search_none(q, res.checked, res.total, res.timed_out, lang), WARN)
+            self._set_candidates([f.probe for f in found[:12]], "search")
+            self._load_table(found[0].probe.key, by="search",
+                             note="✔ " + F.msg_search_found(q, found[0], len(found) - 1, lang))
+
+        def fail(e):
+            self._busy = False
+            self._found(_L("Das hat nicht geklappt: ", "That did not work: ") + (str(e) or e.__class__.__name__), ERROR)
             self.log(str(e), "err")
         self.bg(job, ok, fail)
 

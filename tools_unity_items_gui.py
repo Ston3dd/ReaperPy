@@ -16,6 +16,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import cave_trainer as TR
+import item_finder as F
+import tools_i18n
 import unity_items as U
 import unity_live as UL
 from tools_common import (BG, BG_CARD, ACCENT, ERROR, FONT_HEAD, FONT_LABEL, TEXT, TEXT_DIM, WARN, BaseTab, entry,
@@ -29,6 +31,11 @@ LEVEL_TEXT = {"strict": "streng", "normal": "normal", "off": "aus (alles zeigen)
 MAX_ENUMS = 60
 
 
+def _L(de, en):
+    """Meldung in der gerade gewaehlten Sprache (Texte, die erst zur Laufzeit zusammengesetzt werden)."""
+    return en if tools_i18n.lang() == "en" else de
+
+
 class UnityItemsTab(BaseTab):
     def __init__(self, parent, win):
         super().__init__(parent, win)
@@ -39,6 +46,12 @@ class UnityItemsTab(BaseTab):
         self.out_dirs = []
         self.cap = None
         self.verified = {}                          # Geben-Methode -> 'ok' | 'bad' (Ergebnis von 1 ITEM TESTEN)
+        self.found_by = "name"                      # wie die Item-Liste gefunden wurde: name | give | content | search | manual
+        self.loosened = False                       # Geben-Methode nur mit gelockertem Filter gefunden
+        self.n_enums = 0                            # Anzahl Enums im Dump (fuer die Meldung "nichts erkannt")
+        self.cand_probes, self.cand_by = [], "content"
+        self._note = None                           # einmalige Zusatzmeldung fuer _report
+        self._help_shown = False
         self.level = "normal"                       # Filter der Geben-Methoden: strict | normal | off
         self.v_level = tk.StringVar(value=LEVEL_TEXT["normal"])
         self._busy = False
@@ -109,8 +122,24 @@ class UnityItemsTab(BaseTab):
                    "(dann mit 1 ITEM TESTEN prüfen)").pack(side="left")
         clabel(body, "(alles automatisch gewählt - nur ändern, falls die Liste falsch aussieht)").pack(anchor="w")
 
-        flt = tk.Frame(body, bg=BG_CARD)
+        self._flt = flt = tk.Frame(body, bg=BG_CARD)
         flt.pack(fill="x", pady=(8, 4))
+        self.row_help = tk.Frame(body, bg=BG_CARD)               # Hilfe, wenn die Liste nicht am Namen erkannt wird
+        h1 = tk.Frame(self.row_help, bg=BG_CARD)
+        h1.pack(fill="x")
+        clabel(h1, "Kennst du ein Item aus dem Spiel? Tippe seinen Namen:").pack(side="left")
+        self.v_known = tk.StringVar(value="")
+        ek = entry(h1, self.v_known, 22)
+        ek.pack(side="left", padx=(8, 8))
+        ek.bind("<Return>", lambda _e: self.search_known())
+        pbtn(h1, "IN ALLEN LISTEN SUCHEN", self.search_known).pack(side="left")
+        pbtn(h1, "ALLE LISTEN PRÜFEN", self.check_all_lists).pack(side="left", padx=(8, 0))
+        self.h2 = tk.Frame(self.row_help, bg=BG_CARD)
+        clabel(self.h2, "Mögliche Item-Listen").pack(side="left")
+        self.v_cand = tk.StringVar(value="")
+        self.cb_cand = ttk.Combobox(self.h2, textvariable=self.v_cand, values=[], width=95, state="readonly")
+        self.cb_cand.pack(side="left", padx=8)
+        self.cb_cand.bind("<<ComboboxSelected>>", lambda _e: self.pick_candidate())
         clabel(flt, "Suche").pack(side="left")
         q = entry(flt, self.v_q, 22)
         q.pack(side="left", padx=(8, 12))
@@ -217,17 +246,25 @@ class UnityItemsTab(BaseTab):
     def _analyse(self, game, enum_cls=None, level=None):
         """Im Job-Thread: Item-Liste, Geben-Methoden und Einstiege ermitteln (nur aus dump.cs)."""
         level = level or self.level
-        enums = U.item_enums(game, {g.id_param["type"] for g in U.give_candidates(game, None, level=level)[0]
-                                    if g.id_param["kind"] == "enum"})
+        give_types = {g.id_param["type"] for g in U.give_candidates(game, None, level=level)[0] if g.id_param["kind"] == "enum"}
+        give_types |= U.give_enum_types(game, level)               # auch Enums mit unpassendem Namen (E_Obj, Buki ...)
+        enums = U.item_enums(game, give_types)
         if enum_cls is None and enums:
             enum_cls = enums[0][0]
         gives, bad = U.give_candidates(game, enum_cls, level=level)
+        loosened = False
+        if not gives and level != "off":                          # strenger Filter fand nichts: einmal gelockert versuchen
+            gives2, bad2 = U.give_candidates(game, enum_cls, level="off")
+            if gives2:
+                gives, bad, loosened = gives2, bad2, True
         gives = UL.rank_gives(gives, self.verified)
         give = gives[0] if gives else None
         hooks = U.hook_candidates(game, give) if give else []
         items = U.build_items(enum_cls) if enum_cls is not None else []
+        how = U.enum_how(enum_cls, give_types) if enum_cls is not None else "name"
         return {"enums": enums[:MAX_ENUMS], "enum": enum_cls, "gives": gives, "bad": bad, "give": give, "hooks": hooks,
-                "items": items}
+                "items": items, "how": how, "loosened": loosened,
+                "n_enums": sum(1 for c in game.classes if c.kind == "enum")}
 
     def find_items(self):
         if self._busy:
@@ -244,8 +281,12 @@ class UnityItemsTab(BaseTab):
         self._found("Das hat nicht geklappt: " + (str(e) or e.__class__.__name__), ERROR)
         self.log(str(e), "err")
 
-    def _adopt(self, res, keep_list=False):
+    def _adopt(self, res, keep_list=False, how=None, note=None):
         self._busy = False
+        self.found_by = how or res.get("how", "name")
+        self.loosened = bool(res.get("loosened"))
+        self.n_enums = res.get("n_enums", self.n_enums)
+        self._note = note
         self.enums, self.enum = res["enums"], res["enum"]
         self.gives, self.give_bad, self.give = res["gives"], res["bad"], res["give"]
         self.hooks = res["hooks"]
@@ -270,13 +311,22 @@ class UnityItemsTab(BaseTab):
         self.fill()
 
     def _report(self):
-        parts = []
-        if self.items:
+        parts, lang = [], tools_i18n.lang()
+        if self._note:                                                     # Meldung der Suche / Auswahl (einmalig)
+            parts.append(self._note)
+            self._note = None
+        if self.items and self.found_by == "content":
+            parts.append("⚠ " + F.msg_content_pick(self.enum.name, len(self.items), [i["name"] for i in self.items], lang))
+        elif self.items:
             parts.append(f"✔ {len(self.items)} Items aus der Liste {self.enum.name}")
         else:
-            parts.append("✗ Keine Item-Liste erkannt - oben bei 'Item-Liste' eine auswählen (Namen mit Item zuerst), "
-                         "oder im Reiter EXPERTE ▸ NAMEN von Hand suchen")
-        if self.give:
+            parts.append("✗ " + F.msg_nothing(self.n_enums, 0, False, "enum", lang) + " " + F.msg_next_step(lang))
+        if self.give and self.loosened:
+            why = _L("Notlösung: der Filter fand keine passende Methode, ich habe ihn gelockert - bitte mit "
+                     "1 ITEM TESTEN prüfen", "fallback: the filter found no matching method, so I loosened it - "
+                     "please check it with TEST 1 ITEM")
+            parts.append(f"⚠ Geben-Methode: {self._give_title(self.give)} - {why}")
+        elif self.give:
             parts.append(f"✔ Geben-Methode: {self._give_title(self.give)}")
         else:
             why = self.give_bad[0][1] if self.give_bad else "keine Methode zum Geben von Items im Dump"
@@ -286,16 +336,103 @@ class UnityItemsTab(BaseTab):
             parts.append(f"✔ Einstieg: {self.hook.title}")
         elif self.give:
             parts.append("✗ Kein Einstieg (Update-Methode) für diese Methode gefunden - eine andere Geben-Methode wählen")
-        good = bool(self.items and self.give and self.hook)
+        good = bool(self.items and self.give and self.hook) and self.found_by != "content" and not self.loosened
         self._found("   |   ".join(parts), ACCENT if good else WARN)
+        self._show_help(not self.items or self.found_by == "content")
         self.update_summary()
 
-    def _reanalyse(self, enum_cls):
+    def _reanalyse(self, enum_cls, how="manual", note=None):
         game = self._game()
         if game is None or self._busy:
             return
         self._busy = True
-        self.bg(lambda: self._analyse(game, enum_cls, self.level), lambda r: self._adopt(r, keep_list=True), self._fail)
+        self.bg(lambda: self._analyse(game, enum_cls, self.level),
+                lambda r: self._adopt(r, keep_list=True, how=how, note=note), self._fail)
+
+    # ------------------------------------------------------------------
+    # Hilfe, wenn die Liste nicht am Namen erkannt wird (alles in dieser Karte, kein eigenes Fenster)
+    # ------------------------------------------------------------------
+    def _show_help(self, show):
+        if show and not self._help_shown:
+            self.row_help.pack(fill="x", pady=(4, 0), before=self._flt)
+            self._help_shown = True
+        elif not show and self._help_shown:
+            self.row_help.pack_forget()
+            self._help_shown = False
+
+    def _set_candidates(self, probes, by="content"):
+        self.cand_probes, self.cand_by = list(probes), by
+        lang = tools_i18n.lang()
+        self.cb_cand.configure(values=[p.label(lang) for p in self.cand_probes])
+        self.v_cand.set("")
+        if self.cand_probes:
+            self.h2.pack(fill="x", pady=(4, 0))
+        else:
+            self.h2.pack_forget()
+
+    def pick_candidate(self):
+        i = self.cb_cand.current()
+        if not 0 <= i < len(self.cand_probes):
+            return
+        game = self._game()
+        cls = next((c for c in game.classes if c.kind == "enum" and c.full == self.cand_probes[i].key), None) if game else None
+        if cls is not None:
+            self._reanalyse(cls, how="search" if self.cand_by == "search" else "manual")
+
+    def _need_game(self):
+        game = self._game()
+        if self._busy:
+            self.log("Es läuft noch ein Auftrag - kurz warten", "warn")
+            return None
+        if game is None:
+            self._found(_L("Zuerst Schritt ①: Spiel-Ordner wählen.", "First step ①: choose the game folder."), ERROR)
+        return game
+
+    def check_all_lists(self):
+        """ALLE LISTEN PRÜFEN: jedes Enum des Dumps am Inhalt bewerten, die besten als Auswahl anbieten."""
+        game = self._need_game()
+        if game is None:
+            return
+        self._busy = True
+        self._found(_L("Prüfe alle Listen …", "Checking all lists …"), WARN)
+
+        def ok(probes):
+            self._busy = False
+            ranked = sorted((p for p in probes if p.score >= F.CONTENT_MAYBE), key=lambda p: (-p.score, -p.count, p.name.lower()))
+            self._set_candidates(ranked[:12], "content")
+            best = next((p for p in ranked if p.score >= F.CONTENT_OK), None)
+            lang = tools_i18n.lang()
+            if best is not None and not self.items:
+                cls = next(c for c in game.classes if c.kind == "enum" and c.full == best.key)
+                self._reanalyse(cls, how="content")
+            elif ranked:
+                self._found(_L(f"{len(ranked[:12])} mögliche Item-Listen gefunden - wähle unten eine aus.",
+                               f"{len(ranked[:12])} possible item lists found - pick one below."), ACCENT)
+            else:
+                self._found("✗ " + F.msg_nothing(len(probes), len(probes), False, "enum", lang) + " " + F.msg_next_step(lang), WARN)
+        self.bg(lambda: U.enum_probes(game), ok, self._fail)
+
+    def search_known(self):
+        """Der Nutzer tippt den Namen eines Items, das er im Spiel sieht: das Enum, in dem er steht, wird zur Item-Liste."""
+        q = self.v_known.get().strip()
+        if len(F.norm(q)) < 2:
+            return self._found(_L("Tippe den Namen (oder einen Teil davon) eines Items, das du im Spiel siehst.",
+                                  "Type the name (or part of it) of an item you can see in the game."), ERROR)
+        game = self._need_game()
+        if game is None:
+            return
+        self._busy = True
+        self._found(_L(f"Suche „{q}“ in allen Listen …", f"Searching “{q}” in all lists …"), WARN)
+
+        def ok(found):
+            self._busy = False
+            lang = tools_i18n.lang()
+            if not found:
+                return self._found("✗ " + F.msg_search_none(q, len(U.enum_probes(game)), len(U.enum_probes(game)), False, lang), WARN)
+            self._set_candidates([f.probe for f in found[:12]], "search")
+            cls = next(c for c in game.classes if c.kind == "enum" and c.full == found[0].probe.key)
+            self._reanalyse(cls, how="search", note="✔ " + F.msg_search_found(q, found[0], len(found) - 1, lang))
+        self.bg(lambda: U.search_enums(game, q), ok, self._fail)
 
     def pick_level(self):
         name = self.v_level.get()

@@ -147,7 +147,8 @@ class NetButtons(unittest.TestCase):
 
     def test_offline_buttons_are_never_blocked(self):
         for name in ("VERBINDUNG PRÜFEN", "SPEICHERN…", "LADEN…", "NEU", "KONVERTIEREN", "CSV EXPORT", "OK", "SCHLIESSEN",
-                     "ABBRECHEN", "ZUM ASSISTENTEN", "HAUPTFENSTER ZEIGEN", "? HILFE", "SESSION LADEN…"):
+                     "ABBRECHEN", "ZUM ASSISTENTEN", "HAUPTFENSTER ZEIGEN", "? HILFE", "SESSION LADEN…",
+                     "IN ALLEN LISTEN SUCHEN", "ALLE LISTEN PRÜFEN"):                 # UNITY arbeitet ohne Konsole aus dem Dump
             self.assertNotIn(name, U.NET_BUTTONS, name)
 
 

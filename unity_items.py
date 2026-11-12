@@ -27,6 +27,7 @@ import struct
 
 import cave_trainer as TR
 import il2cpp_dump as D
+import item_finder as F
 import ue_items as IT
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -176,12 +177,21 @@ def enum_score(cls, give_types=()):
         return 0
     name = cls.name.split(".")[-1]
     s = 0.0
+    by_give = cls.name in give_types or cls.full in give_types
     if ITEM_ENUM_GOOD.match(name):
         s += 6
     elif ITEM_ENUM.search(name):
         s += 3
-    elif not ITEM_ENUM.search(cls.full):
-        return 0
+    elif ITEM_ENUM.search(cls.full):
+        pass                                      # der Namensraum sagt "Item": zaehlt, aber ohne Zuschlag
+    else:                                         # der NAME sagt nichts (E_Obj, Buki ...): Geben-Methode und INHALT entscheiden
+        content = F.content_score([n for n, _v in vals])[0]
+        if by_give and len(vals) >= 8:
+            s += 2                                # eine Geben-Methode nimmt dieses Enum: das ist sehr oft die Item-Liste
+        elif content >= F.CONTENT_OK:
+            s += min(content - 3.0, 2.5)          # nur am Inhalt erkannt: schwaecher als jede Namens-Erkennung
+        else:
+            return 0
     if ITEM_ENUM_TYPE.search(name) and len(vals) < 40:
         s -= 3                                    # sieht nach Kategorien aus, nicht nach der Item-Liste
     if len(vals) < 12:
@@ -196,6 +206,65 @@ def enum_score(cls, give_types=()):
     if len(vals) > 3000:
         s -= 2
     return s
+
+
+def give_enum_types(game, level="normal"):
+    """Enum-Typen, die eine Methode mit GEBEN-Namen (Add / Give / Grant / Put ...) als Parameter nimmt - neben einer Zahl (Menge).
+    Unabhaengig vom Namen des Enums: so wird auch 'E_Obj' / 'Buki' als Item-Liste erkannt, wenn 'Put(E_Obj id, int n)' sie nimmt.
+    (classify_give erkennt Enum-Parameter nur, wenn der Enum-Name schon nach Item klingt - ein Henne-Ei-Problem.)"""
+    enums = enum_map(game)
+    out = set()
+    for m in game.all_methods():
+        if not m.cls.image.startswith("Assembly-CSharp") or m.cls.kind == "enum" or m.rva <= 0:
+            continue
+        named = GIVE_NAME_LOOSE.search(m.name) or m.name in ("Put", "Insert", "Store")
+        if not named and not (level in ("normal", "off") and GIVE_NAME_WIDE.search(m.name)):
+            continue
+        if re.search(r"(?i)^(remove|delete|drop|use|consume|sell|clear|can|has|is|get_|set_|op_)", m.name):
+            continue
+        try:
+            params = [parse_param(p, enums) for p in split_params(m.params)]
+        except Exception:  # noqa: BLE001
+            continue
+        if any(p["ref"] for p in params) or not any(p["kind"] == "int" for p in params):
+            continue                                  # ohne Zahl daneben (Menge) ist es kaum eine Geben-Methode
+        out.update(p["type"] for p in params if p["kind"] == "enum")
+    return out
+
+
+def enum_how(cls, give_types=()):
+    """Woran wurde dieses Enum als Item-Liste erkannt?  'name' | 'give' (Geben-Methode nimmt es) | 'content' (nur am Inhalt)."""
+    name = cls.name.split(".")[-1]
+    if ITEM_ENUM_GOOD.match(name) or ITEM_ENUM.search(name) or ITEM_ENUM.search(cls.full):
+        return "name"
+    if cls.name in give_types or cls.full in give_types:
+        return "give"
+    return "content"
+
+
+def enum_probes(game):
+    """Alle Enums mit mindestens 4 Eintraegen als item_finder.Probe (Schluessel = vollstaendiger Name) - zum Suchen / Bewerten."""
+    cached = getattr(game, "_item_probes", None)
+    if cached is not None:
+        return cached
+    out = []
+    for c in game.classes:
+        if c.kind != "enum":
+            continue
+        names = [n for n, _v in real_values(c)]
+        if len(names) >= 4:
+            score, reasons = F.content_score(names)
+            out.append(F.Probe(c.full, c.name.split(".")[-1], names, score, reasons))
+    try:
+        game._item_probes = out
+    except AttributeError:
+        pass
+    return out
+
+
+def search_enums(game, query):
+    """Item-Name aus dem Spiel -> in welchen Enums steht er?  [item_finder.Found], beste zuerst."""
+    return F.search(query, enum_probes(game))
 
 
 def item_enums(game, give_types=()):

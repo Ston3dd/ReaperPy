@@ -1,8 +1,5 @@
 {
- "hide": [
-  "libsce",
-  "syslib"
- ],
+ "hide": [],
  "custom": "",
  "off": []
 }

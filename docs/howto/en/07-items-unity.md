@@ -15,6 +15,11 @@ Press **CHOOSE GAME FOLDER …** and pick the Il2CppDumper folder. Loading takes
 ## Step 2 - Find items
 Press **FIND ITEMS**. ReaperPy picks the item list (the enum with the item IDs), the method that gives items (`AddItem`, `GiveItem` ... with an item ID and optionally an amount) and an entry point on its own. Tick the items you want.
 
+## No item list found?
+ReaperPy recognises the item list (an enum) by its name, by a give method that takes it (`Put(E_Obj id, int n)` - even if the enum has an unhelpful name) and, as a weaker hint, by its **content** (names like `Sword_Iron`, `Potion_Small`). Content-only finds are marked with a warning sign and the first names.
+
+If nothing is found, **type the name of an item you can see in the game** under the buttons and press **SEARCH IN ALL LISTS** - the enum that contains the name becomes the item list. **CHECK ALL LISTS** offers the best candidates under *Possible item lists*. If the filter finds no give method, ReaperPy loosens it once by itself; check such a method with **TEST 1 ITEM**.
+
 ## Step 3 - Save the trainer
 Press **SAVE TRAINER**. The result is a normal ReaperPy project, just like in [Items in Unreal games](howto:items-unreal): switch on `00 BASE` once, then click the entries. Categories, several projects and **CHECK TRAINER …** work the same way.
 

@@ -15,6 +15,15 @@ Drücke **ITEMS FINDEN**. ReaperPy bewertet jede Tabelle und Funktion des Spiels
 - **Filter** *streng / normal / aus* - wie streng Tabellen und Funktionen gefiltert werden. Wird nichts gefunden, sagt das Protokoll, wo der Filter etwas verworfen hat.
 - Nur Fortgeschrittene brauchen *Auswahl selbst ändern*: Damit wählst du die Item-Liste und die Geben-Funktion selbst.
 
+## Keine Item-Liste gefunden?
+ReaperPy erkennt die Item-Tabelle zuerst am **Namen** (Item, Weapon, Loot ...). Benutzt das Spiel andere Namen, schaut es danach auf den **Inhalt** jeder Tabelle: wie viele Einträge, ob die Namen Gruppen wie `Sword_Iron`, `Potion_Small` bilden und ob sie nach Items klingen. Eine so gefundene Liste ist mit einem Warnzeichen und den ersten Namen markiert, damit du sofort siehst, ob wirklich Items drin sind.
+
+Wird nichts gefunden, erscheint unter den Knöpfen eine Zeile:
+- **Tippe den Namen eines Items, das du im Spiel siehst** (zum Beispiel *Potion*), und drücke **IN ALLEN LISTEN SUCHEN**. ReaperPy sucht den Namen in jeder Tabelle und nimmt die, in der er steht, als Item-Liste. Bei übersetzten Spielen kann der Name auf dem Bildschirm vom internen abweichen - probiere dann den englischen Namen oder nur einen Teil davon.
+- **ALLE LISTEN PRÜFEN** bewertet jede Tabelle nach Inhalt und bietet die besten unter *Mögliche Item-Listen* an, mit Größe und den ersten Namen zum Wiedererkennen.
+
+Findet der strenge Filter keine Geben-Funktion, lockert ReaperPy ihn einmal selbst und sagt es dazu. Prüfe so eine Funktion mit **1 ITEM TESTEN**.
+
 ## Schritt 3 - Trainer speichern
 Drücke **TRAINER SPEICHERN**, gib die Menge pro Item ein und speichere. Die Menge wird auf das eigene Limit des Spiels gekürzt, wenn die Tabelle eines hat. Das Ergebnis ist ein normales ReaperPy-Projekt:
 1. Wähle den Ordner als Projekt.
