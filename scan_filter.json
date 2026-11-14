@@ -1,5 +1,7 @@
 {
- "hide": [],
+ "hide": [
+  "syslib"
+ ],
  "custom": "",
  "off": []
 }

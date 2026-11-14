@@ -610,6 +610,27 @@ def _gui_dialog():
                 tk.Entry(row2, textvariable=var, width=w, bg=BG_CARD, fg=ACCENT, insertbackground=ACCENT,
                          relief="flat", font=FONT_MONO).pack(side="left")
 
+            row3 = tk.Frame(self, bg=BG)
+            row3.pack(fill="x", padx=12, pady=2)
+            self.v_card = tk.BooleanVar(value=bool(app.cfg.get("release_card", True)))
+            tk.Checkbutton(row3, text="Release-Karte (PNG) mit erstellen", variable=self.v_card, bg=BG, fg=ACCENT,
+                           selectcolor=BG, activebackground=BG, activeforeground=ACCENT,
+                           font=FONT_LABEL).pack(side="left", padx=(8, 8))
+            self.v_art = tk.StringVar(value="")
+            self.v_accent = tk.StringVar(value=app.cfg.get("release_card_accent", ""))
+            tk.Label(row3, text="Cover", bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(side="left", padx=(4, 3))
+            tk.Entry(row3, textvariable=self.v_art, width=24, bg=BG_CARD, fg=ACCENT, insertbackground=ACCENT,
+                     relief="flat", font=FONT_MONO).pack(side="left")
+            tk.Button(row3, text="WÄHLEN ...", bg=BG_CARD, fg=ACCENT, font=FONT_LABEL, relief="flat", bd=0, padx=8,
+                      pady=2, cursor="hand2", command=self.pick_art).pack(side="left", padx=4)
+            tk.Label(row3, text="Farbe", bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(side="left", padx=(8, 3))
+            tk.Entry(row3, textvariable=self.v_accent, width=8, bg=BG_CARD, fg=ACCENT, insertbackground=ACCENT,
+                     relief="flat", font=FONT_MONO).pack(side="left")
+            tk.Button(row3, text="NUR KARTE ...", bg=BG_CARD, fg=ACCENT, font=FONT_LABEL, relief="flat", bd=0, padx=8,
+                      pady=2, cursor="hand2", command=self.card_only).pack(side="right")
+            tk.Label(self, text="Cover und Farbe leer lassen: das Cover wird in der Bibliothek gesucht, die Farbe kommt "
+                                "aus dem Cover.", bg=BG, fg=TEXT_DIM, font=FONT_LABEL).pack(anchor="w", padx=20)
+
             tk.Label(self, text="Patches (Mehrfachauswahl, Standard: alle)", bg=BG, fg=TEXT_DIM,
                      font=FONT_LABEL).pack(anchor="w", padx=16, pady=(10, 2))
             lf = tk.Frame(self, bg=BG)
@@ -730,6 +751,54 @@ def _gui_dialog():
                 self.v_game.set(name)
             self._say(f"Erkannt: {tid}  \"{name}\"  Version {ver or '?'}", "ok")
 
+        # -- Release-Karte -----------------------------------------------
+        def pick_art(self):
+            f = filedialog.askopenfilename(parent=self, title="Cover wählen",
+                                           filetypes=[("Bilder", "*.png *.jpg *.jpeg *.webp *.bmp"), ("Alle", "*.*")])
+            if f:
+                self.v_art.set(f)
+
+        def _card_opts(self):
+            """Einstellungen der Release-Karte aus dem Dialog (None = keine Karte)."""
+            if not self.v_card.get():
+                return None
+            a = self.app
+            accent = self.v_accent.get().strip()
+            if accent and not re.fullmatch(r"#?[0-9A-Fa-f]{6}", accent):
+                self._say(f"Farbe '{accent}' ist kein Hex-Wert wie #00ffc8 - die Farbe kommt aus dem Cover.", "warn")
+                accent = ""
+            a.cfg["release_card"] = True
+            a.cfg["release_card_accent"] = accent
+            dirs = [a.cfg.get("library_dir") or "", getattr(a, "PATCH_DIR", "") or ""]
+            return {"art": self.v_art.get().strip(), "accent": ("#" + accent.lstrip("#")) if accent else None,
+                    "lang": getattr(getattr(a, "tr", None), "lang", "en"), "dirs": dirs}
+
+        def card_only(self):
+            """Nur die Karte - ohne Konsole, mit den Namen der markierten Patches."""
+            import release_card
+            sel = self.lb.curselection() or range(len(self.items))
+            mods = [{"name": _mod_name(self.items[i][1])} for i in sel]
+            if not mods:
+                return self._say("Keine Patches vorhanden.", "err")
+            tid = self.v_id.get().strip().upper()
+            doc = build_document(mods, self.v_game.get().strip(), tid, self.v_ver.get().strip(), "",
+                                 [c.strip() for c in self.v_cred.get().split(",") if c.strip()])
+            path = filedialog.asksaveasfilename(
+                parent=self, title="Release-Karte speichern", defaultextension=".png",
+                initialfile=release_card.card_path_for(suggested_filename(tid or "CUSAxxxxx", self.v_ver.get().strip()
+                                                                          or "01.00")), filetypes=[("PNG", "*.png")])
+            if not path:
+                return
+            opts = self._card_opts() or {"art": self.v_art.get().strip(), "accent": None,
+                                         "lang": getattr(getattr(self.app, "tr", None), "lang", "en"),
+                                         "dirs": [self.app.cfg.get("library_dir") or "", self.app.PATCH_DIR or ""]}
+            self._say("--- Release-Karte ---")
+            out, msg = release_card.card_for_export(doc, path, opts["dirs"], opts["art"], "", opts["accent"],
+                                                    opts["lang"], out_path=path)
+            self._say(f"Release-Karte: {out}" if out else msg, "ok" if out else "err")
+            if out:
+                self._say(msg)
+
         # -- Hilfen ------------------------------------------------------
         def _say(self, msg, tag=None):
             try:
@@ -789,12 +858,17 @@ def _gui_dialog():
                 return
             creds = [c.strip() for c in self.v_cred.get().split(",") if c.strip()]
             args = (a.backend, sel, a.IMAGE_BASE, path, self.v_game.get().strip(), tid, ver,
-                    self.v_proc.get().strip(), creds, tb, fmt)
+                    self.v_proc.get().strip(), creds, tb, fmt, self._card_opts())
+            try:
+                import projects
+                projects.save_config(a.cfg)
+            except Exception:
+                pass
             self.btn.configure(state="disabled")
             self._say(f"--- Export von {len(sel)} Patch(es) ---")
             threading.Thread(target=self._work, args=args, daemon=True).start()
 
-        def _work(self, backend, sel, image_base, path, game, tid, ver, proc, creds, tb, fmt="json"):
+        def _work(self, backend, sel, image_base, path, game, tid, ver, proc, creds, tb, fmt="json", card=None):
             def log(m):
                 return self.q.put(("log", (str(m), None)))
             try:
@@ -818,6 +892,13 @@ def _gui_dialog():
                         self.q.put(("log", (f"{fmt.upper()}: Datei in den {fmt}-Ordner deines Cheat-Menues legen, "
                                             f"Dateiname {suggested_filename(tid, ver, fmt)} (Titel-ID und "
                                             "Version muessen zum Spiel passen).", None)))
+                    if card is not None:
+                        import release_card
+                        out, msg = release_card.card_for_export(doc, path, card["dirs"], card["art"], "", card["accent"],
+                                                                card["lang"], False, fmt)
+                        self.q.put(("log", (f"Release-Karte: {out}" if out else msg, "ok" if out else "warn")))
+                        if out:
+                            self.q.put(("log", (msg, None)))
             except Exception as e:
                 self.q.put(("log", (f"FEHLER: {e}", "err")))
             finally:
@@ -859,6 +940,10 @@ def main(argv=None):
     ap.add_argument("--format", choices=("json", "shn", "mc4"), default="json",
                     help="Ausgabeformat (Standard json = GoldHEN/etaHEN)")
     ap.add_argument("--out", help="Ausgabedatei (Standard: {id}_{version}.<format>)")
+    ap.add_argument("--card", action="store_true", help="Release-Karte (PNG) neben die Export-Datei legen")
+    ap.add_argument("--art", default="", help="Cover für die Karte (sonst wird danach gesucht)")
+    ap.add_argument("--accent", default="", help="Farbe der Karte, z. B. #00ffc8 (sonst aus dem Cover)")
+    ap.add_argument("--lang", choices=("de", "en"), default="en", help="Sprache der Karte")
     a = ap.parse_args(argv)
 
     from ps5_backend import PS5Backend
@@ -890,6 +975,11 @@ def main(argv=None):
         print(f"Pruefung: {i}")
     if doc["mods"]:
         print(f"{len(doc['mods'])} Mod(s) -> {out}")
+        if a.card:
+            import release_card
+            card, msg = release_card.card_for_export(doc, out, [os.getcwd()] + [os.path.dirname(f) for f in files], a.art,
+                                                     "", a.accent or None, a.lang, False, a.format)
+            print(f"Release-Karte: {card}" if card else msg)
         return 0
     return 2
 

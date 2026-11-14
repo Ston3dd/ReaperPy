@@ -14,6 +14,15 @@ Du kannst deine Cheats aus ReaperPy herausnehmen und im Cheat-Menü von GoldHEN 
 
 Titel-ID und Version müssen zum Spiel passen. Der Export kennt nur Mods in Section 0 der GoldHEN-JSON; andere Sections werden übersprungen, nicht halb importiert. Du kannst solche Dateien auch **importieren**.
 
+## Release-Karte: das Bild zum Release
+Beim Export entsteht auf Wunsch gleich eine **Release-Karte** (PNG, 1920×1080) neben der Cheat-Datei: Spielname, Titel-ID, Version, alle Cheats mit römischen Nummern und die Anzahl im Siegel. Der Haken **Release-Karte (PNG) mit erstellen** steht im Export-Dialog und ist standardmäßig an.
+- **Cover:** Lass das Feld leer, dann sucht ReaperPy in deiner Bibliothek nach `TITELID.png` oder `TITELID_icon0.jpg`. Mit **WÄHLEN ...** nimmst du ein eigenes Bild. Ohne Cover zeichnet die Karte ein Portal in der Spielfarbe.
+- **Farbe:** Leer lassen, dann kommt die Farbe aus dem Cover. Oder trage einen Hex-Wert wie `ff5d38` ein.
+- **Autor:** Die Credits aus dem Export stehen unten links.
+- **NUR KARTE ...** macht die Karte ohne Konsole, mit den Namen der markierten Patches.
+
+Auf der Kommandozeile: `python export_goldhen.py ... --card` (optional `--art`, `--accent`, `--lang`).
+
 ## Auf die Konsole bringen
 Kopiere die Datei auf die Konsole:
 - GoldHEN: `/user/data/GoldHEN/cheats/json/`

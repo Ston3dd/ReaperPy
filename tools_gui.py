@@ -1189,9 +1189,9 @@ class ToolsWindow(tk.Toplevel):
     # Sammel-Tabs: Reitername -> [(interner Tab-Name, Reiter-Beschriftung im Sammel-Tab)] in Arbeitsreihenfolge
     GROUPS = {
         "★ UNREAL": (("★ ITEMS", "ITEMS"), ("★ WERTE", "WERTE"), ("★ UE-LIVE", "LIVE"), ("★ CHEAT-MENÜ", "CHEAT-MENÜ"),
-                     ("★ UE-ENTDECKER", "ENTDECKER"), ("UE-AUTO", "EXPERTE")),
+                     ("★ UE-ENTDECKER", "ENTDECKER"), ("★ UE CAVEMAKER", "CAVEMAKER"), ("UE-AUTO", "EXPERTE")),
         "★ UNITY": (("★ UNITY ITEMS", "ITEMS"), ("★ WERTE UNITY", "SCHNELL"), ("★ UNITY MANUELL", "MANUELL"),
-                   ("★ UNITY CHEAT-MENÜ", "CHEAT-MENÜ")),
+                   ("★ UNITY CHEAT-MENÜ", "CHEAT-MENÜ"), ("★ UNITY CAVEMAKER", "CAVEMAKER")),
     }
     GROUPED = {inner for subs in GROUPS.values() for inner, _t in subs}
 
@@ -1300,8 +1300,10 @@ class ToolsWindow(tk.Toplevel):
                  ("tools_values_gui", "ValuesTab", "★ WERTE UNITY", {"engine": "unity"}),
                  ("tools_discover_gui", "DiscoverTab", "★ UE-ENTDECKER"),
                  ("tools_cheatmenu_gui", "CheatMenuTab", "★ CHEAT-MENÜ"),
+                 ("tools_ue_cave_gui", "UeCaveTab", "★ UE CAVEMAKER"),
                  ("tools_unity_gui", "UnityTab", "★ UNITY MANUELL"),
                  ("tools_unity_cheatmenu_gui", "UnityCheatMenuTab", "★ UNITY CHEAT-MENÜ"),
+                 ("tools_unity_cave_gui", "UnityCaveTab", "★ UNITY CAVEMAKER"),
                  ("tools_ue_gui", "UeTab", "UE-AUTO"))
         group_of = {inner: g for g, subs in self.GROUPS.items() for inner, _t in subs}
         for modname, clsname, name, *kw in extra:

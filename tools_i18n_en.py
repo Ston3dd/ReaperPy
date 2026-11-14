@@ -1834,6 +1834,10 @@ from tools_i18n_unity import EN_UNITY  # noqa: E402
 EN.update(EN_UNITY)
 from tools_i18n_unity_items import EN_UNITY_ITEMS  # noqa: E402
 EN.update(EN_UNITY_ITEMS)
+from tools_i18n_unity_cave import EN_UNITY_CAVE, EN_UNITY_CAVE_LABELS  # noqa: E402
+EN.update(EN_UNITY_CAVE)
+for _k, _v in EN_UNITY_CAVE_LABELS.items():
+    EN.setdefault(_k, _v)
 
 
 EN.update({

@@ -14,6 +14,15 @@ You can take your cheats out of ReaperPy and use them in the cheat menu of GoldH
 
 The title ID and the version must match the game. The exporter only knows mods in section 0 of the GoldHEN JSON; other sections are skipped, not imported half. You can also **import** such files.
 
+## Release card: the picture for your release
+On request, the export also creates a **release card** (PNG, 1920×1080) next to the cheat file: game name, title ID, version, all cheats with Roman numerals and the count in the seal. The checkbox **Also create a release card (PNG)** is in the export dialog and is on by default.
+- **Cover:** Leave the field empty and ReaperPy looks in your library for `TITLEID.png` or `TITLEID_icon0.jpg`. **CHOOSE ...** lets you pick your own image. Without a cover the card draws a portal in the game's colour.
+- **Colour:** Leave it empty and the colour is taken from the cover. Or enter a hex value like `ff5d38`.
+- **Author:** The credits from the export appear at the bottom left.
+- **CARD ONLY ...** makes the card without a console, using the names of the selected patches.
+
+On the command line: `python export_goldhen.py ... --card` (optionally `--art`, `--accent`, `--lang`).
+
 ## Put it on the console
 Copy the file to the console:
 - GoldHEN: `/user/data/GoldHEN/cheats/json/`

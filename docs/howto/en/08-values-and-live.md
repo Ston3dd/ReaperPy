@@ -19,6 +19,13 @@ In **UNREAL → LIVE** you choose the game's SDK folder, click a value such as `
 ## CHEAT MENU: switches for your character
 Press **BUILD MENU** after loading the game in LIVE. Each entry shows whether it can be reached on your character (check mark) or why not (cross). **ON / OFF** (or double-click) switches an entry and puts the original value back when you switch it off. If your character changes (death, loading screen), all entries are released. **BUILD CODE CAVE** turns the selected entry into a permanent cheat: ReaperPy searches the game code for the instruction that writes the value and saves a cave as a `.reapproj` patch (without an active project it asks for a folder). **CAVE: CHOOSE HIT** lets you pick the instruction yourself.
 
+## CAVEMAKER: cheats from dump.cs, tested and checked
+**UNITY → CAVEMAKER** builds a cheat from any method or field in `dump.cs`: set a return value, change a parameter (e.g. always receive 999 money), set a field of the passed object, hold an instance or static field. You only need the MANUAL tab (load the game folder, connect, DETECT MODULE), then press **LOAD LIST** in the CAVEMAKER. Pick something on the left (search, category, "only useful cheats"), and on the right **WHAT SHOULD HAPPEN?**, mode and value. **ADD** reads the original bytes live from the game and builds a patch or code cave with a signature; it lands in the **COLLECTION**. For static fields, **FIND HOOK AUTOMATICALLY** looks for a method that runs regularly in the game and checks live that the value is really set.
+
+In the COLLECTION you try it out in the game with **TEST ON** / **TEST OFF**. **TAKE OVER INTO PROJECT** first checks every hook with ReaperPy's own parser and cave assembler (is there a patch site, an `OriginTarget` label, a matching `OriginReturn`, does every jump go to a label, does the cave end with the jump back, can it be assembled?), writes the file, reads it back and adds it to the main window as a normal card. A hook that ReaperPy would not understand is rejected with a reason instead of being silently ignored.
+
+**UNREAL → CAVEMAKER** is the cheat menu with the same collection: **BUILD CODE CAVE** does not write to disk straight away but puts the cave in the COLLECTION - check it there, **TEST ON** / **TEST OFF** in the game, then **TAKE OVER INTO PROJECT**.
+
 ## DISCOVERER: what is there to find?
 **UNREAL → DISCOVERER** analyses the SDK and tells you in plain words what the game offers: item tables, give-functions, stat enums, cheat managers - and whether a trainer can be built for each. Start with **ANALYZE**. **READ TABLE LIVE** lists the rows of a table by name. **SEARCH INVENTORY ENTRIES** sets quantities directly in memory when no give-function fits.
 
