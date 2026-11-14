@@ -31,6 +31,34 @@ def is_patch_file(name: str) -> bool:
     return any(low.endswith(ext.lower()) for ext in PATCH_EXTENSIONS)
 
 
+def _read_text(path: str) -> str:
+    """Datei als Text lesen: UTF-8 mit/ohne BOM, Notfalls UTF-16 / cp1252."""
+    with open(path, "rb") as f:
+        raw = f.read()
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return raw.decode("utf-16", errors="replace")
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return raw.decode("utf-8-sig", errors="replace")
+
+
+def _to_int(v, default=0):
+    """Zahl tolerant lesen (int, float, '0x..', '123', None)."""
+    if isinstance(v, bool):
+        return default
+    if isinstance(v, int):
+        return v
+    if isinstance(v, float):
+        return int(v)
+    if isinstance(v, str):
+        try:
+            return int(v.strip(), 0)
+        except Exception:
+            return default
+    return default
+
+
 class ShnExtEncrypted(ValueError):
     """ShnExt-Container mit verschlüsselten Patch-Einträgen (wird nicht entschlüsselt)."""
 
@@ -102,9 +130,42 @@ class ReapPatch:
         return p
 
     def _finalize(self):
-        """Wenn nur Zusatz-Stellen existieren, die erste zur Haupt-Stelle machen."""
+        """Wenn nur Zusatz-Stellen existieren, die erste zur Haupt-Stelle machen.
+        Fehlt jede OriginSource, wird aus beliebigen Eintraegen mit Adresse/Signatur + newValue eine Stelle gebaut."""
+        if self.origin_source is None and not self.extra_sources:
+            self._adopt_generic()
         if self.origin_source is None and self.extra_sources:
             self.origin_source = self.extra_sources.pop(0)
+
+    def _adopt_generic(self):
+        """Patches ohne 'OriginSource' (andere Reaper-Varianten): jeder Eintrag mit Adresse (offset) oder
+        Signatur (offsetFinder) und einem Text-newValue ist eine Patch-Stelle."""
+        data = self.raw if isinstance(self.raw, dict) else {}
+        variables = (data.get("Variables") or data.get("variables") or data.get("cheats") or
+                     data.get("Cheats") or data.get("items") or data.get("codes") or data.get("Codes") or [])
+        if not isinstance(variables, list):
+            return
+        for v in variables:
+            if not isinstance(v, dict):
+                continue
+            nv = v.get("newValue", v.get("NewValue"))
+            if not isinstance(nv, str) or not nv.strip():
+                continue
+            dv = v.get("defaultValue", v.get("DefaultValue"))
+            dv = dv if isinstance(dv, str) else ""
+            off = _to_int(v.get("offset", v.get("Offset", 0)))
+            finder = v.get("offsetFinder") or v.get("OffsetFinder")
+            if not off and not (isinstance(finder, str) and finder.strip()):
+                continue
+            if self.origin_source is None and not self.extra_sources and isinstance(finder, str) and finder.strip():
+                self.origin_aob = finder.strip()
+                self.origin_aob_offset = 0
+            self.extra_sources.append((off, dv, nv))
+
+    @property
+    def has_hook(self) -> bool:
+        """True, wenn der Patch eine anwendbare Stelle hat (sonst wird er nur angezeigt)."""
+        return self.origin_source is not None
 
     def sites(self):
         """Alle Patch-Stellen: [(offset, default_asm, new_asm), ...]."""
@@ -118,8 +179,11 @@ class ReapPatch:
     # JSON-basierte Formate (ReapProj, Reapatch, reines JSON)
     # ------------------------------------------------------------------
     def _load_json(self, path: str):
-        with open(path, encoding="utf-8", errors="replace") as f:
-            data = json.load(f)
+        data = json.loads(_read_text(path))
+        if isinstance(data, list):                      # manche Dateien sind direkt eine Variablen-Liste
+            data = {"Variables": data}
+        if not isinstance(data, dict):
+            data = {}
         self.raw = data
 
         # Meta
@@ -158,12 +222,7 @@ class ReapPatch:
               v.get("patched") or v.get("Patched") or
               v.get("value") or v.get("Value") or "")
 
-        off = v.get("offset", v.get("Offset", 0))
-        if isinstance(off, str):
-            try:
-                off = int(off, 0)
-            except Exception:
-                off = 0
+        off = _to_int(v.get("offset", v.get("Offset", 0)))
 
         low = str(label).lower().replace("_", "")
         if low.startswith("originsource"):
@@ -207,8 +266,7 @@ class ReapPatch:
     # Shnext / SHN (XML-Text oder JSON-Struktur)
     # ------------------------------------------------------------------
     def _load_shnext(self, path: str):
-        with open(path, encoding="utf-8", errors="replace") as f:
-            raw = f.read().strip()
+        raw = _read_text(path).strip()
 
         # Erst als JSON versuchen
         if raw.startswith("{") or raw.startswith("["):

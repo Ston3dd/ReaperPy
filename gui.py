@@ -1192,6 +1192,7 @@ class App:
         self.wanted = set()
         self._load_state()
 
+        nohook = 0
         for f in sorted(os.listdir(self.PATCH_DIR)):
             if not is_patch_file(f):
                 continue
@@ -1199,8 +1200,7 @@ class App:
             try:
                 rp = ReapPatch.load(path)
                 if not rp.origin_source:
-                    self.log_msg(self.tr.t("log_patch_noorigin", name=f), "warn")
-                    continue
+                    nohook += 1                      # trotzdem laden (Karte sichtbar), kein Fehler
                 import cave_trainer as _TR
                 shown = _TR.display_name(path, rp.name)        # Trainer-Dateien: der Name, den der Nutzer vergeben hat
                 if shown != rp.name:
@@ -1211,6 +1211,8 @@ class App:
                 self.log_msg(self.tr.t("log_patch_error", name=f, err=e), "err")
 
         self.log_msg(self.tr.t("log_patches_load", n=len(self.patches)), "accent")
+        if nohook:
+            self.log_msg(self.tr.t("log_patch_nohook_n", n=nohook), "info")
         if self.gp is not None:                                  # Profil-Eintraege geloeschter Cheat-Dateien aufraeumen
             before = (len(self.gp.favorites), len(self.gp.groups), len(self.gp.hotkeys))
             self.gp.forget_missing([f for f in os.listdir(self.PATCH_DIR) if is_patch_file(f)])
@@ -1481,7 +1483,9 @@ class App:
             try:
                 rp = card.rp
                 if not rp.origin_source:
-                    raise RuntimeError(self.tr.t("log_patch_noorigin", name=rp.name))
+                    self.q.put(("log", (self.tr.t("log_patch_nohook", name=rp.name), "info")))
+                    self.q.put(("card_state", (card, St.OFF, None)))
+                    return
                 hook = self._hook(rp)
                 self._trainer_preflight(card)
                 typ = self.tr.t("type_cave") if is_cave_patch(rp) else self.tr.t("type_patch")
