@@ -1,6 +1,5 @@
 """Test: Tab UNITY > CAVEMAKER - Liste laden, Cheat bauen, TEST AN/AUS auf (simuliertem) Speicher mit echtem Maschinencode,
 ins Projekt übernehmen.  Ohne Display (ghost_tk) und ohne Konsole."""
-import json
 import os
 import sys
 import tempfile
@@ -159,7 +158,7 @@ class UnityCaveTabFlow(unittest.TestCase):
         self.assertIn("✗", t.lbl_done.cget("text"))
 
     def test_static_field_needs_script_json_hint(self):
-        c = self.pick("Player.Gold")
+        self.pick("Player.Gold")
         self.assertEqual([a.key for a in self.t.actions], ["static"])
         self.assertTrue(self.t.hooks, "Haken-Methoden für das statische Feld")
 

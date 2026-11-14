@@ -60,8 +60,8 @@ class UeCaveTab(CaveCollectionMixin, CheatMenuTab):
         def ok(pd):
             self._busy = False
             self._add_item(Item(pd, (e, mode, value)))
-            self.log(f"CAVEMAKER: Gilt für ALLE Objekte, die diesen Code benutzen (auch Gegner). Erst TEST AN, im Spiel "
-                     f"prüfen, dann IN PROJEKT ÜBERNEHMEN.", "warn")
+            self.log("CAVEMAKER: Gilt für ALLE Objekte, die diesen Code benutzen (auch Gegner). Erst TEST AN, im Spiel "
+                     "prüfen, dann IN PROJEKT ÜBERNEHMEN.", "warn")
             if done:
                 done(pd.name, "")
 

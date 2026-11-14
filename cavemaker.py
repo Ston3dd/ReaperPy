@@ -1023,7 +1023,7 @@ def find_working_hook(model, ctx, act, mode, value, hooks, name, log, author="",
                 PE.deactivate_patch(ctx.backend, rp, st)
                 st = None
                 if regular:
-                    log(f"    läuft regelmäßig - das ist der richtige Haken.")
+                    log("    läuft regelmäßig - das ist der richtige Haken.")
                     return pd, rp, finish(pd, rp), hm, True
                 log("    läuft nur ab und zu (Ereignis-Methode) - merke ich mir als Notlösung, suche weiter.")
                 if weak is None:
