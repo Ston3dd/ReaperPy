@@ -7,6 +7,9 @@ Icons    : PPSA01234.png (exakt) hat Vorrang vor Dateien, die die ID nur irgendw
 Patches  : jede Patch-Datei (reapatch.is_patch_file) im Bibliotheks-Ordner, im Projekte-Ordner und in
            den bekannten Projekt-Ordnern.  Zuordnung per Dateiname, sonst per Ordnerpfad.
            Ohne ID wird nach Ordner gruppiert, damit nichts versteckt bleibt.
+Ordner   : fuer jedes Spiel mit ID (Cover/Icon/Patch) legt die Bibliothek im Bibliotheks-Ordner einen Ordner
+           'Spielname - PPSA01234' an.  Patches aus anderen Quellen einfach dort hineinschieben - die ID im
+           Ordnernamen ordnet sie dem Spiel zu.
 """
 import os
 import re
@@ -30,6 +33,19 @@ def extract_id(*texts):
         if m:
             return m.group(1).upper()
     return ""
+
+
+_BAD_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def folder_name(title, game_id):
+    """'Super Game', 'PPSA01234' -> 'Super Game - PPSA01234' (windows-tauglich, ID im Namen)."""
+    t = _BAD_CHARS.sub(" ", title or "")
+    t = re.sub(r"\s{2,}", " ", t).strip(" .-")
+    if t.upper() == (game_id or "").upper():
+        t = ""
+    t = t[:80].strip(" .-")
+    return f"{t} - {game_id}" if t else game_id
 
 
 def clean_title(name, game_id=""):
@@ -75,7 +91,9 @@ def _walk(root, depth=MAX_DEPTH):
 
 
 class Library:
-    def __init__(self, library_dir, projects_root="", extra_dirs=(), covers=None):
+    def __init__(self, library_dir, projects_root="", extra_dirs=(), covers=None, make_folders=False):
+        self.make_folders = make_folders        # fuer jedes Spiel mit ID einen Patch-Ordner anlegen
+        self.created = []                       # dabei neu angelegte Ordner
         self.covers = list(covers or [])        # gamemeta.Meta aus dem Konsolen-Cache (exakte Namen + Cover)
         self.library_dir = library_dir or ""
         self.projects_root = projects_root or ""
@@ -167,8 +185,47 @@ class Library:
                 g.title = cm.name
             if not g.icon or g.icon == self._generic_icon(g.project_dir):
                 g.icon = cm.icon or cm.cover or g.icon
+        if self.make_folders:
+            self._ensure_folders(games.values())
         self.entries = sorted(games.values(), key=lambda g: (g.title.lower(), g.id))
         return self.entries
+
+    # ------------------------------------------------------------------
+    def _id_folders(self):
+        """id -> Ordner im Bibliotheks-Ordner, dessen Name die Spiel-ID enthaelt."""
+        out = {}
+        for dirpath, _files in _walk(self.library_dir):
+            if os.path.abspath(dirpath) == os.path.abspath(self.library_dir):
+                continue
+            gid = extract_id(os.path.basename(dirpath))
+            if gid and gid not in out:
+                out[gid] = dirpath
+        return out
+
+    def _ensure_folders(self, games):
+        """Fuer jedes Spiel mit ID einen Ordner 'Spielname - ID' anlegen (falls noch keiner mit der ID existiert).
+        Spiele ohne Patches bekommen ihn als Projekt-Ordner, damit ein Klick auf die Karte ihn oeffnet."""
+        if not self.library_dir:
+            return
+        try:
+            os.makedirs(self.library_dir, exist_ok=True)
+        except OSError:
+            return
+        have = self._id_folders()
+        for g in games:
+            if not g.id:
+                continue
+            folder = have.get(g.id)
+            if folder is None:
+                folder = os.path.join(self.library_dir, folder_name(g.title, g.id))
+                try:
+                    os.makedirs(folder, exist_ok=True)
+                except OSError:
+                    continue
+                have[g.id] = folder
+                self.created.append(folder)
+            if not g.project_dir:
+                g.project_dir = folder
 
     def filter(self, text):
         return [g for g in self.entries if g.matches(text)]

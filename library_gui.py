@@ -58,6 +58,21 @@ def load_icon_image(path):
     return None
 
 
+def open_folder(path):
+    """Patch-Ordner des Spiels im Datei-Manager oeffnen (Rechtsklick auf die Karte)."""
+    if not path or not os.path.isdir(path):
+        return
+    try:
+        if hasattr(os, "startfile"):
+            os.startfile(path)                                       # noqa: S606 - Windows
+        else:
+            import subprocess
+            import sys
+            subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", path])
+    except Exception:
+        pass
+
+
 class GameCard(tk.Frame):
     def __init__(self, parent, entry, on_click):
         super().__init__(parent, bg=BG_CARD, highlightthickness=1, highlightbackground=BORDER, bd=0,
@@ -78,6 +93,7 @@ class GameCard(tk.Frame):
         self.lbl_n.pack(pady=(0, 12))
         self._kids = (self, self.cv, self.lbl_title, self.lbl_id, self.lbl_n)
         for w in self._kids:
+            w.bind("<Button-3>", lambda _e: open_folder(entry.project_dir))
             w.bind("<Button-1>", lambda _e: on_click(entry))
             w.bind("<Enter>", lambda _e: self._hover(True))
             w.bind("<Leave>", lambda _e: self._hover(False))
@@ -176,7 +192,7 @@ class LibraryWindow(tk.Toplevel):
         self.lbl_count.configure(text=self.tr.t("lib_scanning"), fg=WARN)
         cfg = self.app.cfg
         lib = Library(self._library_dir(), cfg.get("projects_root", ""),
-                      [k for k in cfg.get("projects", {})], covers=gamemeta.cached())
+                      [k for k in cfg.get("projects", {})], covers=gamemeta.cached(), make_folders=True)
 
         def job():
             try:
@@ -197,7 +213,8 @@ class LibraryWindow(tk.Toplevel):
                                              fg=WARN)
                 elif kind == "fail":
                     self._fetching = False
-                    self.lbl_count.configure(text=self.tr.t("lib_console_fail", err=val), fg=ERROR)
+                    self.lbl_count.configure(text=self.tr.t("lib_console_fail", err=val)[:140], fg=ERROR)
+                    self.app.log_msg(self.tr.t("lib_console_fail", err=val), "warn")      # volle Meldung ins Protokoll
                 elif kind == "done":
                     self._fetching = False
                     self.rescan()

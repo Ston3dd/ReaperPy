@@ -447,8 +447,10 @@ class App:
 
         self.project_list = []
         self.reload_projects()
+        # Start leer: erst beim Verbinden wird das laufende Spiel erkannt und dessen Codes angezeigt.
+        # (Altes Verhalten - zuletzt benutztes Projekt wieder öffnen - mit "restore_last_project": true in der Config.)
         last = self.cfg.get("last_project", "")
-        if last:
+        if last and self.cfg.get("restore_last_project", False):
             self.select_project_by_name(last)
         if not self.current_project:
             self._set_title(self.tr.t("no_project"))
@@ -1855,12 +1857,21 @@ class App:
         if res.status == "newer":
             self.log_msg(self.tr.t("log_update_new", ver=res.remote, cur=res.local, url=res.url or "-"), "accent")
 
-    def _detect_codes(self):
-        """Arbeits-Thread: Vordergrund-Spiel erkennen und passende Codes (Patches) vorschlagen -> UI-Queue."""
+    def _detect_codes(self, retries=4, wait=3.0):
+        """Arbeits-Thread: Vordergrund-Spiel erkennen und passende Codes (Patches) vorschlagen -> UI-Queue.
+        Läuft das Spiel gerade erst an (noch kein Vordergrund-Spiel), wird mehrmals im Abstand von `wait` s versucht."""
         if not self.cfg.get("auto_codes", True):
             return
         import autocodes
-        det = autocodes.detect(self.backend.client, self.cfg, projects.DEFAULTS)
+        det = None
+        for attempt in range(max(1, retries)):
+            if not self._connected:
+                return
+            det = autocodes.detect(self.backend.client, self.cfg, projects.DEFAULTS)
+            if not (det.error and not det.title_id):
+                break
+            if attempt < retries - 1:
+                time.sleep(wait)
         if det.error and not det.title_id:
             self.q.put(("log", (self.tr.t("log_codes_noid", err=det.error), "info")))
             return
