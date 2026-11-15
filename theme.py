@@ -17,6 +17,10 @@ BG_LOG = "#03060f"        # Protokoll- und Textfelder (tiefster Ton)
 SELECT = "#1d4f91"        # markierte Zeile / Auswahl
 BTN_HVR = "#254580"       # zweitrangige Knoepfe unter der Maus
 
+# Disassembler-Ansicht (disasm_view.py): Zebra-Zeile und die zwei Markierungen eines Treffers
+ROW_ALT = "#0d182e"       # jede zweite Zeile, kaum heller als BG_CARD
+ROW_WRITER = "#0e4a3a"    # der Befehl, der geschrieben hat (Akzent-gruen, kraeftiger als BG_CARD_ON)
+
 # Rahmen
 BORDER = "#243a66"
 BORDER_HVR = "#3f64a8"

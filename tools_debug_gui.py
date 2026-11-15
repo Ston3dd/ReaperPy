@@ -3,8 +3,10 @@ import time
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
+import hit_context as HC
 import ps5_ext as X
 from debugger import DebugSession
+from disasm_view import DisasmView
 from tools_common import (BG, ACCENT, ERROR, TEXT_DIM, BaseTab, button, label, entry, tree, with_scroll)
 
 WP_TYPES = {"schreiben": X.WP_WRITE, "lesen/schreiben": X.WP_RDWR, "ausführen": X.WP_EXEC}
@@ -15,6 +17,7 @@ class DebugTab(BaseTab):
         super().__init__(parent, win)
         self.sess = None
         self.hit_items = {}          # iid -> hit-Paket
+        self._ctx_token = 0          # nur die zuletzt angeforderte Kontext-Ansicht wird gezeigt
 
         top = tk.Frame(self, bg=BG); top.pack(fill="x", padx=8, pady=(8, 4))
         button(top, "ATTACH", self.attach, accent=True).pack(side="left", padx=2)
@@ -49,7 +52,7 @@ class DebugTab(BaseTab):
         button(row, "SETZEN", self.add_bp, accent=True).pack(side="left", padx=2)
         button(row, "ENTFERNEN", self.del_bp).pack(side="left", padx=2)
         self.bpt = tree(left, [("i", "#"), ("a", "ADRESSE"), ("o", "OFFSET"), ("on", "AN")],
-                        [40, 170, 100, 50], height=5)
+                        [40, 170, 100, 50], height=3)
         self.bpt.pack(fill="x", pady=(2, 8))
 
         # Watchpoints
@@ -66,16 +69,21 @@ class DebugTab(BaseTab):
         button(row, "SETZEN", self.add_wp, accent=True).pack(side="left", padx=2)
         button(row, "ENTFERNEN", self.del_wp).pack(side="left", padx=2)
         self.wpt = tree(left, [("i", "#"), ("a", "ADRESSE"), ("s", "GRÖSSE"), ("t", "TYP")],
-                        [40, 170, 70, 130], height=4)
+                        [40, 170, 70, 130], height=3)
         self.wpt.pack(fill="x", pady=(2, 8))
 
         # Treffer
         label(left, "TREFFER (Klick = Register dieses Treffers)").pack(anchor="w")
-        fr = tk.Frame(left, bg=BG); fr.pack(fill="both", expand=True)
+        fr = tk.Frame(left, bg=BG); fr.pack(fill="x")
         self.hits = tree(fr, [("t", "ZEIT"), ("k", "ART"), ("a", "ADRESSE"), ("th", "THREAD"), ("n", "ANZAHL")],
-                         [80, 70, 170, 90, 70], height=8)
+                         [80, 70, 170, 90, 70], height=4)
         with_scroll(fr, self.hits)
         self.hits.bind("<<TreeviewSelect>>", self._hit_sel)
+
+        # Kontext: Befehle rund um den Treffer, Schreiber und RIP markiert
+        label(left, "KONTEXT (Befehle um den Treffer - grün = Schreiber, gelb = RIP)").pack(anchor="w", pady=(8, 2))
+        self.ctxv = DisasmView(left, on_open=self._ctx_open, on_preset=self._ctx_preset, height=11)
+        self.ctxv.pack(fill="both", expand=True)
 
         # Register
         label(right, "REGISTER (Doppelklick = ändern)").pack(anchor="w")
@@ -258,13 +266,48 @@ class DebugTab(BaseTab):
         self.hit_items[iid] = hit
         self.hits.selection_set(iid)
         self._fill_regs(hit["regs"])
+        self._load_context(hit)
         self.log(f"{hit['kind']} @ {hit['addr']:#x}  Thread {hit['lwpid']}  (#{hit['count']})", "warn")
         self.refresh_threads(select=hit["lwpid"])
 
     def _hit_sel(self, _e):
         sel = self.hits.selection()
         if sel and sel[0] in self.hit_items:
-            self._fill_regs(self.hit_items[sel[0]]["regs"])
+            hit = self.hit_items[sel[0]]
+            self._fill_regs(hit["regs"])
+            self._load_context(hit)
+
+    # ---- Kontext-Ansicht ----
+    def _wp_info(self, hit):
+        """Der ausgeloeste Watchpoint (Adresse, Groesse, Art) - bestimmt, ob RIP HINTER dem Zugriff steht."""
+        w = self.sess.wps.get(hit.get("index")) if self.sess and hit.get("kind") == "WP" else None
+        if not w:
+            return None
+        access = {X.WP_WRITE: "write", X.WP_RDWR: "rw", X.WP_EXEC: "exec"}.get(w["type"], "rw")
+        return {"addr": w["addr"], "size": w["size"], "access": access}
+
+    def _load_context(self, hit):
+        client, wp = self.win.client, self._wp_info(hit)
+        self._ctx_token += 1
+        tok = self._ctx_token
+        self.ctxv.show_message("Lese Befehle um den Treffer …")
+
+        def ok(ctx):
+            if tok == self._ctx_token:
+                self.ctxv.show(ctx)
+
+        def err(e):
+            if tok == self._ctx_token:
+                self.ctxv.show_message(f"Kontext nicht lesbar: {e}")
+        self.bg(lambda: HC.build_context(client.read_memory, hit, wp), ok, err)
+
+    def _ctx_open(self, line):
+        """Im Disassembler-Tab öffnen - ab dem Anfang des Kontexts, die gewählte Zeile ist dort markiert."""
+        start = self.ctxv.lines[0]["addr"] if self.ctxv.lines else line["addr"]
+        self.win.goto_disasm(start, focus=line["addr"])
+
+    def _ctx_preset(self, line):
+        self.win.t_dis.recipe_at(line["addr"], f"{line['mnemonic']} {line['op_str']}".strip())
 
     # ---- Threads / Register / Stack ----
     def refresh_threads(self, select=None):

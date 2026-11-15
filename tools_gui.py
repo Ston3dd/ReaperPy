@@ -294,8 +294,10 @@ class DisasmTab(BaseTab):
         button(act, "→ CHEAT-EDITOR", self.to_cheat, accent=True).pack(side="right")
         button(act, "ALS CAVE-HOOK", self.to_cave_hook, accent=True).pack(side="right", padx=(0, 8))
 
-    def goto(self, address):
+    def goto(self, address, focus=None):
+        """Ab `address` zeigen; `focus` = Adresse einer Zeile, die danach markiert und sichtbar sein soll."""
         self.v_addr.set(hexs(address))
+        self._focus = focus
         self.run()
 
     def run(self):
@@ -321,6 +323,13 @@ class DisasmTab(BaseTab):
                 AT.hexdump_line(l["bytes"]), f"{l['mnemonic']} {l['op_str']}".strip(),
                 AX.explain(l["mnemonic"], l["op_str"])))
         self.lbl_exp.configure(text="")
+        focus, self._focus = getattr(self, "_focus", None), None
+        if focus is not None:
+            for i, l in enumerate(lines):
+                if l["addr"] == focus:
+                    self.tv.selection_set(str(i))
+                    self.tv.see(str(i))
+                    break
 
     def _explain(self):
         """Klartext zur markierten Zeile (die Spalte ERKLÄRUNG kann abgeschnitten sein)."""
@@ -1608,8 +1617,8 @@ class ToolsWindow(tk.Toplevel):
     def goto_memory(self, address):
         self.show_tab(self.t_mem); self.t_mem.goto(address)
 
-    def goto_disasm(self, address):
-        self.show_tab(self.t_dis); self.t_dis.goto(address)
+    def goto_disasm(self, address, focus=None):
+        self.show_tab(self.t_dis); self.t_dis.goto(address, focus)
 
     def to_pointer(self, address, vname="Int32"):
         if not self.ptr_tab:

@@ -4,6 +4,28 @@ Wird am Ende von tools_i18n_en.py in EN eingemischt. Schluessel = deutscher Text
 """
 
 EN_MORE = {
+    # --- Kontext-Ansicht im Debugger (disasm_view.py, hit_context.py, tools_debug_gui.py) ---
+    'KONTEXT (Befehle um den Treffer - grün = Schreiber, gelb = RIP)': 'CONTEXT (instructions around the hit - green = writer, yellow = RIP)',
+    'Lese Befehle um den Treffer …': 'Reading instructions around the hit …',
+    'Kontext nicht lesbar: ': 'Context not readable: ',
+    'Noch kein Treffer - setze einen Breakpoint oder Watchpoint und lass das Spiel laufen.': 'No hit yet - set a breakpoint or watchpoint and let the game run.',
+    '✎ SCHREIBER': '✎ WRITER',
+    'SCHREIBER': 'WRITER',
+    'ADRESSE KOPIEREN': 'COPY ADDRESS',
+    'BYTES KOPIEREN': 'COPY BYTES',
+    'INSTRUKTION KOPIEREN': 'COPY INSTRUCTION',
+    'IM DISASSEMBLER ÖFFNEN': 'OPEN IN DISASSEMBLER',
+    'PRESET …': 'PRESET …',
+    'Schreibzugriff': 'Write access',
+    'Zugriff (lesen oder schreiben)': 'Access (read or write)',
+    ' (vermutlich)': ' (probably)',
+    'Speicher bei RIP {rip} nicht lesbar': 'Memory at RIP {rip} not readable',
+    'Ausführung bei {rip} - dieser Befehl wurde noch nicht ausgeführt.': 'Execution at {rip} - this instruction has not run yet.',
+    'Breakpoint bei {rip} - dieser Befehl wurde noch nicht ausgeführt.': 'Breakpoint at {rip} - this instruction has not run yet.',
+    'Einzelschritt - der nächste Befehl ist {rip}.': 'Single step - the next instruction is {rip}.',
+    'Angehalten bei {rip}.': 'Stopped at {rip}.',
+    '{what} auf {watch} durch den Befehl bei {writer}{vague}. RIP steht schon dahinter ({rip}) - der Schreiber ist der Befehl davor.': '{what} on {watch} by the instruction at {writer}{vague}. RIP is already past it ({rip}) - the writer is the instruction before.',
+    '{what} auf {watch}. RIP steht schon hinter dem Zugriff ({rip}), der Befehl davor war es.': '{what} on {watch}. RIP is already past the access ({rip}); the instruction before it did it.',
     ') - nehme die nächste': ') - using the next one',
     ' nicht lesbar (': ' not readable (',
     'Inhalt geprüft: ': 'Content checked: ',
