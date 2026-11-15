@@ -519,6 +519,7 @@ ReaperPy is released under the **[MIT License](LICENSE)**.
   of its published wire protocol (`PROTOCOL.md`, v1.3.2) and contains none of its code; the payload is a separate program
   with its own license. ps5debug-NG in turn is inspired by `ps5debug` (Ctn, SiSTRo) and `ps4debug` (jogolden) and uses
   the [ps5-payload-sdk](https://github.com/ps5-payload-dev/sdk) by John Törnblom.
+- **Pharaoh2k** - also for the idea of the **trainer release cards** (the card that is created next to the cheat file at export).
 - **[ps4-unreal-dumper](https://github.com/TetzkatLipHoka/ps4-unreal-dumper)** by TetzkatLipHoka (MIT) - ReaperPy's Unreal
   Engine tools read the output of this dumper; calling a UFunction follows the method of its `uecall`. No code was copied.
 - **[Il2CppDumper](https://github.com/TetzkatLipHoka/Il2CppDumper)** by TetzkatLipHoka (MIT, fork of Perfare's Il2CppDumper) - the

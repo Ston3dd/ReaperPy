@@ -521,8 +521,8 @@ def render_card(title, game_id, version, names, author="", art_path="", accent=N
     art = None
     if art_path and os.path.isfile(art_path):
         try:
-            art = Image.open(art_path)
-            art.load()
+            with Image.open(art_path) as im:       # Datei sofort wieder schliessen (Windows sperrt sie sonst)
+                art = im.copy()
         except Exception:  # noqa: BLE001
             art = None
     if accent is None:

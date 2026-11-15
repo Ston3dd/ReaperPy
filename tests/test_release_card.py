@@ -58,8 +58,12 @@ class Inputs(unittest.TestCase):
 
     def test_accent_is_taken_from_the_cover(self):
         with tempfile.TemporaryDirectory() as d:
-            red = Image.open(cover(os.path.join(d, "r.png"), colors=((200, 20, 20), (230, 40, 30))))
-            blue = Image.open(cover(os.path.join(d, "b.png"), colors=((20, 60, 200), (40, 90, 230))))
+            # Bilder ganz in den Speicher holen und die Dateien schliessen: unter Windows laesst sich das
+            # Temp-Verzeichnis sonst nicht loeschen (WinError 32)
+            with Image.open(cover(os.path.join(d, "r.png"), colors=((200, 20, 20), (230, 40, 30)))) as im:
+                red = im.copy()
+            with Image.open(cover(os.path.join(d, "b.png"), colors=((20, 60, 200), (40, 90, 230)))) as im:
+                blue = im.copy()
             grey = Image.new("RGB", (64, 64), (120, 120, 120))
         r, b = R.hex_rgb(R.accent_from_art(red)), R.hex_rgb(R.accent_from_art(blue))
         self.assertTrue(r[0] > r[2] and b[2] > b[0], (r, b))
