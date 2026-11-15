@@ -11,6 +11,11 @@ The idea of the trainer release cards comes from **Pharaoh2k** (also credited fo
 ### Fixed (Unity scanning itself to death)
 - Every field click in **UNITY → MANUAL** started its own full memory scan, several at once. The memory is now scanned **once** (progress in %, **CANCEL SCAN**), after that all fields are instant; classes with an `Instance` field need no scan at all. The live give and the cheat menu use the same finder (`unity_objects.py`).
 
+### Added (Game name + cover from the console)
+- On connect, ReaperPy now fetches the running game's **exact title** (`param.json`) and its **cover** (`pic0.png`, fallback `icon0.png`) over FTP (ports 2121 / 1337, anonymous) and shows both in the header, above the patch list. Cached in `covers/`, so it only asks the console once per game.
+- Name priority: `param.json` > name reported by the console > library title > title ID. Process names like `eboot.bin` are never used as a name.
+- Optional `config.json` keys: `ftp_ports`, `meta_dirs` (extra folders, `{id}` = title ID), `ftp_timeout`, `game_meta` (`false` = off). The log lists every FTP path that was tried when something is missing.
+
 ### Added (Release card)
 - Credit: The idea of the trainer release cards comes from **Pharaoh2k** (also credited for the ps5debug-NG payload) - thank you!
 - **Release card at export:** the GoldHEN / etaHEN export dialog can now create a release card (PNG, 1920x1080) next to the cheat file: game name, title ID, version, all cheats with Roman numerals, the count in a seal and your credits. The cover is looked up in the library (`TITLEID.png`, `TITLEID_icon0.jpg`) or chosen by hand; the accent colour is taken from the cover. **CARD ONLY ...** makes the card without a console, `export_goldhen.py --card` does it on the command line. A problem with the card never stops the export.

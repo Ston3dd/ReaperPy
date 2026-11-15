@@ -21,6 +21,9 @@ class Detected:
     version: str = ""
     entry: object = None        # library.GameEntry mit Patches oder None
     error: str = ""
+    meta: object = None         # gamemeta.Meta (Cover + param.json-Name) oder None
+    display_name: str = ""      # bester Name fuer die Anzeige (param.json > Konsole > Bibliothek > ID)
+    name_source: str = ""
 
 
 def foreground(client):
@@ -28,7 +31,21 @@ def foreground(client):
     return ps5_more.foreground_app(client)
 
 
-def detect(client, cfg, defaults=None, foreground_fn=None, library_cls=None):
+def _meta(client, tid, cfg, meta_fn):
+    """Cover + exakter Name per FTP.  Ohne echten Client (Tests) und ohne meta_fn: nichts."""
+    if meta_fn is None:
+        host = getattr(client, "host", None)
+        if not host:
+            return None
+        import gamemeta
+        meta_fn = lambda t: gamemeta.fetch(host, t, cfg)        # noqa: E731
+    try:
+        return meta_fn(tid)
+    except Exception:                                           # noqa: BLE001
+        return None
+
+
+def detect(client, cfg, defaults=None, foreground_fn=None, library_cls=None, meta_fn=None):
     """-> Detected.  Wirft nie: Fehler landen in .error (dann bleibt alles wie es ist)."""
     d = Detected()
     try:
@@ -47,6 +64,10 @@ def detect(client, cfg, defaults=None, foreground_fn=None, library_cls=None):
         d.entry = next((e for e in lib.entries if e.id == d.title_id and e.patches), None)
     except Exception as e:  # noqa: BLE001
         d.error = f"Bibliothek: {e}"
+    import gamemeta
+    d.meta = _meta(client, d.title_id, cfg, meta_fn)
+    d.display_name, d.name_source = gamemeta.pick_name(
+        d.title_id, getattr(d.meta, "name", ""), d.name, getattr(d.entry, "title", ""))
     return d
 
 

@@ -426,6 +426,8 @@ class App:
         self._patch_lock = threading.RLock()
         self._blink_on = True
         self._title_base = ""
+        self.game_info = None            # {"tid","name","version","cover"} des erkannten Spiels (autocodes)
+        self._cover_img = None           # PhotoImage-Referenz (sonst raeumt Tk das Bild weg)
         self._cols = 0
         self._pb_visible = False
 
@@ -594,11 +596,68 @@ class App:
         self._title_base = text
         self._render_title()
 
-    def _refresh_title(self):
+    def _header_title(self):
+        """Der exakte Name des laufenden Spiels (param.json); gehoert das geoeffnete Projekt zu einem ANDEREN
+        Spiel, bleibt dessen Name stehen."""
+        gi = self.game_info
+        if gi and gi.get("name"):
+            import library as _lib
+            cur = _lib.extract_id(f"{self.current_project or ''} {self.PATCH_DIR or ''}")
+            if not self.current_project or not cur or cur == gi.get("tid"):
+                tid = gi.get("tid") or ""
+                return f"\u25b8  {gi['name'].upper()}" + (f"  \u00b7  {tid}" if tid else "")
         if self.current_project:
-            self._set_title(f"\u25b8  {self.current_project.upper()}")
-        else:
-            self._set_title(self.tr.t("no_project"))
+            return f"\u25b8  {self.current_project.upper()}"
+        return self.tr.t("no_project")
+
+    def _refresh_title(self):
+        self._set_title(self._header_title())
+
+    def _load_cover(self, path, h=56):
+        """pic0.png -> PhotoImage (Hoehe h, Seitenverhaeltnis bleibt); None wenn es nicht geht."""
+        try:
+            try:
+                from PIL import Image, ImageTk
+                im = Image.open(path).convert("RGBA")
+                im.thumbnail((int(h * 16 / 9) + 40, h), Image.LANCZOS)
+                return ImageTk.PhotoImage(im)
+            except ImportError:
+                img = tk.PhotoImage(file=path)
+                f = max(1, img.height() // h)
+                return img.subsample(f, f) if f > 1 else img
+        except Exception:                                   # noqa: BLE001
+            return None
+
+    def _show_cover(self, path):
+        """Cover links im Kopf zeigen; ohne Bild verschwindet das Feld."""
+        img = self._load_cover(path) if path and os.path.isfile(path) else None
+        self._cover_img = img
+        if img is None:
+            self.lbl_cover.pack_forget()
+            return
+        self.lbl_cover.configure(image=img)
+        if not self.lbl_cover.winfo_ismapped():
+            self.lbl_cover.pack(side="left", before=self.lbl_cover_anchor, padx=(0, 10))
+
+    def _set_game_info(self, det):
+        """UI-Thread: erkanntes Spiel (Name + Cover) im Kopf anzeigen und protokollieren."""
+        m = det.meta
+        name = det.display_name or det.name or det.title_id
+        self.game_info = {"tid": det.title_id, "name": name, "version": det.version,
+                          "cover": getattr(m, "cover", "")}
+        self._show_cover(self.game_info["cover"])
+        self._refresh_title()
+        kind = getattr(m, "cover_kind", "") or "-"
+        self.log_msg(self.tr.t("log_game_info", name=name, tid=det.title_id, ver=det.version or "?",
+                               src=det.name_source, cover=kind), "accent")
+        if m is not None and (not m.cover or not getattr(m, "name", "")):
+            why = m.error or "; ".join(f"{p}: {r}" for p, r in m.tried[:12])
+            self.log_msg(self.tr.t("log_game_meta_miss", why=why or "-"), "info")
+
+    def _clear_game_info(self):
+        self.game_info = None
+        self._show_cover("")
+        self._refresh_title()
 
     def _render_title(self):
         cursor = "\u2588" if self._blink_on else " "
@@ -614,8 +673,10 @@ class App:
         head.pack(fill="x", padx=14, pady=(10, 4))
         head.pack_propagate(False)
 
+        self.lbl_cover = tk.Label(head, bg=BG, bd=0)          # Cover (pic0.png), erst sichtbar wenn vorhanden
         left = tk.Frame(head, bg=BG)
         left.pack(side="left", fill="y")
+        self.lbl_cover_anchor = left
 
         self.lbl_project = tk.Label(left, text="", bg=BG,
                                     fg=ACCENT, font=("Consolas", 15, "bold"), anchor="w")
@@ -1023,7 +1084,7 @@ class App:
             self.imgbase_var.set(hex(self.IMAGE_BASE))
             self.cfg["last_project"] = nm
             projects.save_config(self.cfg)
-            self._set_title(f"\u25b8  {nm.upper()}")
+            self._refresh_title()
             self.log_msg(self.tr.t("log_project", name=nm), "accent")
             self.log_msg(self.tr.t("log_patches_dir", path=patches_dir), "info")
             self.log_msg(self.tr.t("log_base", base=f"{self.IMAGE_BASE:#x}"), "info")
@@ -1797,9 +1858,10 @@ class App:
     def _apply_codes(self, det):
         """UI-Thread: Codes des erkannten Spiels laden oder die Liste leeren."""
         import autocodes
+        self._set_game_info(det)
         cur = f"{self.current_project or ''} {self.PATCH_DIR or ''}".strip()
         action, entry = autocodes.decide(det, cur)
-        game = f"{det.name or det.title_id} ({det.title_id})"
+        game = f"{det.display_name or det.name or det.title_id} ({det.title_id})"
         if action == "load":
             if self.open_library_entry(entry):
                 self.log_msg(self.tr.t("log_codes_loaded", game=game, n=len(self.patches)), "ok")
@@ -1812,7 +1874,7 @@ class App:
             self.wanted = set()
             self._rebuild_cards()
             self._update_count()
-            self._set_title(self.tr.t("no_project"))
+            self._refresh_title()
             self.log_msg(self.tr.t("log_codes_none", game=game), "info")
         else:
             self.log_msg(self.tr.t("log_codes_keep", game=game), "info")
@@ -1822,6 +1884,7 @@ class App:
         Die Merkliste `wanted` bleibt für die Wiederherstellung erhalten."""
         with self._patch_lock:
             self.applied.clear()
+        self.q.put(("game_info_clear", None))
         for card in list(self.cards.values()):
             if card.state != St.OFF:
                 self.q.put(("card_state", (card, St.OFF, None)))
@@ -1906,6 +1969,8 @@ class App:
                     self._progress_done()
                 elif kind == "codes":
                     self._apply_codes(val)
+                elif kind == "game_info_clear":
+                    self._clear_game_info()
                 elif kind == "update":
                     self._on_update(val)
                 elif kind == "update_gh":
