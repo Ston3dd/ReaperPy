@@ -98,6 +98,11 @@ class ReapPatch:
         self.origin_aob_offset = 0         # Hook = Treffer + origin_aob_offset
         self.labels = []                   # [(label:str, asm:str), ...]
         self.raw = {}                      # originale JSON-Daten
+        self.native = False                # Reaper-Originalformat: jede Quelle hat eine eigene Signatur (offsetFinder)
+        self.src_info = []                 # parallel zu sites(): {"label", "aob", "aob_offset"}
+        self.native_returns = {}           # Return-Name -> (Quell-Label, Abstand)
+        self.variables = []                # [(name, typ, default, new)] - Schalter/Werte, liegen in der Cave
+        self.nohook_info = ""              # Diagnose, falls keine Patch-Stelle gefunden wurde
         self.file_type = "unknown"         # 'reapproj', 'shnext', 'json', 'shn'
 
     @classmethod
@@ -136,6 +141,20 @@ class ReapPatch:
             self._adopt_generic()
         if self.origin_source is None and self.extra_sources:
             self.origin_source = self.extra_sources.pop(0)
+        if self.origin_source is None:
+            self.nohook_info = self._describe_nohook()
+
+    def _describe_nohook(self):
+        """Kurze Beschreibung, was in der Datei steht (fuers Log, damit man das Format erkennt)."""
+        data = self.raw if isinstance(self.raw, dict) else {}
+        vs = data.get("Variables") or data.get("variables") or []
+        rows = []
+        for v in vs[:12] if isinstance(vs, list) else []:
+            if isinstance(v, dict):
+                rows.append("%s(type=%s,off=%s,static=%s,nv=%s)" % (
+                    v.get("label"), v.get("type"), v.get("offset"), v.get("isStatic"),
+                    "ja" if str(v.get("newValue") or "").strip() else "leer"))
+        return "Eintraege: " + "; ".join(rows) if rows else "keine 'Variables' gefunden, Schluessel: " + ", ".join(map(str, list(data)[:12]))
 
     def _adopt_generic(self):
         """Patches ohne 'OriginSource' (andere Reaper-Varianten): jeder Eintrag mit Adresse (offset) oder
@@ -200,6 +219,10 @@ class ReapPatch:
         if not isinstance(variables, list):
             variables = []
 
+        if self._is_native(variables):                  # Reaper-Originalformat (XSource/XReturn + Signatur)
+            self._parse_native(variables)
+            return
+
         for v in variables:
             if not isinstance(v, dict):
                 continue
@@ -208,6 +231,72 @@ class ReapPatch:
         # Falls OriginSource direkt im Root liegt (manche Formate)
         if self.origin_source is None:
             self._parse_root_source(data)
+
+    # ------------------------------------------------------------------
+    # Reaper-Originalformat
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _finder_aob(of):
+        """offsetFinder {'UniqueAOB': base64, 'Mask': base64} -> '55 48 89 ?? ...' oder ''."""
+        import base64
+        if not isinstance(of, dict) or not of.get("UniqueAOB"):
+            return ""
+        try:
+            pat = base64.b64decode(of["UniqueAOB"])
+            m = of.get("Mask")
+            mask = base64.b64decode(m) if m else b"\x01" * len(pat)
+        except Exception:
+            return ""
+        if not pat:
+            return ""
+        if len(mask) != len(pat):
+            mask = (mask + b"\x01" * len(pat))[:len(pat)]
+        return " ".join("%02X" % b if k else "??" for b, k in zip(pat, mask))
+
+    @classmethod
+    def _is_native(cls, variables):
+        return any(isinstance(v, dict) and cls._finder_aob(v.get("offsetFinder")) for v in variables)
+
+    def _parse_native(self, variables):
+        """Eintraege: type 11 + offsetFinder = Patch-Stelle ('XSource'), type 11 ohne Signatur = Cave-Label,
+        type 6 = Rueckkehr ('XReturn', baseId = Quelle), sonst (2, 7, ...) = Variable in der Cave."""
+        sources, labels, returns = [], [], {}
+        for v in variables:
+            if not isinstance(v, dict):
+                continue
+            label = str(v.get("label") or "")
+            typ = _to_int(v.get("type"), -1)
+            dv, nv = v.get("defaultValue"), v.get("newValue")
+            aob = self._finder_aob(v.get("offsetFinder"))
+            if typ == 6:
+                returns[str(v.get("baseId") or "")] = (label, _to_int(v.get("offset"), 0))
+            elif typ == 11 and aob:
+                sources.append({"label": label, "aob": aob, "off": 0,
+                                "dv": dv if isinstance(dv, str) else "", "nv": nv if isinstance(nv, str) else ""})
+            elif typ == 11 and isinstance(nv, str) and nv.strip() and _to_int(v.get("offset")):
+                sources.append({"label": label, "aob": "", "off": _to_int(v.get("offset")),
+                                "dv": dv if isinstance(dv, str) else "", "nv": nv})
+            elif typ == 11:
+                labels.append((label, dv if isinstance(dv, str) else ""))
+            elif label:
+                self.variables.append((label, typ, dv, nv))
+        if not sources:
+            return
+        names = {n for n, _ in labels}
+
+        def is_cave(src):
+            return any(m in names for m in re.findall(r"\b(?:jmp|call)\s+([A-Za-z_]\w*)", src["nv"]))
+        main = next((x for x in sources if is_cave(x)), sources[0])
+        order = [main] + [x for x in sources if x is not main]
+        self.native = True
+        self.labels = labels
+        self.origin_source = (main["off"], main["dv"], main["nv"])
+        self.extra_sources = [(x["off"], x["dv"], x["nv"]) for x in order[1:]]
+        self.origin_aob, self.origin_aob_offset = main["aob"], 0
+        self.src_info = [{"label": x["label"], "aob": x["aob"], "aob_offset": 0} for x in order]
+        self.native_returns = {r[0]: (src, r[1]) for src, r in returns.items()}
+        ret = returns.get(main["label"])
+        self.origin_return_offset = (ret[1] if ret else 0) or 8
 
     def _parse_variable(self, v: dict):
         label = (v.get("label") or v.get("Label") or
@@ -224,8 +313,12 @@ class ReapPatch:
 
         off = _to_int(v.get("offset", v.get("Offset", 0)))
 
-        low = str(label).lower().replace("_", "")
-        if low.startswith("originsource"):
+        low = re.sub(r"[\s_\-.]+", "", str(label).lower())       # "Origin Source", "origin-source" ...
+        is_static = v.get("isStatic", v.get("IsStatic")) is True
+        typ = _to_int(v.get("type", v.get("Type")), -1)
+        has_text = isinstance(nv, str) and nv.strip() != ""
+        if (low.startswith(("originsource", "hookaddress", "hooksource", "patchaddress", "hook"))
+                or (is_static and typ == 11 and off and has_text)):
             entry = (off, dv or "", nv or "")
             if self.origin_source is None:
                 self.origin_source = entry
@@ -241,7 +334,7 @@ class ReapPatch:
             else:
                 # Zweite/dritte OriginSource = zusätzliche Patch-Stelle ("fusionierter" Patch)
                 self.extra_sources.append(entry)
-        elif low == "originreturn":
+        elif low in ("originreturn", "hookreturn", "returnoffset"):
             self.origin_return_offset = off or 8
         else:
             if isinstance(dv, str) and dv.strip():

@@ -159,6 +159,13 @@ def _asm_or_empty(backend, asm, addr):
 
 def _plan_sites(backend, reapatch, hook_addr):
     """Liste aller Patch-Stellen: [{addr, new_asm, default_asm}, ...]."""
+    if getattr(reapatch, "native", False):
+        plan = []
+        for i, (off, dv, nv) in enumerate(reapatch.sites()):
+            a = _site_addr(backend, reapatch, i, hook_addr)
+            if a:
+                plan.append({"addr": a, "new_asm": nv, "default_asm": dv})
+        return plan
     base = hook_addr - reapatch.origin_source[0]
     plan = []
     for off, dv, nv in reapatch.sites():
@@ -240,6 +247,8 @@ def _is_writable_region(backend, addr):
 # ==================================================================
 def is_cave_patch(reapatch):
     """True wenn newValue auf ein Label im Reapatch springt."""
+    if getattr(reapatch, "native", False):
+        return False                      # Reaper-Originalformat: eigener Ablauf (_apply_native), Zustand wie 'simple'
     if not reapatch.origin_source:
         return False
     _, _, new_asm = reapatch.origin_source
@@ -526,10 +535,211 @@ def _apply_simple(backend, reapatch, hook_addr):
 
 
 # ==================================================================
+# Reaper-Originalformat: mehrere Stellen mit eigener Signatur, mehrere Caves, Variablen
+# ==================================================================
+def _name_sub(text, addrs):
+    """Namen (Labels, Variablen, Return-Namen) durch absolute Adressen ersetzen."""
+    if not addrs or not text:
+        return text
+    rx = re.compile(r"\b(" + "|".join(re.escape(n) for n in sorted(addrs, key=len, reverse=True)) + r")\b")
+    return rx.sub(lambda m: f"{addrs[m.group(1)]:#x}", text)
+
+
+def _cave_lines(asm):
+    out = []
+    for line in (asm or "").splitlines():
+        line = line.strip()
+        if not line or line.startswith((";", "#", "//")):
+            continue
+        line = re.split(r"\s;|\s//", line, maxsplit=1)[0].strip()
+        if line:
+            out.append(line)
+    return out
+
+
+def _var_bytes(typ, dv, nv):
+    """Wert einer Variable (aktiver Patch: newValue, sonst defaultValue) als Bytes: Typ 7 = float32, sonst int32."""
+    val = nv if nv is not None else dv
+    if isinstance(val, str):
+        t = val.strip()
+        try:
+            val = int(t, 0)
+        except ValueError:
+            val = float(t or 0)
+    if typ == 7 or isinstance(val, float):
+        return struct.pack("<f", float(val))
+    return struct.pack("<I", int(val) & 0xFFFFFFFF)
+
+
+def _layout_native_cave(backend, rp, cave_base, ext):
+    """Alle Labels hintereinander (Durchfall zwischen Labels bleibt erhalten), danach die Variablen.
+    Sprungziele aendern die Befehlslaenge -> so lange wiederholen, bis die Adressen stabil sind."""
+    items = [(n, _cave_lines(a)) for n, a in rp.labels]
+    vnames = [v[0] for v in rp.variables]
+    addrs = {n: cave_base for n, _ in items}
+    addrs.update({n: cave_base for n in vnames})
+    for _ in range(10):
+        known = dict(ext)
+        known.update(addrs)
+        parts, new, pos = [], {}, cave_base
+        for n, lines in items:
+            new[n] = pos
+            code = _name_sub("\n".join(lines), known)
+            try:
+                b = _extract_bytes(backend.assemble(code + "\n", pos)) if code.strip() else b""
+            except Exception as e:
+                raise RuntimeError(f"Cave-Label '{n}': {e}")
+            parts.append(b)
+            pos += len(b)
+        pad = (-pos) % 8
+        parts.append(b"\x90" * pad)
+        pos += pad
+        for name, typ, dv, nv in rp.variables:
+            new[name] = pos
+            vb = _var_bytes(typ, dv, nv)
+            parts.append(vb)
+            pos += len(vb)
+        if new == addrs:
+            return b"".join(parts), addrs
+        addrs = new
+    raise RuntimeError("Cave-Layout wird nicht stabil (Sprunglaengen schwanken)")
+
+
+def _site_addr(backend, rp, i, main_addr=None):
+    """Adresse der i-ten Patch-Stelle: Signatur-Treffer (auch wenn schon gepatcht) oder Basis+Offset."""
+    off, dv, _nv = rp.sites()[i]
+    info = rp.src_info[i] if i < len(rp.src_info) else {}
+    if info.get("aob"):
+        import aob as AOB
+        try:
+            wild = len(asm_to_bytes(backend, dv, 0x400000))
+        except Exception:
+            wild = 0
+        a = AOB.find_site(backend, info["aob"], wild)
+        return a + info.get("aob_offset", 0) if a else None
+    if main_addr is not None:
+        return main_addr - rp.origin_source[0] + off
+    return None
+
+
+def _native_has_label(rp, new_asm):
+    names = {n for n, _ in rp.labels}
+    return any(m in names for m in re.findall(r"\b(?:jmp|call)\s+([A-Za-z_]\w*)", new_asm or ""))
+
+
+def _apply_native(backend, rp, hook_addr, size_hint=0x4000):
+    sites = rp.sites()
+    addrs = []
+    for i in range(len(sites)):
+        a = _site_addr(backend, rp, i, addrs[0] if addrs else None)
+        lab = rp.src_info[i]["label"] if i < len(rp.src_info) else str(i)
+        if a is None:
+            raise RuntimeError(f"Signatur von '{lab}' nicht gefunden - andere Spielversion?")
+        addrs.append(a)
+        print(f"[native] {lab}: {a:#x}")
+
+    cave_addr, names = None, {}
+    if rp.labels or rp.variables:
+        by_label = {inf["label"]: addrs[k] for k, inf in enumerate(rp.src_info)}
+        ext = {ret: by_label[src] + off for ret, (src, off) in rp.native_returns.items() if src in by_label}
+        cave_addr = backend.find_cave(addrs[0], size_hint)
+        print(f"[native] Cave-Adresse: {cave_addr:#x}")
+        blob, names = _layout_native_cave(backend, rp, cave_addr, ext)
+        names = dict(names)
+        names.update(ext)
+        if len(blob) > size_hint:
+            raise RuntimeError(f"Cave zu gross: {len(blob)} > {size_hint}")
+        try:
+            backend.set_rwx(cave_addr, size_hint)
+        except Exception as e:
+            print(f"[native] set_rwx cave: {e}")
+        backend.write(cave_addr, blob)
+        if not _verify_write(backend, cave_addr, blob, "Cave"):
+            raise RuntimeError("Cave-Write fehlgeschlagen!")
+        print(f"[native] Cave: {len(blob)} Bytes, {len(rp.labels)} Label(s), {len(rp.variables)} Variable(n)")
+
+    done = []
+    try:
+        for i, (off, dv, nv) in enumerate(sites):
+            addr = addrs[i]
+            new_asm = _name_sub(nv, names)
+            if not new_asm.strip():
+                continue
+            new_raw = asm_to_bytes(backend, new_asm, addr)
+            if not new_raw:
+                raise RuntimeError(f"newValue @ {addr:#x} ergibt keine Bytes")
+            try:
+                default_bytes = asm_to_bytes(backend, dv, addr)
+            except Exception as e:
+                print(f"[native] defaultValue @ {addr:#x} ignoriert: {e}")
+                default_bytes = b""
+            size = len(default_bytes) or len(new_raw)
+            if len(new_raw) > size:
+                raise RuntimeError(f"Neuer Code zu gross @ {addr:#x}: {len(new_raw)} > {size}")
+            new_bytes = new_raw + b"\x90" * (size - len(new_raw))
+            mem = backend.read(addr, size)
+            if mem is None:
+                raise RuntimeError(f"Original-Bytes an {addr:#x} nicht lesbar")
+            mem = bytes(mem)
+            if default_bytes and mem not in (default_bytes, new_bytes):
+                print(f"[native] Hinweis @ {addr:#x}: Speicher {mem.hex(' ')} weicht von defaultValue "
+                      f"{default_bytes.hex(' ')} ab (Signatur passt) - Speicher wird als Original gesichert")
+            original = default_bytes if (mem == new_bytes and default_bytes) else mem
+            backend.write(addr, new_bytes)
+            done.append({"addr": addr, "size": size, "original_bytes": original, "new_bytes": new_bytes})
+            if not _verify_write(backend, addr, new_bytes, "Patch"):
+                raise RuntimeError(f"Patch-Write fehlgeschlagen @ {addr:#x}!")
+            print(f"[native] {addr:#x}: {fmt_bytes(original)} -> {fmt_bytes(new_bytes)}")
+    except Exception:
+        for s in reversed(done):
+            try:
+                backend.write(s["addr"], s["original_bytes"])
+            except Exception:
+                pass
+        raise
+    if not done:
+        raise RuntimeError("newValue fehlt (nichts zu patchen)")
+    time.sleep(0.15)
+    first = done[0]
+    return {"hook_addr": addrs[0], "cave_addr": cave_addr, "cave_region_size": size_hint,
+            "size": sum(s["size"] for s in done), "original_bytes": first["original_bytes"],
+            "new_bytes": first["new_bytes"], "sites": done, "simple": True, "native": True}
+
+
+def _detect_native(backend, rp, hook_addr):
+    """Status ueber die Haupt-Stelle (eine Signatur-Suche pro Patch)."""
+    typ = "Cave" if rp.labels else "Patch"
+    try:
+        addr = _site_addr(backend, rp, 0)
+    except Exception:
+        addr = None
+    if addr is None:
+        return False, None, typ
+    nv = rp.origin_source[2]
+    cur = backend.read(addr, 8)
+    if cur is None:
+        return False, None, typ
+    cur = bytes(cur)
+    if _native_has_label(rp, nv):
+        if len(cur) >= 5 and cur[0] == 0xE9:
+            target = (addr + 5 + struct.unpack("<i", cur[1:5])[0]) & 0xFFFFFFFFFFFFFFFF
+            if _is_writable_region(backend, target):
+                return True, target, typ
+        return False, None, typ
+    try:
+        nb = asm_to_bytes(backend, nv, addr)
+    except Exception:
+        return False, None, typ
+    return bool(nb) and cur[:len(nb)] == nb, None, typ
+
+
+# ==================================================================
 # Dispatch
 # ==================================================================
 def apply_patch(backend, reapatch, hook_addr, size_hint=0x4000):
     """Erkennt automatisch Cave oder SimplePatch und wendet ihn an."""
+    if getattr(reapatch, "native", False):
+        return _apply_native(backend, reapatch, hook_addr, size_hint)
     if is_cave_patch(reapatch):
         return _apply_cave(backend, reapatch, hook_addr, size_hint)
     return _apply_simple(backend, reapatch, hook_addr)
@@ -605,6 +815,8 @@ def detect_patched(backend, reapatch, hook_addr):
     """Rückgabe: (ist_gepatcht: bool, cave_addr_or_none, typ: str)."""
     if not reapatch.origin_source:
         return False, None, "?"
+    if getattr(reapatch, "native", False):
+        return _detect_native(backend, reapatch, hook_addr)
     _, default_asm, new_asm = reapatch.origin_source
     if not new_asm:
         return False, None, "?"

@@ -191,6 +191,8 @@ EN_MORE = {
     "WEITER": "CONTINUE",
     "Kein Patch-Dokument (Variables fehlt)": "Not a patch document (Variables missing)",
     "OriginSource fehlt": "OriginSource missing",
+    "Cave-Layout wird nicht stabil (Sprunglaengen schwanken)": "Cave layout does not stabilise (jump sizes keep changing)",
+    "' nicht gefunden - andere Spielversion?": "' not found - different game version?",
     "Ordner fuer die .ReapPatch-Dateien": "Folder for the .ReapPatch files",
     " Datei(en) nach ": " file(s) written to ",
     "Keine Patches vorhanden.": "No patches available.",

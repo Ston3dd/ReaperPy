@@ -248,6 +248,24 @@ def resolve_hook(backend, rp, image_base, log=None):
         return default
 
 
+def find_site(backend, aob_text, wild=0):
+    """Adresse einer Patch-Stelle per Signatur (Treffer = Stelle). Ist die Stelle schon gepatcht, passt die
+    Signatur nicht mehr: dann ein zweiter Versuch mit den ersten `wild` Bytes als Wildcard. -> Adresse oder None."""
+    key = (backend.pid, aob_text)
+    if key in _cache:
+        return _cache[key]
+    pat, mask = parse_pattern(aob_text)
+    regions = exec_regions(backend.get_maps())
+    addr = find_first(backend.client, regions, pat, mask)
+    if not addr and wild > 0 and len(pat) > wild:
+        mask2 = bytes(0 for _ in range(wild)) + mask[wild:]
+        if any(mask2):
+            addr = find_first(backend.client, regions, pat, mask2)
+    if addr:
+        _cache[key] = addr
+    return addr or None
+
+
 def _label(v):
     return str(v.get("label") or v.get("Label") or v.get("name") or v.get("Name") or "")
 

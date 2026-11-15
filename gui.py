@@ -1201,6 +1201,8 @@ class App:
                 rp = ReapPatch.load(path)
                 if not rp.origin_source:
                     nohook += 1                      # trotzdem laden (Karte sichtbar), kein Fehler
+                    if getattr(rp, "nohook_info", ""):
+                        self.log_msg(f"[patches] {rp.name}: {rp.nohook_info}", "info")
                 import cave_trainer as _TR
                 shown = _TR.display_name(path, rp.name)        # Trainer-Dateien: der Name, den der Nutzer vergeben hat
                 if shown != rp.name:
