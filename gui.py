@@ -440,7 +440,6 @@ class ValuesDialog(tk.Toplevel):
         self.status.configure(text=text, fg=ERROR if err else TEXT_DIM)
 
     def _control(self, row, name, typ, kind, cur):
-        rp = self.card.rp
         if kind == "switch":
             var = tk.IntVar(value=1 if float(cur or 0) else 0)
             cb = tk.Checkbutton(self.body, variable=var, bg=BG, activebackground=BG, selectcolor=BG_CARD,
