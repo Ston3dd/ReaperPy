@@ -173,6 +173,9 @@ class LibraryWindow(tk.Toplevel):
 
         self.lbl_empty = tk.Label(self.inner, text="", bg=BG, fg=TEXT_DIM, font=FONT_MONO, justify="center")
 
+        import dnd                                       # Patches auf das Fenster ziehen (optional, tkinterdnd2)
+        dnd.enable(self.app.root, [self], lambda paths: self.after(0, lambda: self._dropped(paths)))
+
         self.after(100, self._poll)
         self.rescan()                                   # Auto-Scan beim Öffnen
 
@@ -309,6 +312,13 @@ class LibraryWindow(tk.Toplevel):
             self.app.cfg["library_dir"] = d
             projects.save_config(self.app.cfg)
             self.rescan()
+
+    def _dropped(self, paths):
+        try:
+            self.app.import_paths(paths)
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror(self.tr.t("dlg_error"), str(e), parent=self)
+        self.rescan()
 
     def add_patch(self):
         fn = filedialog.askopenfilename(parent=self, title=self.tr.t("lib_pick_patch"))

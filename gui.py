@@ -139,6 +139,13 @@ class CheatCard(tk.Frame):
         self.lbl_info = tk.Label(self, text="\u24d8", bg=BG_CARD, fg=TEXT_DIM2,
                                  font=("Segoe UI", 13), cursor="hand2")
         self.lbl_info.grid(row=0, column=3, rowspan=2, padx=(6, 14), sticky="e")
+        self.lbl_vars = None                      # Zahnrad: einstellbare Werte (nur Patches mit Variablen)
+        if getattr(reapatch, "variables", None):
+            self.lbl_vars = tk.Label(self, text="\u2699", bg=BG_CARD, fg=TEXT_DIM2, font=("Segoe UI", 13),
+                                     cursor="hand2")
+            self.lbl_vars.grid(row=0, column=3, rowspan=2, padx=(6, 0), sticky="e")
+            self.lbl_info.grid_configure(column=4)
+            self.lbl_vars.bind("<Button-1>", lambda _e: self.app.show_values(self))
 
         self.columnconfigure(2, weight=1)
         self.bind("<Configure>", self._on_resize)
@@ -173,8 +180,9 @@ class CheatCard(tk.Frame):
             stripe = {St.ERROR: ERROR, St.LOAD: WARN}.get(
                 self.state, BORDER_HVR if self._hovering else BORDER)
         self.configure(bg=bg)
-        for w in (self.cv, self.lbl_name, self.lbl_sub, self.lbl_info):
-            w.configure(bg=bg)
+        for w in (self.cv, self.lbl_name, self.lbl_sub, self.lbl_info, self.lbl_vars):
+            if w is not None:
+                w.configure(bg=bg)
         self.stripe.configure(bg=stripe)
         self.draw()
 
@@ -245,7 +253,10 @@ class CheatCard(tk.Frame):
         gp = getattr(self.app, "gp", None)
         fn = os.path.basename(self.path)
         items = [(tr("ctx_deactivate") if on else tr("ctx_activate"), self._click),
-                 (tr("ctx_info"), self._info),
+                 (tr("ctx_info"), self._info)]
+        if self.lbl_vars is not None:
+            items.append((tr("ctx_values"), lambda: self.app.show_values(self)))
+        items += [
                  (None, None),
                  (tr("ctx_fav_off") if gp and fn in gp.favorites else tr("ctx_fav_on"), lambda: self.app.toggle_favorite(self)),
                  (tr("ctx_group"), lambda: self.app.set_card_group(self)),
@@ -357,6 +368,124 @@ class InfoDialog(tk.Toplevel):
                   command=self.destroy).pack(side="right")
 
 
+class ValuesDialog(tk.Toplevel):
+    """Einstellbare Werte eines Cheats (Schalter 0/1, Zahlen, Kommazahlen).  Ist der Cheat an, wirkt jede
+    Änderung sofort im Spiel; ist er aus, wird der Wert beim nächsten Aktivieren benutzt."""
+
+    def __init__(self, parent, app, card):
+        super().__init__(parent)
+        import patch_engine as PE
+        self.app, self.card, self.PE = app, card, PE
+        self.tr = app.tr
+        rp = card.rp
+        self.configure(bg=BG)
+        self.title(self.tr.t("values_title"))
+        self.transient(parent)
+        self.resizable(False, True)
+
+        head = tk.Frame(self, bg=BG_BAR, height=42)
+        head.pack(fill="x")
+        tk.Label(head, text=f"\u25b8  {rp.name}", bg=BG_BAR, fg=ACCENT, font=FONT_HEAD,
+                 anchor="w").pack(side="left", padx=12)
+
+        self.body = tk.Frame(self, bg=BG)
+        self.body.pack(fill="both", expand=True, padx=14, pady=10)
+        self.status = tk.Label(self, text="", bg=BG, fg=TEXT_DIM, font=FONT_SUB, wraplength=420, justify="left")
+        self.status.pack(fill="x", padx=14)
+
+        live = self._live_values()
+        self.rows = {}
+        for i, (name, typ, dv, nv) in enumerate(rp.variables):
+            kind = PE.var_kind(typ, dv, nv)
+            meta = rp.var_meta.get(name, {})
+            cur = live.get(name, rp.var_values.get(name, nv if nv is not None else dv))
+            tk.Label(self.body, text=meta.get("display") or name, bg=BG, fg=TEXT, font=FONT_LABEL,
+                     anchor="w").grid(row=2 * i, column=0, sticky="w", pady=(8, 0))
+            if meta.get("comment"):
+                tk.Label(self.body, text=meta["comment"], bg=BG, fg=TEXT_DIM, font=FONT_SUB, anchor="w",
+                         justify="left", wraplength=300).grid(row=2 * i + 1, column=0, sticky="w")
+            self.rows[name] = self._control(2 * i, name, typ, kind, cur)
+        self.body.columnconfigure(0, weight=1)
+
+        bar = tk.Frame(self, bg=BG)
+        bar.pack(fill="x", padx=14, pady=(4, 12))
+        tk.Button(bar, text=self.tr.t("values_reset"), command=self._reset, bg=BG_CARD, fg=TEXT,
+                  activebackground=BG_CARD_HVR, activeforeground=ACCENT, font=FONT_LABEL, relief="flat", bd=0,
+                  padx=14, pady=5, cursor="hand2").pack(side="left")
+        tk.Button(bar, text=self.tr.t("info_close"), command=self.destroy, bg=BG_CARD, fg=TEXT,
+                  activebackground=BG_CARD_HVR, activeforeground=ACCENT, font=FONT_LABEL, relief="flat", bd=0,
+                  padx=14, pady=5, cursor="hand2").pack(side="right")
+        self._set_status(bool(live))
+
+    # --- Werte aus dem Spiel lesen (nur wenn der Cheat an ist) ---
+    def _live_values(self):
+        out = {}
+        app, card = self.app, self.card
+        if card.state != St.ON or not app._connected:
+            return out
+        try:
+            addrs = self.PE.var_addrs(app.backend, card.rp, app.applied.get(card.path))
+            for name, typ, _dv, _nv in card.rp.variables:
+                if name in addrs:
+                    v = self.PE.read_var(app.backend, addrs[name], typ)
+                    out[name] = round(v, 4) if typ == 7 else v
+        except Exception as e:  # noqa: BLE001
+            app.log_msg(f"[values] {e}", "warn")
+        return out
+
+    def _set_status(self, live, text=None, err=False):
+        if text is None:
+            text = self.tr.t("values_live") if live or (self.card.state == St.ON and self.app._connected) \
+                else self.tr.t("values_offline")
+        self.status.configure(text=text, fg=ERROR if err else TEXT_DIM)
+
+    def _control(self, row, name, typ, kind, cur):
+        rp = self.card.rp
+        if kind == "switch":
+            var = tk.IntVar(value=1 if float(cur or 0) else 0)
+            cb = tk.Checkbutton(self.body, variable=var, bg=BG, activebackground=BG, selectcolor=BG_CARD,
+                                fg=ACCENT, activeforeground=ACCENT, bd=0, highlightthickness=0, cursor="hand2",
+                                command=lambda: self._commit(name, typ, kind, var.get()))
+            cb.grid(row=row, column=1, rowspan=2, sticky="e", padx=(12, 0))
+            return ("switch", var)
+        var = tk.StringVar(value=str(cur))
+        box = tk.Frame(self.body, bg=BG)
+        box.grid(row=row, column=1, rowspan=2, sticky="e", padx=(12, 0))
+        ent = tk.Entry(box, textvariable=var, width=10, bg=BG_CARD, fg=TEXT, insertbackground=ACCENT, relief="flat",
+                       font=FONT_MONO, highlightthickness=1, highlightbackground=BORDER, highlightcolor=ACCENT_DIM)
+        ent.pack(side="left")
+        ent.bind("<Return>", lambda _e: self._commit_text(name, typ, kind, var))
+        tk.Button(box, text=self.tr.t("values_set"), bg=BG_CARD, fg=ACCENT, activebackground=BG_CARD_HVR,
+                  activeforeground=ACCENT, font=FONT_SUB, relief="flat", bd=0, padx=8, pady=3, cursor="hand2",
+                  command=lambda: self._commit_text(name, typ, kind, var)).pack(side="left", padx=(4, 0))
+        return (kind, var)
+
+    def _commit_text(self, name, typ, kind, var):
+        txt = var.get().strip().replace(",", ".")
+        try:
+            val = float(txt) if kind == "float" else int(float(txt)) if "." in txt else int(txt, 0)
+        except ValueError:
+            self._set_status(False, self.tr.t("values_bad", v=var.get()), err=True)
+            return
+        self._commit(name, typ, kind, val)
+
+    def _commit(self, name, typ, kind, val):
+        self.app.set_var(self.card, name, typ, val)
+        self._set_status(False)
+
+    def _reset(self):
+        rp = self.card.rp
+        for name, typ, dv, nv in rp.variables:
+            default = nv if nv is not None else dv
+            kind, var = self.rows[name]
+            if kind == "switch":
+                var.set(1 if float(default or 0) else 0)
+            else:
+                var.set(str(default))
+            self.app.set_var(self.card, name, typ, default, reset=True)
+        self._set_status(False)
+
+
 # ------------------------------------------------------------------
 # Anwendung
 # ------------------------------------------------------------------
@@ -454,6 +583,11 @@ class App:
             self.select_project_by_name(last)
         if not self.current_project:
             self._set_title(self.tr.t("no_project"))
+
+        import dnd
+        self._dnd = dnd.enable(root, [root], lambda paths: root.after(0, lambda: self.import_paths(paths)))
+        if self._dnd:
+            self.log_msg(self.tr.t("log_dnd_on"), "info")
 
         root.after(80, self.poll)
         root.after(500, self._blink)
@@ -666,9 +800,29 @@ class App:
             self.log_msg(self.tr.t("log_version_ok", game=det.version, patch=found[0]), "info")
         elif status == "mismatch":
             self.log_msg(self.tr.t("log_version_bad", game=det.version, patch=" / ".join(found)), "warn")
+        self._set_version_banner(det.version, found if status == "mismatch" else [])
+
+    def _set_version_banner(self, game_version, patch_versions):
+        """Sichtbare Warnung im Kopf, wenn Spiel- und Patch-Version nicht zusammenpassen (sonst leer)."""
+        txt = self.tr.t("version_banner", game=game_version, patch=" / ".join(patch_versions)) \
+            if patch_versions else ""
+        self.lbl_version.configure(text=txt)
+
+    def _recheck_version(self):
+        """Nach jedem (Neu-)Laden der Patches: passt die Spielversion noch zu den Datei-/Ordnernamen?"""
+        ver = (self.game_info or {}).get("version") if self.game_info else ""
+        if not ver or not self.patches:
+            self._set_version_banner("", [])
+            return
+        import versioncheck
+        names = [os.path.basename(p) for p in self.patches] + [os.path.basename(self.PATCH_DIR or ""),
+                                                                 self.current_project or ""]
+        status, found = versioncheck.check(ver, names)
+        self._set_version_banner(ver, found if status == "mismatch" else [])
 
     def _clear_game_info(self):
         self.game_info = None
+        self._set_version_banner("", [])
         self._show_cover("")
         self._refresh_title()
 
@@ -698,6 +852,8 @@ class App:
         self.lbl_status = tk.Label(left, text=self.tr.t("status_ready"), bg=BG,
                                    fg=TEXT_DIM, font=FONT_SUB, anchor="w")
         self.lbl_status.pack(anchor="w")
+        self.lbl_version = tk.Label(left, text="", bg=BG, fg=WARN, font=FONT_SUB, anchor="w")
+        self.lbl_version.pack(anchor="w")                     # Versions-Warnung (leer = alles in Ordnung)
 
         right = tk.Frame(head, bg=BG)
         right.pack(side="right", fill="y")
@@ -1063,7 +1219,17 @@ class App:
         if not is_patch_file(path):
             raise ValueError(f"Keine bekannte Patch-Datei: {os.path.basename(path)}")
         ReapPatch.load(path)                        # wirft bei kaputten/verschlüsselten Dateien
-        dest_dir = target_dir or self.PATCH_DIR
+        dest_dir = target_dir
+        if dest_dir is None:
+            route = self._route_patch(path)
+            if route["folder"]:                       # Spiel-ID im Dateinamen: in den Ordner DIESES Spiels
+                os.makedirs(route["folder"], exist_ok=True)
+                dest_dir = route["folder"]
+                if route["mismatch"]:
+                    self.log_msg(self.tr.t("log_import_mismatch", file=os.path.basename(path), id=route["id"]),
+                                 "warn")
+            else:
+                dest_dir = self.PATCH_DIR
         if not dest_dir or not os.path.isdir(dest_dir):
             folder = os.path.dirname(os.path.abspath(path))
             self.cfg.setdefault("projects", {}).setdefault(folder, {})["name"] = \
@@ -1084,7 +1250,48 @@ class App:
         self.log_msg(self.tr.t("log_added_patch", name=os.path.basename(dest)), "ok")
         if os.path.abspath(dest_dir) == os.path.abspath(self.PATCH_DIR or ""):
             self.load_patches()
+        elif not self.PATCH_DIR:                      # nichts geoeffnet: den Spielordner gleich aufmachen
+            name = os.path.basename(dest_dir) or dest_dir
+            self.cfg.setdefault("projects", {}).setdefault(dest_dir, {})["name"] = name
+            projects.save_config(self.cfg)
+            self.reload_projects()
+            self.select_project_by_name(name)
+        else:
+            self.log_msg(self.tr.t("log_import_to", folder=dest_dir), "info")
         return dest
+
+    def _route_patch(self, path):
+        """Ziel-Ordner einer Patch-Datei nach der Spiel-ID im Dateinamen (siehe library.route_patch)."""
+        import library as _lib
+        import gamemeta
+        lib_dir = self.cfg.get("library_dir") or projects.DEFAULTS["library_dir"]
+        try:
+            names = {m.title_id: m.name for m in gamemeta.cached() if m.name}
+        except Exception:  # noqa: BLE001
+            names = {}
+        cur = (self.game_info or {}).get("tid") or _lib.extract_id(self.current_project or "", self.PATCH_DIR or "")
+        return _lib.route_patch(lib_dir, path, names, cur)
+
+    def import_paths(self, paths):
+        """Dateien/Ordner (z. B. per Drag & Drop): jede Patch-Datei ins richtige Spiel-Verzeichnis kopieren."""
+        files = []
+        for p in paths:
+            if os.path.isdir(p):
+                files += [os.path.join(p, f) for f in sorted(os.listdir(p)) if is_patch_file(f)]
+            else:
+                files.append(p)
+        ok = 0
+        for f in files:
+            try:
+                self.add_patch_from_file(f)
+                ok += 1
+            except Exception as e:  # noqa: BLE001
+                self.log_msg(self.tr.t("log_import_fail", file=os.path.basename(f), err=e), "err")
+        if ok:
+            self.log_msg(self.tr.t("log_import_done", n=ok), "ok")
+        elif not files:
+            self.log_msg(self.tr.t("log_import_none"), "warn")
+        return ok
 
     def on_project_selected(self, ev):
         name = self.project_var.get()
@@ -1282,6 +1489,7 @@ class App:
                 if shown != rp.name:
                     self.log_msg(f"[trainer] Name aus dem Dateinamen: '{rp.name}' -> '{shown}'", "info")
                     rp.name = shown
+                self._load_var_values(path, rp)
                 self.patches[path] = rp
             except Exception as e:
                 self.log_msg(self.tr.t("log_patch_error", name=f, err=e), "err")
@@ -1296,6 +1504,7 @@ class App:
                 self.gp.save()
         self.wanted &= set(self.patches)
         self._rebuild_cards()
+        self._recheck_version()
         if self._connected:
             threading.Thread(target=self._sync_all, daemon=True).start()
 
@@ -1618,6 +1827,72 @@ class App:
     def show_info(self, rp):
         InfoDialog(self.root, rp, self.IMAGE_BASE, self.tr)
 
+    # --- einstellbare Werte (Variablen in der Cave) ---
+    def show_values(self, card):
+        ValuesDialog(self.root, self, card)
+
+    def _var_file(self):
+        return os.path.join(self.PATCH_DIR, "var_values.json") if self.PATCH_DIR else None
+
+    def _read_var_file(self):
+        p = self._var_file()
+        try:
+            with open(p, encoding="utf-8-sig") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else {}
+        except Exception:  # noqa: BLE001 - fehlt/kaputt: ohne gespeicherte Werte weiter
+            return {}
+
+    def _load_var_values(self, path, rp):
+        """Gespeicherte Werte des Nutzers (var_values.json im Patch-Ordner) an den Patch haengen."""
+        if not getattr(rp, "variables", None):
+            return
+        saved = self._read_var_file().get(os.path.basename(path), {})
+        names = {v[0] for v in rp.variables}
+        rp.var_values = {k: v for k, v in saved.items() if k in names and isinstance(v, (int, float))}
+
+    def _save_var_values(self):
+        p = self._var_file()
+        if not p:
+            return
+        data = self._read_var_file()
+        for path, rp in self.patches.items():
+            if getattr(rp, "variables", None):
+                if rp.var_values:
+                    data[os.path.basename(path)] = rp.var_values
+                else:
+                    data.pop(os.path.basename(path), None)
+        try:
+            tmp = p + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=1)
+            os.replace(tmp, p)
+        except Exception as e:  # noqa: BLE001
+            self.log_msg(f"[values] {e}", "warn")
+
+    def set_var(self, card, name, typ, value, reset=False):
+        """Wert merken (gilt beim naechsten Aktivieren) und - ist der Cheat an - sofort ins Spiel schreiben."""
+        rp = card.rp
+        if reset:
+            rp.var_values.pop(name, None)
+        else:
+            rp.var_values[name] = value
+        self._save_var_values()
+        if card.state == St.ON and self._connected:
+            threading.Thread(target=self._write_var_job, args=(card, name, typ, value), daemon=True).start()
+
+    def _write_var_job(self, card, name, typ, value):
+        import patch_engine as PE
+        with self._patch_lock:
+            try:
+                addrs = PE.var_addrs(self.backend, card.rp, self.applied.get(card.path))
+                if name not in addrs:
+                    raise RuntimeError(self.tr.t("values_noaddr", name=name))
+                PE.write_var(self.backend, addrs[name], typ, value)
+                self.q.put(("log", (self.tr.t("log_value_set", cheat=card.rp.name, name=name, v=value), "ok")))
+            except Exception as e:  # noqa: BLE001
+                self.q.put(("log", (self.tr.t("log_error", name=card.rp.name, err=e), "err")))
+
     # --- Sammel-Aktionen mit Fortschrittsbalken ---
     def _run_bulk(self, cards, fn):
         n = len(cards)
@@ -1901,6 +2176,8 @@ class App:
             self.log_msg(self.tr.t("log_codes_none", game=game), "info")
         else:
             self.log_msg(self.tr.t("log_codes_keep", game=game), "info")
+            if self.patches:
+                self._check_version(det)
 
     def _forget_active(self):
         """Nichts ist mehr gepatcht (Spiel beendet / Verbindung weg): Karten zurück auf AUS.

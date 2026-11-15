@@ -48,6 +48,32 @@ def folder_name(title, game_id):
     return f"{t} - {game_id}" if t else game_id
 
 
+def find_id_folder(library_dir, game_id):
+    """Vorhandener Ordner im Bibliotheks-Ordner, dessen Name die Spiel-ID enthaelt ('' wenn keiner)."""
+    for dirpath, _files in _walk(library_dir):
+        if os.path.abspath(dirpath) != os.path.abspath(library_dir) and \
+                extract_id(os.path.basename(dirpath)) == game_id:
+            return dirpath
+    return ""
+
+
+def route_patch(library_dir, path, names=None, current_id=""):
+    """Wohin gehoert eine importierte Patch-Datei?  Die Spiel-ID im Dateinamen entscheidet.
+
+    names      : {Titel-ID: Spielname} (z. B. aus dem Konsolen-Cache) fuer den Ordnernamen
+    current_id : ID des gerade geoeffneten Spiels (nur fuer die Warnung)
+    -> {"id", "folder", "exists", "mismatch"}; folder == '' wenn die Datei keine ID hat (dann: geoeffnetes Projekt)."""
+    gid = extract_id(os.path.basename(path))
+    if not gid:
+        return {"id": "", "folder": "", "exists": False, "mismatch": False}
+    folder = find_id_folder(library_dir, gid)
+    exists = bool(folder)
+    if not folder:
+        folder = os.path.join(library_dir, folder_name((names or {}).get(gid, ""), gid))
+    return {"id": gid, "folder": folder, "exists": exists,
+            "mismatch": bool(current_id) and current_id != gid}
+
+
 def clean_title(name, game_id=""):
     """'PPSA01234 - Super_Game (v1.02)' -> 'Super Game (v1.02)'."""
     base = os.path.splitext(name)[0] if os.path.splitext(name)[1].lower() in (

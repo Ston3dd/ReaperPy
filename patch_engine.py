@@ -596,7 +596,7 @@ def _layout_native_cave(backend, rp, cave_base, ext):
         pos += pad
         for name, typ, dv, nv in rp.variables:
             new[name] = pos
-            vb = _var_bytes(typ, dv, nv)
+            vb = _var_bytes(typ, dv, getattr(rp, "var_values", {}).get(name, nv))
             parts.append(vb)
             pos += len(vb)
         if new == addrs:
@@ -703,7 +703,60 @@ def _apply_native(backend, rp, hook_addr, size_hint=0x4000):
     first = done[0]
     return {"hook_addr": addrs[0], "cave_addr": cave_addr, "cave_region_size": size_hint,
             "size": sum(s["size"] for s in done), "original_bytes": first["original_bytes"],
-            "new_bytes": first["new_bytes"], "sites": done, "simple": True, "native": True}
+            "new_bytes": first["new_bytes"], "sites": done, "simple": True, "native": True,
+            "vars": {n: {"addr": names[n], "typ": t} for n, t, _d, _v in rp.variables if n in names}}
+
+
+# ------------------------------------------------------------------
+# Variablen live lesen/schreiben (Werte-Dialog)
+# ------------------------------------------------------------------
+def var_kind(typ, dv, nv):
+    """'switch' (0/1), 'float' oder 'int' - bestimmt das Bedienelement."""
+    def num(x):
+        try:
+            return float(x if not isinstance(x, str) else int(x.strip(), 0))
+        except Exception:
+            return None
+    vals = [num(x) for x in (dv, nv) if x is not None]
+    if typ == 7 or any(isinstance(x, float) and not float(x).is_integer() for x in (dv, nv)):
+        return "float"
+    if vals and all(v in (0.0, 1.0) for v in vals):
+        return "switch"
+    return "int"
+
+
+def var_addrs(backend, rp, state):
+    """name -> Adresse der Variablen im Cave des aktiven Patches (aus dem Zustand, sonst neu berechnet)."""
+    saved = (state or {}).get("vars")
+    if saved:
+        return {n: v["addr"] for n, v in saved.items()}
+    cave = (state or {}).get("cave_addr")
+    if not cave or not rp.variables:
+        return {}
+    addrs = []
+    for i in range(len(rp.sites())):
+        addrs.append(_site_addr(backend, rp, i, addrs[0] if addrs else None))
+    if any(a is None for a in addrs):
+        return {}
+    by_label = {inf["label"]: addrs[k] for k, inf in enumerate(rp.src_info)}
+    ext = {ret: by_label[src] + off for ret, (src, off) in rp.native_returns.items() if src in by_label}
+    _blob, names = _layout_native_cave(backend, rp, cave, ext)
+    return {n: names[n] for n, *_ in rp.variables if n in names}
+
+
+def read_var(backend, addr, typ):
+    raw = backend.read(addr, 4)
+    if raw is None or len(raw) < 4:
+        raise RuntimeError(f"Variable @ {addr:#x} nicht lesbar")
+    raw = bytes(raw)
+    return struct.unpack("<f", raw)[0] if typ == 7 else struct.unpack("<i", raw)[0]
+
+
+def write_var(backend, addr, typ, value):
+    data = _var_bytes(typ, value, value)
+    backend.write(addr, data)
+    if not _verify_write(backend, addr, data, "Variable"):
+        raise RuntimeError(f"Variable @ {addr:#x}: Schreiben fehlgeschlagen")
 
 
 def _detect_native(backend, rp, hook_addr):

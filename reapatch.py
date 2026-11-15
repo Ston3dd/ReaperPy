@@ -102,6 +102,8 @@ class ReapPatch:
         self.src_info = []                 # parallel zu sites(): {"label", "aob", "aob_offset"}
         self.native_returns = {}           # Return-Name -> (Quell-Label, Abstand)
         self.variables = []                # [(name, typ, default, new)] - Schalter/Werte, liegen in der Cave
+        self.var_meta = {}                 # name -> {"display", "comment"} (Anzeige im Werte-Dialog)
+        self.var_values = {}               # name -> vom Nutzer gewaehlter Wert (ueberschreibt newValue)
         self.nohook_info = ""              # Diagnose, falls keine Patch-Stelle gefunden wurde
         self.file_type = "unknown"         # 'reapproj', 'shnext', 'json', 'shn'
 
@@ -280,6 +282,8 @@ class ReapPatch:
                 labels.append((label, dv if isinstance(dv, str) else ""))
             elif label:
                 self.variables.append((label, typ, dv, nv))
+                self.var_meta[label] = {"display": str(v.get("DisplayName") or label),
+                                        "comment": str(v.get("comment") or "")}
         if not sources:
             return
         names = {n for n, _ in labels}
