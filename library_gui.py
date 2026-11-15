@@ -8,6 +8,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
+import gamemeta
 import projects
 import theme
 from library import Library, GameEntry
@@ -116,6 +117,8 @@ class LibraryWindow(tk.Toplevel):
         self._cols = 0
         self._q = queue.Queue()
         self._scanning = False
+        self._fetching = False
+        self._cq = queue.Queue()
 
         head = tk.Frame(self, bg=BG_BAR)
         head.pack(fill="x")
@@ -133,7 +136,8 @@ class LibraryWindow(tk.Toplevel):
                  relief="flat", font=FONT_MONO, highlightthickness=1, highlightbackground=BORDER,
                  highlightcolor=ACCENT_DIM).pack(side="left", padx=8)
         for key, cmd, acc in (("lib_rescan", self.rescan, True), ("lib_folder", self.pick_folder, False),
-                              ("lib_add_patch", self.add_patch, False)):
+                              ("lib_add_patch", self.add_patch, False),
+                              ("lib_console", self.fetch_console, False)):
             tk.Button(bar, text=self.tr.t(key), command=cmd, bg=BG_CARD, fg=ACCENT if acc else TEXT,
                       font=FONT_LABEL, relief="flat", bd=0, padx=12, pady=4, cursor="hand2",
                       activebackground=BG_CARD_HVR, activeforeground=ACCENT).pack(side="left", padx=3)
@@ -172,7 +176,7 @@ class LibraryWindow(tk.Toplevel):
         self.lbl_count.configure(text=self.tr.t("lib_scanning"), fg=WARN)
         cfg = self.app.cfg
         lib = Library(self._library_dir(), cfg.get("projects_root", ""),
-                      [k for k in cfg.get("projects", {})])
+                      [k for k in cfg.get("projects", {})], covers=gamemeta.cached())
 
         def job():
             try:
@@ -185,6 +189,22 @@ class LibraryWindow(tk.Toplevel):
     def _poll(self):
         if not self.winfo_exists():
             return
+        try:
+            while True:
+                kind, val = self._cq.get_nowait()
+                if kind == "prog":
+                    self.lbl_count.configure(text=self.tr.t("lib_console_prog", i=val[0], n=val[1], name=val[2]),
+                                             fg=WARN)
+                elif kind == "fail":
+                    self._fetching = False
+                    self.lbl_count.configure(text=self.tr.t("lib_console_fail", err=val), fg=ERROR)
+                elif kind == "done":
+                    self._fetching = False
+                    self.rescan()
+                    self.lbl_count.configure(text=self.tr.t("lib_console_done", n=val[0], c=val[1], m=val[2]),
+                                             fg=TEXT_DIM)
+        except queue.Empty:
+            pass
         try:
             while True:
                 kind, val = self._q.get_nowait()
@@ -241,6 +261,29 @@ class LibraryWindow(tk.Toplevel):
     def open_entry(self, entry: GameEntry):
         if self.app.open_library_entry(entry):
             self.destroy()
+
+    def fetch_console(self):
+        """Cover + exakte Namen ALLER installierten Spiele per FTP holen (landet im Cache covers/)."""
+        if self._fetching:
+            return
+        host = self.app.ip_var.get().strip()                   # Tk-Variable hier (UI-Thread) lesen
+        cfg = dict(self.app.cfg)
+        self._fetching = True
+        self.lbl_count.configure(text=self.tr.t("lib_scanning"), fg=WARN)
+
+        def job():
+            try:
+                metas, err = gamemeta.fetch_all(
+                    host, cfg, progress=lambda i, n, m: self._cq.put(("prog", (i, n, m.name or m.title_id))))
+            except Exception as e:                              # noqa: BLE001
+                self._cq.put(("fail", str(e)))
+                return
+            if not metas:
+                self._cq.put(("fail", err or "-"))
+                return
+            self._cq.put(("done", (len(metas), sum(1 for m in metas if m.cover),
+                                   sum(1 for m in metas if m.name))))
+        threading.Thread(target=job, daemon=True).start()
 
     def pick_folder(self):
         d = filedialog.askdirectory(parent=self, title=self.tr.t("lib_pick_dir"),

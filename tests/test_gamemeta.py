@@ -47,6 +47,9 @@ class FakeFTP:
     def abort(self):
         pass
 
+    def nlst(self, root):
+        raise ftplib.error_perm("550 no such dir")
+
     def quit(self):
         pass
 

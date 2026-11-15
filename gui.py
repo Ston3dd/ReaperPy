@@ -654,6 +654,17 @@ class App:
             why = m.error or "; ".join(f"{p}: {r}" for p, r in m.tried[:12])
             self.log_msg(self.tr.t("log_game_meta_miss", why=why or "-"), "info")
 
+    def _check_version(self, det):
+        """Passen die Patches (Version im Datei-/Ordnernamen) zur Spielversion auf der Konsole?"""
+        import versioncheck
+        names = [os.path.basename(p) for p in self.patches] + [os.path.basename(self.PATCH_DIR or ""),
+                                                                 self.current_project or ""]
+        status, found = versioncheck.check(det.version, names)
+        if status == "ok":
+            self.log_msg(self.tr.t("log_version_ok", game=det.version, patch=found[0]), "info")
+        elif status == "mismatch":
+            self.log_msg(self.tr.t("log_version_bad", game=det.version, patch=" / ".join(found)), "warn")
+
     def _clear_game_info(self):
         self.game_info = None
         self._show_cover("")
@@ -1865,6 +1876,7 @@ class App:
         if action == "load":
             if self.open_library_entry(entry):
                 self.log_msg(self.tr.t("log_codes_loaded", game=game, n=len(self.patches)), "ok")
+                self._check_version(det)
         elif action == "clear":
             self.current_project = None
             self.PATCH_DIR = ""

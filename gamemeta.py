@@ -8,7 +8,11 @@ Ablauf (ohne GUI, testbar):
   fetch()      holt beides (mit Cache im Ordner covers/), wirft nie - Fehler stehen in Meta.error / Meta.tried
   pick_name()  waehlt den besten Namen: param.json > Name vom Vordergrund-Prozess > Bibliothek > Titel-ID
 
+Ordner-Dumps (z. B. /data/homebrew/<beliebiger Name>/sce_sys/param.json): ReaperPy liest die Titel-ID aus der param.json
+jedes Dump-Ordners - der Ordnername ist egal.  Die Zuordnung Ordner -> Titel-ID wird in covers/dumps.json gemerkt.
+
 Einstellungen (config.json, alle optional):
+  dump_roots  ["/data/homebrew"]  Ordner, in denen die Spiele-Dumps liegen
   ftp_ports   [2121, 1337]   Ports, die der Reihe nach probiert werden
   meta_dirs   ["/pfad/{id}"] zusaetzliche Ordner, die zuerst durchsucht werden ({id} = Titel-ID)
   ftp_timeout 4              Sekunden je Verbindungsversuch
@@ -50,6 +54,7 @@ class Meta:
     name: str = ""              # exakter Titel aus param.json ('' = nicht gefunden)
     cover: str = ""             # lokaler Pfad der pic0.png (oder icon0.png)
     cover_kind: str = ""        # "pic0" | "icon0" | ""
+    icon: str = ""              # lokaler Pfad der icon0.png (quadratisch, fuer die Bibliothek) oder ''
     source: str = ""            # FTP-Ordner, aus dem die Daten kamen ("cache" bei reinem Cache-Treffer)
     error: str = ""
     tried: list = field(default_factory=list)       # [(pfad, ergebnis)] fuer das Protokoll
@@ -77,6 +82,18 @@ def parse_param_json(raw, prefer=("en-US", "en-GB")):
             if isinstance(e, dict) and k != "defaultLanguage" and clean_name(e.get("titleName")):
                 return clean_name(e["titleName"])
     return clean_name(data.get("titleName"))
+
+
+def parse_param_id(raw):
+    """param.json -> Titel-ID (titleId) oder ''."""
+    try:
+        if isinstance(raw, (bytes, bytearray)):
+            raw = bytes(raw).decode("utf-8-sig", "replace")
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return ""
+    t = str(data.get("titleId") or "").strip().upper() if isinstance(data, dict) else ""
+    return t if ID_RE.match(t) else ""
 
 
 def clean_name(s):
@@ -121,6 +138,8 @@ def _read_cache(tid, directory=None):
         if os.path.isfile(p) and os.path.getsize(p) > 0:
             m.cover, m.cover_kind = p, kind
             break
+    if os.path.isfile(ico) and os.path.getsize(ico) > 0:
+        m.icon = ico
     if m.name or m.cover:
         m.source = "cache"
     return m
@@ -173,6 +192,65 @@ def _connect(host, ports, timeout, factory):
     return None, 0, last
 
 
+# ---------------------------------------------------------------------------- Ordner-Dumps
+DUMP_ROOTS = ("/data/homebrew",)
+
+
+def _dump_index_path(directory=None):
+    return os.path.join(directory or cache_dir(), "dumps.json")
+
+
+def index_dumps(ftp, cfg, directory=None, m=None):
+    """{Titel-ID: [sce_sys-Ordner]} aus den Dump-Ordnern.  Schon gelesene Ordner kommen aus dem Cache
+    (covers/dumps.json); nur neue/umbenannte Ordner werden per FTP gelesen."""
+    path = _dump_index_path(directory)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            known = json.load(f)
+        if not isinstance(known, dict):
+            known = {}
+    except (OSError, ValueError):
+        known = {}
+    changed = False
+    out = {}
+    roots = list(cfg.get("dump_roots") or DUMP_ROOTS)
+    for root in roots:
+        root = str(root).rstrip("/") or "/"
+        try:
+            names = ftp.nlst(root)
+        except (ftplib.Error, OSError, EOFError):
+            if m is not None:
+                m.tried.append((root, "cannot list"))
+            continue
+        for n in names:
+            base = os.path.basename(str(n).rstrip("/"))
+            if not base or base.startswith("."):
+                continue
+            folder = f"{root}/{base}"
+            tid = known.get(folder)
+            if tid is None:
+                tid = ""
+                for sub in ("sce_sys/param.json", "param.json"):
+                    raw = _try(ftp, f"{folder}/{sub}", MAX_JSON, m or Meta())
+                    if raw:
+                        tid = parse_param_id(raw)
+                        if tid:
+                            break
+                if not tid:
+                    mt = TITLE_RE.search(base)          # Notnagel: ID steht im Ordnernamen
+                    tid = mt.group(1) if mt else ""
+                known[folder] = tid
+                changed = True
+            if tid:
+                out.setdefault(tid, []).append(folder)
+    if changed:
+        try:
+            _write_atomic(path, json.dumps(known, ensure_ascii=False, indent=0).encode("utf-8"))
+        except OSError:
+            pass
+    return out
+
+
 def fetch(host, title_id, cfg=None, ftp_factory=None, directory=None, now=None):
     """Cover + Namen holen.  Cache zuerst; fehlt etwas, wird per FTP nachgeladen.  Wirft nie."""
     cfg = cfg or {}
@@ -202,7 +280,7 @@ def fetch(host, title_id, cfg=None, ftp_factory=None, directory=None, now=None):
             return m
         _DOWN.pop(host, None)
         try:
-            _scan(ftp, tid, cfg, m, directory)
+            _scan(ftp, tid, cfg, m, directory, dumps=index_dumps(ftp, cfg, directory, m))
         finally:
             try:
                 ftp.quit()
@@ -218,13 +296,14 @@ def fetch(host, title_id, cfg=None, ftp_factory=None, directory=None, now=None):
     return m
 
 
-def _scan(ftp, tid, cfg, m, directory):
+def _scan(ftp, tid, cfg, m, directory, dumps=None):
     pic, ico, js = _cache_paths(tid, directory)
-    dirs = [str(d).replace("{id}", tid) for d in (cfg.get("meta_dirs") or [])]
+    dirs = [f"{f}/sce_sys" for f in (dumps or {}).get(tid, [])] + [f for f in (dumps or {}).get(tid, [])]
+    dirs += [str(d).replace("{id}", tid) for d in (cfg.get("meta_dirs") or [])]
     dirs += [d.format(id=tid) for d in SEARCH_DIRS]
     need_name = not m.name
     need_pic = m.cover_kind != "pic0"
-    icon_data = None
+    found_dir = ""
     for d in dirs:
         if not (need_name or need_pic):
             break
@@ -234,7 +313,7 @@ def _scan(ftp, tid, cfg, m, directory):
                 name = parse_param_json(raw)
                 if name:
                     m.name, need_name = name, False
-                    m.source = m.source if m.source not in ("", "cache") else d
+                    found_dir = found_dir or d
                     _write_atomic(js, json.dumps({"name": name, "dir": d, "ts": int(time.time())},
                                                  ensure_ascii=False).encode("utf-8"))
         if need_pic:
@@ -242,14 +321,19 @@ def _scan(ftp, tid, cfg, m, directory):
             if img and img.startswith(PNG_MAGIC):
                 _write_atomic(pic, img)
                 m.cover, m.cover_kind, need_pic = pic, "pic0", False
-                m.source = d
-            elif icon_data is None and not m.cover:
-                ic = _try(ftp, f"{d}/icon0.png", MAX_IMAGE, m)
-                if ic and ic.startswith(PNG_MAGIC):
-                    icon_data = (ic, d)
-    if need_pic and icon_data and not m.cover:                # pic0 gibt es nirgends -> icon0 als Ersatz
-        _write_atomic(ico, icon_data[0])
-        m.cover, m.cover_kind, m.source = ico, "icon0", icon_data[1]
+                found_dir = d
+    # icon0.png (quadratisch): fuer die Bibliothek; zugleich Ersatz-Cover, falls es kein pic0.png gibt
+    if not m.icon:
+        for d in dict.fromkeys(([found_dir] if found_dir else []) + dirs):
+            ic = _try(ftp, f"{d}/icon0.png", MAX_IMAGE, m)
+            if ic and ic.startswith(PNG_MAGIC):
+                _write_atomic(ico, ic)
+                m.icon, found_dir = ico, found_dir or d
+                break
+    if not m.cover and m.icon:
+        m.cover, m.cover_kind = m.icon, "icon0"
+    if found_dir:
+        m.source = found_dir
 
 
 def _try(ftp, path, limit, m):
@@ -262,3 +346,64 @@ def _try(ftp, path, limit, m):
     except (ftplib.Error, OSError, EOFError) as e:
         m.tried.append((path, f"{type(e).__name__}"))
     return None
+
+
+# ---------------------------------------------------------------------------- alle installierten Spiele
+TITLE_ROOTS = ("/user/app", "/mnt/ext0/user/app", "/mnt/ext1/user/app",
+               "/system_data/priv/appmeta", "/user/appmeta")
+TITLE_RE = re.compile(r"(?<![A-Za-z])((?:PPSA|CUSA)\d{5})(?!\d)")
+
+
+def list_titles(host, cfg=None, ftp_factory=None, directory=None):
+    """Titel-IDs aller Spiele, die per FTP in den bekannten App-Ordnern liegen -> (sortierte Liste, Fehlertext)."""
+    cfg = cfg or {}
+    ftp, _port, err = _connect(host, list(cfg.get("ftp_ports") or DEFAULT_PORTS),
+                               float(cfg.get("ftp_timeout", 4)), ftp_factory or ftplib.FTP)
+    if ftp is None:
+        return [], "FTP nicht erreichbar: " + err
+    found = set()
+    try:
+        found.update(index_dumps(ftp, cfg, directory).keys())
+        for root in TITLE_ROOTS:
+            try:
+                names = ftp.nlst(root)
+            except (ftplib.Error, OSError, EOFError):
+                continue
+            for n in names:
+                mt = TITLE_RE.search(os.path.basename(str(n).rstrip("/")))
+                if mt:
+                    found.add(mt.group(1))
+    finally:
+        try:
+            ftp.quit()
+        except Exception:                                   # noqa: BLE001
+            pass
+    return sorted(found), ("" if found else "keine Spiele-Ordner gefunden (" + ", ".join(TITLE_ROOTS) + ")")
+
+
+def fetch_all(host, cfg=None, progress=None, ftp_factory=None, directory=None, stop=None):
+    """Cover + Namen aller gefundenen Spiele holen.  progress(i, n, meta).  -> (Liste von Meta, Fehlertext)."""
+    ids, err = list_titles(host, cfg, ftp_factory, directory)
+    out = []
+    for i, tid in enumerate(ids, 1):
+        if stop is not None and stop():
+            break
+        m = fetch(host, tid, cfg, ftp_factory=ftp_factory, directory=directory)
+        out.append(m)
+        if progress:
+            progress(i, len(ids), m)
+    return out, err
+
+
+def cached(directory=None):
+    """Alles, was im Cache liegt: [Meta] (fuer die Bibliothek, auch ohne Verbindung)."""
+    d = directory or cache_dir()
+    ids = set()
+    try:
+        for f in os.listdir(d):
+            mt = TITLE_RE.match(f)
+            if mt:
+                ids.add(mt.group(1))
+    except OSError:
+        return []
+    return [_read_cache(t, d) for t in sorted(ids)]

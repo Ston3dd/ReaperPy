@@ -75,7 +75,8 @@ def _walk(root, depth=MAX_DEPTH):
 
 
 class Library:
-    def __init__(self, library_dir, projects_root="", extra_dirs=()):
+    def __init__(self, library_dir, projects_root="", extra_dirs=(), covers=None):
+        self.covers = list(covers or [])        # gamemeta.Meta aus dem Konsolen-Cache (exakte Namen + Cover)
         self.library_dir = library_dir or ""
         self.projects_root = projects_root or ""
         self.extra_dirs = [d for d in extra_dirs if d]
@@ -158,6 +159,14 @@ class Library:
             if not g.icon and g.project_dir:
                 g.icon = self._generic_icon(g.project_dir)
 
+        for cm in self.covers:                  # von der Konsole geholt: exakter Name, Icon (icon0 vor pic0)
+            g = games.get(cm.title_id)
+            if g is None:
+                g = games[cm.title_id] = GameEntry(id=cm.title_id, title=cm.name or cm.title_id)
+            elif cm.name:
+                g.title = cm.name
+            if not g.icon or g.icon == self._generic_icon(g.project_dir):
+                g.icon = cm.icon or cm.cover or g.icon
         self.entries = sorted(games.values(), key=lambda g: (g.title.lower(), g.id))
         return self.entries
 

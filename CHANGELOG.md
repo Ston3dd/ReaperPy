@@ -16,6 +16,10 @@ The idea of the trainer release cards comes from **Pharaoh2k** (also credited fo
 - Name priority: `param.json` > name reported by the console > library title > title ID. Process names like `eboot.bin` are never used as a name.
 - Optional `config.json` keys: `ftp_ports`, `meta_dirs` (extra folders, `{id}` = title ID), `ftp_timeout`, `game_meta` (`false` = off). The log lists every FTP path that was tried when something is missing.
 
+### Added (Library from the console, version check)
+- **LIBRARY → FETCH FROM CONSOLE** lists all installed games over FTP and caches their cover (`icon0.png` for the cards, `pic0.png` for the header) and exact title. Games without patches show up too; the exact title replaces the folder name.
+- On connect, the game version reported by the console is compared with the versions found in the patch file / folder names. If none match, the log shows a **version warning** (silent when no version is found in the names).
+
 ### Added (Release card)
 - Credit: The idea of the trainer release cards comes from **Pharaoh2k** (also credited for the ps5debug-NG payload) - thank you!
 - **Release card at export:** the GoldHEN / etaHEN export dialog can now create a release card (PNG, 1920x1080) next to the cheat file: game name, title ID, version, all cheats with Roman numerals, the count in a seal and your credits. The cover is looked up in the library (`TITLEID.png`, `TITLEID_icon0.jpg`) or chosen by hand; the accent colour is taken from the cover. **CARD ONLY ...** makes the card without a console, `export_goldhen.py --card` does it on the command line. A problem with the card never stops the export.
