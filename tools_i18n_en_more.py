@@ -4,6 +4,7 @@ Wird am Ende von tools_i18n_en.py in EN eingemischt. Schluessel = deutscher Text
 """
 
 EN_MORE = {
+    ': Schreiben fehlgeschlagen': ': write failed',
     # --- Kontext-Ansicht im Debugger (disasm_view.py, hit_context.py, tools_debug_gui.py) ---
     'KONTEXT (Befehle um den Treffer - grün = Schreiber, gelb = RIP)': 'CONTEXT (instructions around the hit - green = writer, yellow = RIP)',
     'Lese Befehle um den Treffer …': 'Reading instructions around the hit …',

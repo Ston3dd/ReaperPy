@@ -134,7 +134,7 @@ class T(unittest.TestCase):
     def test_card_menu_items_follow_state_and_profile(self):
         a = self.app
         card = types.SimpleNamespace(app=a, path="/p/Gold.reapproj", state=gui.St.OFF, rp=types.SimpleNamespace(name="Gold", author=""),
-                                     _click=None, _info=None, _copy_name=None, _show_file=None)
+                                     lbl_vars=None, _click=None, _info=None, _copy_name=None, _show_file=None)
         labels = [i[0] for i in gui.CheatCard.menu_items(card) if i[0]]
         self.assertEqual(labels, ["Aktivieren", "Info anzeigen", "★ Als Favorit markieren", "Gruppe setzen…", "Hotkey setzen…",
                                   "Namen kopieren", "Patch-Datei im Ordner zeigen"])
