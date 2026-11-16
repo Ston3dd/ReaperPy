@@ -108,5 +108,28 @@ class Context(unittest.TestCase):
         self.assertIn(ctx["how"], ("writes", "guess"))
 
 
+class Helpers(unittest.TestCase):
+    def test_reg_changes_reports_only_changed_registers_with_old_value(self):
+        prev = {"rax": 1, "rbx": 2, "rip": 0x100}
+        cur = {"rax": 1, "rbx": 5, "rip": 0x104}
+        self.assertEqual(HC.reg_changes(prev, cur), {"rbx": 2, "rip": 0x100})
+        self.assertEqual(HC.reg_changes(prev, cur, ["rip", "rax"]), {"rip": 0x100})       # nur die gezeigten Register
+
+    def test_reg_changes_without_previous_is_empty(self):
+        self.assertEqual(HC.reg_changes(None, {"rax": 1}), {})
+        self.assertEqual(HC.reg_changes({}, {"rax": 1}), {})
+        self.assertEqual(HC.reg_changes({"rax": 1}, {"rax": 1, "rbx": 2}), {})              # neues Register ist keine Aenderung
+
+    @unittest.skipUnless(AT.HAVE_CAPSTONE, "Capstone fehlt")
+    def test_describe_names_the_writer_or_the_rip_instruction(self):
+        wp = {"addr": 0x701C, "size": 4, "access": "write"}
+        self.assertEqual(HC.describe(HC.build_context(read, hit("WP", RIP_AFTER, 0), wp)),
+                         f"{WRITER:#x}  mov dword ptr [rdi + 0x1c], eax")
+        self.assertEqual(HC.describe(HC.build_context(read, hit("BP", RIP_AFTER))), f"{RIP_AFTER:#x}  mov ecx, 1")
+
+    def test_describe_of_empty_context_is_empty(self):
+        self.assertEqual(HC.describe({"lines": [], "focus": 5}), "")
+
+
 if __name__ == "__main__":
     unittest.main()

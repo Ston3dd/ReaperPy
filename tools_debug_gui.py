@@ -7,9 +7,12 @@ import hit_context as HC
 import ps5_ext as X
 from debugger import DebugSession
 from disasm_view import DisasmView
-from tools_common import (BG, ACCENT, ERROR, TEXT_DIM, BaseTab, button, label, entry, tree, with_scroll)
+from tools_common import (BG, ACCENT, ERROR, TEXT_DIM, WARN, FONT_MONO, BaseTab, button, label, entry, tree, with_scroll)
 
 WP_TYPES = {"schreiben": X.WP_WRITE, "lesen/schreiben": X.WP_RDWR, "ausführen": X.WP_EXEC}
+
+
+_AUTO = object()                # _fill_regs: 'vergleiche mit dem, was zuletzt fuer diesen Thread gezeigt wurde'
 
 
 class DebugTab(BaseTab):
@@ -18,6 +21,8 @@ class DebugTab(BaseTab):
         self.sess = None
         self.hit_items = {}          # iid -> hit-Paket
         self._ctx_token = 0          # nur die zuletzt angeforderte Kontext-Ansicht wird gezeigt
+        self._ctx_cache = {}         # iid -> Kontext (Klick auf einen alten Treffer liest nichts neu)
+        self._shown_regs = {}        # lwpid -> zuletzt gezeigte Register (fuer die Hervorhebung geaenderter)
 
         top = tk.Frame(self, bg=BG); top.pack(fill="x", padx=8, pady=(8, 4))
         button(top, "ATTACH", self.attach, accent=True).pack(side="left", padx=2)
@@ -75,8 +80,8 @@ class DebugTab(BaseTab):
         # Treffer
         label(left, "TREFFER (Klick = Register dieses Treffers)").pack(anchor="w")
         fr = tk.Frame(left, bg=BG); fr.pack(fill="x")
-        self.hits = tree(fr, [("t", "ZEIT"), ("k", "ART"), ("a", "ADRESSE"), ("th", "THREAD"), ("n", "ANZAHL")],
-                         [80, 70, 170, 90, 70], height=4)
+        self.hits = tree(fr, [("t", "ZEIT"), ("k", "ART"), ("a", "ADRESSE"), ("th", "THREAD"), ("n", "ANZAHL"),
+                              ("ins", "BEFEHL")], [74, 56, 150, 62, 62, 300], height=4)
         with_scroll(fr, self.hits)
         self.hits.bind("<<TreeviewSelect>>", self._hit_sel)
 
@@ -86,9 +91,10 @@ class DebugTab(BaseTab):
         self.ctxv.pack(fill="both", expand=True)
 
         # Register
-        label(right, "REGISTER (Doppelklick = ändern)").pack(anchor="w")
-        self.regs = tree(right, [("r", "REG"), ("v", "WERT")], [70, 170], height=20)
+        label(right, "REGISTER (Doppelklick = ändern, gelb = geändert)").pack(anchor="w")
+        self.regs = tree(right, [("r", "REG"), ("v", "WERT"), ("o", "VORHER")], [64, 150, 150], height=20)
         self.regs.pack(fill="y", expand=True)
+        self.regs.tag_configure("chg", foreground=WARN, font=(FONT_MONO[0], FONT_MONO[1], "bold"))
         self.regs.bind("<Double-1>", self._edit_reg)
         self.lbl_stack = label(right, "")
 
@@ -262,11 +268,11 @@ class DebugTab(BaseTab):
     def _show_hit(self, hit):
         iid = self.hits.insert("", 0, values=(
             time.strftime("%H:%M:%S", time.localtime(hit["time"])), hit["kind"],
-            f"{hit['addr']:016X}", hit["lwpid"], hit["count"]))
+            f"{hit['addr']:016X}", hit["lwpid"], hit["count"], ""))
         self.hit_items[iid] = hit
         self.hits.selection_set(iid)
-        self._fill_regs(hit["regs"])
-        self._load_context(hit)
+        self._fill_regs(hit["regs"], prev=self._prev_hit_regs(iid), lwp=hit["lwpid"])
+        self._load_context(hit, iid)
         self.log(f"{hit['kind']} @ {hit['addr']:#x}  Thread {hit['lwpid']}  (#{hit['count']})", "warn")
         self.refresh_threads(select=hit["lwpid"])
 
@@ -274,8 +280,20 @@ class DebugTab(BaseTab):
         sel = self.hits.selection()
         if sel and sel[0] in self.hit_items:
             hit = self.hit_items[sel[0]]
-            self._fill_regs(hit["regs"])
-            self._load_context(hit)
+            self._fill_regs(hit["regs"], prev=self._prev_hit_regs(sel[0]), lwp=hit["lwpid"])
+            self._load_context(hit, sel[0])
+
+    def _prev_hit_regs(self, iid):
+        """Register des Treffers davor (gleicher Thread; die Liste ist neueste zuerst) - oder None."""
+        rows = list(self.hits.get_children())
+        me = self.hit_items.get(iid)
+        if me is None or iid not in rows:
+            return None
+        for other in rows[rows.index(iid) + 1:]:
+            h = self.hit_items.get(other)
+            if h and h["lwpid"] == me["lwpid"]:
+                return h["regs"]
+        return None
 
     # ---- Kontext-Ansicht ----
     def _wp_info(self, hit):
@@ -286,17 +304,25 @@ class DebugTab(BaseTab):
         access = {X.WP_WRITE: "write", X.WP_RDWR: "rw", X.WP_EXEC: "exec"}.get(w["type"], "rw")
         return {"addr": w["addr"], "size": w["size"], "access": access}
 
-    def _load_context(self, hit):
-        client, wp = self.win.client, self._wp_info(hit)
+    def _load_context(self, hit, iid=None):
+        cached = self._ctx_cache.get(iid)
         self._ctx_token += 1
         tok = self._ctx_token
+        if cached:
+            return self.ctxv.show(cached)
+        client, wp = self.win.client, self._wp_info(hit)
         self.ctxv.show_message("Lese Befehle um den Treffer …")
 
         def ok(ctx):
+            if iid is not None and self.hits.exists(iid):
+                self._ctx_cache[iid] = ctx
+                self.hits.set(iid, "ins", HC.describe(ctx))
             if tok == self._ctx_token:
                 self.ctxv.show(ctx)
 
         def err(e):
+            if iid is not None and self.hits.exists(iid):
+                self.hits.set(iid, "ins", "?")
             if tok == self._ctx_token:
                 self.ctxv.show_message(f"Kontext nicht lesbar: {e}")
         self.bg(lambda: HC.build_context(client.read_memory, hit, wp), ok, err)
@@ -304,7 +330,7 @@ class DebugTab(BaseTab):
     def _ctx_open(self, line):
         """Im Disassembler-Tab öffnen - ab dem Anfang des Kontexts, die gewählte Zeile ist dort markiert."""
         start = self.ctxv.lines[0]["addr"] if self.ctxv.lines else line["addr"]
-        self.win.goto_disasm(start, focus=line["addr"])
+        self.win.goto_disasm(start, focus=line["addr"], marks=self.ctxv.marks)
 
     def _ctx_preset(self, line):
         self.win.t_dis.recipe_at(line["addr"], f"{line['mnemonic']} {line['op_str']}".strip())
@@ -328,18 +354,27 @@ class DebugTab(BaseTab):
         if not self._need() or self._lwp() is None:
             return
         lw = self._lwp()
-        self.bg(lambda: self.sess.regs(lw), self._fill_regs)
+        self.bg(lambda: self.sess.regs(lw), lambda r: self._fill_regs(r, lwp=lw))
 
-    def _fill_regs(self, regs):
+    def _fill_regs(self, regs, prev=_AUTO, lwp=None):
+        """Register zeigen; was sich gegenueber `prev` geaendert hat, wird gelb und mit dem alten Wert (VORHER) gezeigt.
+
+        prev=_AUTO: mit dem vergleichen, was zuletzt fuer diesen Thread gezeigt wurde (REGISTER-Knopf, nach Aendern);
+        prev=None: kein Vergleich (erster Treffer eines Threads)."""
+        if prev is _AUTO:
+            prev = self._shown_regs.get(lwp)
+        self._shown_regs[lwp] = dict(regs)
         self.regs.delete(*self.regs.get_children())
+        changed = HC.reg_changes(prev, regs, X.REG_SHOW_ORDER)
         for n in X.REG_SHOW_ORDER:
-            self.regs.insert("", "end", values=(n, f"{regs[n]:016X}"))
+            self.regs.insert("", "end", tags=("chg",) if n in changed else (),
+                             values=(n, f"{regs[n]:016X}", f"{changed[n]:016X}" if n in changed else ""))
 
     def _edit_reg(self, _e):
         sel = self.regs.selection()
         if not sel or not self._need() or self._lwp() is None:
             return
-        name, cur = self.regs.item(sel[0], "values")
+        name, cur = self.regs.item(sel[0], "values")[:2]
         txt = simpledialog.askstring("Register ändern", f"{name} = (hex)", initialvalue=cur, parent=self)
         if not txt:
             return

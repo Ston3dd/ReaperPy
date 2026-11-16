@@ -123,6 +123,19 @@ def build_context(read, hit, wp=None, disasm=None):
             "headline": _headline(kind, wp, rip, writer_line, how)}
 
 
+def reg_changes(prev, cur, names=None):
+    """{Register: alter Wert} fuer alles, was sich von `prev` auf `cur` geaendert hat.  prev=None -> nichts (kein Vergleich)."""
+    if not prev:
+        return {}
+    return {n: prev[n] for n in (names or cur) if n in prev and n in cur and prev[n] != cur[n]}
+
+
+def describe(ctx):
+    """Kurztext fuer die Trefferliste: der wichtige Befehl (Schreiber, sonst der bei RIP) mit seiner Adresse."""
+    ln = next((x for x in ctx["lines"] if x["addr"] == ctx["focus"]), None)
+    return f"{ln['addr']:#x}  {ln['mnemonic']} {ln['op_str']}".strip() if ln else ""
+
+
 def _headline(kind, wp, rip, writer, how):
     r = f"{rip:#x}"
     if kind == "WP" and wp is not None:
