@@ -35,3 +35,6 @@ dumps/
 .update_backup/
 .update_pending.json
 *.update_new
+
+# Cover-Cache von der Konsole (gamemeta.py)
+covers/

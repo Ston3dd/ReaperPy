@@ -33,6 +33,47 @@ def _kind_of(line):
     return "plain"
 
 
+def style_rows(tv):
+    """Zeilenfarben fuer jede Befehls-Tabelle im Tool: pro Zeile genau EIN Tag (Zebra x Art), Markierungen gehen vor."""
+    bold = (FONT_MONO[0], FONT_MONO[1], "bold")
+    for kind, fg in (("plain", TEXT), ("flow", ACCENT_DIM), ("quiet", TEXT_DIM2)):
+        tv.tag_configure(f"{kind}_a", background=BG_CARD, foreground=fg)
+        tv.tag_configure(f"{kind}_b", background=T.ROW_ALT, foreground=fg)
+    tv.tag_configure("writer", background=T.ROW_WRITER, foreground=ACCENT, font=bold)
+    tv.tag_configure("rip", background=T.CALLOUT_WARN_BG, foreground=WARN, font=bold)
+
+
+def row_tag(line, index, mark=None):
+    """Das Tag einer Zeile: Markierung ('writer' / 'rip') oder Zebra x Befehlsart."""
+    if mark in ("writer", "rip"):
+        return mark
+    return f"{_kind_of(line)}_{'ab'[index % 2]}"
+
+
+def addr_width(lines):
+    """Hex-Stellen fuer die Adressspalte: gleich breit, aber nur so breit wie noetig (PS5-Code liegt meist bei 0x4xxxxx)."""
+    return max([8] + [len(f"{ln['addr']:X}") for ln in lines])
+
+
+def center_row(tv, idx, n, tries=4):
+    """Zeile idx von n in die Mitte der sichtbaren Liste scrollen (ttk 'see' wuerde sie nur an den Rand holen).
+
+    Die sichtbare Zeilenzahl kommt aus der echten Hoehe des Widgets - das Fenster ist oft niedriger als `height`.
+    Ist es noch nicht angeordnet (Hoehe 1), wird kurz gewartet und es nochmal versucht."""
+    if not n:
+        return
+    try:
+        tv.update_idletasks()
+        h = tv.winfo_height()
+        if h <= 30 and tries:
+            return tv.after(60, lambda: center_row(tv, idx, n, tries - 1))
+        row = int(ttk.Style(tv).lookup("Treeview", "rowheight") or 20)
+        rows = max(1, (h - row - 2) // row)                       # eine Zeile geht fuer die Kopfleiste ab
+        tv.yview_moveto(max(0, min(idx - rows // 2, n - rows)) / n)
+    except tk.TclError:
+        pass
+
+
 class DisasmView(tk.Frame):
     COLS = [("mark", ""), ("addr", "ADRESSE"), ("hex", "HEX"), ("ins", "INSTRUKTION"), ("len", "LÄNGE")]
     WIDTHS = [96, 100, 160, 220, 50]
@@ -69,13 +110,7 @@ class DisasmView(tk.Frame):
         self.tv.column("ins", stretch=True)
         self.tv.bind("<Double-1>", lambda _e: self._open())
 
-        # Zeilenfarben: pro Zeile genau EIN Tag (Zebra x Art), Markierungen gehen vor
-        bold = (FONT_MONO[0], FONT_MONO[1], "bold")
-        for kind, fg in (("plain", TEXT), ("flow", ACCENT_DIM), ("quiet", TEXT_DIM2)):
-            self.tv.tag_configure(f"{kind}_a", background=BG_CARD, foreground=fg)
-            self.tv.tag_configure(f"{kind}_b", background=T.ROW_ALT, foreground=fg)
-        self.tv.tag_configure("writer", background=T.ROW_WRITER, foreground=ACCENT, font=bold)
-        self.tv.tag_configure("rip", background=T.CALLOUT_WARN_BG, foreground=WARN, font=bold)
+        style_rows(self.tv)
 
     @staticmethod
     def _chip(parent, text, bg, fg):
@@ -93,44 +128,22 @@ class DisasmView(tk.Frame):
             self.lbl.configure(text="")
         self.tv.delete(*self.tv.get_children())
         focus_iid = None
-        # Adressen gleich breit, aber nur so breit wie noetig (PS5-Code liegt meist bei 0x4xxxxx, Heap bei 0x2xxxxxxxxx)
-        w = max([8] + [len(f"{ln['addr']:X}") for ln in self.lines])
+        w = addr_width(self.lines)
         for i, ln in enumerate(self.lines):
             mark = self.marks.get(ln["addr"])
-            tag = mark if mark in ("writer", "rip") else f"{_kind_of(ln)}_{'ab'[i % 2]}"
-            self.tv.insert("", "end", iid=str(i), tags=(tag,), values=(
+            self.tv.insert("", "end", iid=str(i), tags=(row_tag(ln, i, mark),), values=(
                 MARK_TEXT.get(mark, ""), f"{ln['addr']:0{w}X}", AT.hexdump_line(ln["bytes"]),
                 f"{ln['mnemonic']} {ln['op_str']}".strip(), ln["size"]))
             if ln["addr"] == focus:
                 focus_iid = i
         if focus_iid is not None:
-            self.after_idle(lambda: self._center(focus_iid))
+            self.after_idle(lambda: center_row(self.tv, focus_iid, len(self.lines)))
 
     def show_message(self, text):
         """Statt einer Liste nur einen Satz zeigen (z. B. Fehler beim Lesen)."""
         self.lines, self.marks, self.focus = [], {}, None
         self.tv.delete(*self.tv.get_children())
         self.lbl.configure(text=text)
-
-    def _center(self, idx, tries=4):
-        """Zeile idx in die Mitte der sichtbaren Liste scrollen (ttk 'see' wuerde sie nur an den Rand holen).
-
-        Die sichtbare Zeilenzahl kommt aus der echten Hoehe des Widgets - das Fenster ist oft niedriger als `height`.
-        Ist es noch nicht angeordnet (Hoehe 1), wird kurz gewartet und es nochmal versucht."""
-        n = len(self.lines)
-        if not n:
-            return
-        try:
-            self.tv.update_idletasks()
-            h = self.tv.winfo_height()
-            if h <= 30 and tries:
-                return self.after(60, lambda: self._center(idx, tries - 1))
-            row = int(ttk.Style(self).lookup("Treeview", "rowheight") or 20)
-            rows = max(1, (h - row - 2) // row)                       # eine Zeile geht fuer die Kopfleiste ab
-            top = max(0, min(idx - rows // 2, n - rows))
-            self.tv.yview_moveto(top / n)
-        except tk.TclError:
-            pass
 
     # ---- Auswahl / Aktionen ----
     def line(self):

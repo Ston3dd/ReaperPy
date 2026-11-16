@@ -21,6 +21,8 @@ import asm_help as AH
 import asm_recipes as AR
 import reappatch_fmt as RF
 import asm_tools as AT
+import disasm_view as DV
+import hit_context as HC
 import ps5_ext as X
 from ps5_client import PS5DebugClient
 from reapatch import ReapPatch
@@ -276,10 +278,12 @@ class DisasmTab(BaseTab):
         if not AT.HAVE_CAPSTONE:
             label(bar, "  Capstone fehlt: pip install capstone").pack(side="left")
 
-        cols = [("addr", "ADRESSE"), ("off", "OFFSET"), ("bytes", "BYTES"), ("ins", "INSTRUKTION"), ("exp", "ERKLÄRUNG")]
+        cols = [("mark", ""), ("addr", "ADRESSE"), ("off", "OFFSET"), ("bytes", "BYTES"), ("ins", "INSTRUKTION"),
+                ("len", "LÄNGE"), ("exp", "ERKLÄRUNG")]
         fr = tk.Frame(self, bg=BG); fr.pack(fill="both", expand=True, padx=8)
-        self.tv = tree(fr, cols, [150, 90, 170, 300, 520], height=20)
+        self.tv = tree(fr, cols, [100, 100, 80, 160, 290, 50, 480], height=20, anchors={"len": "e"})
         with_scroll(fr, self.tv)
+        DV.style_rows(self.tv)                  # gleiche Zeilenfarben wie die Kontext-Ansicht im Debugger
         self.tv.bind("<Double-1>", lambda _e: self.follow())
         self.tv.bind("<<TreeviewSelect>>", lambda _e: self._explain())
         self.lbl_exp = tk.Label(self, text="", bg=BG, fg=ACCENT, font=FONT_LABEL, justify="left", wraplength=1000, anchor="w")
@@ -294,10 +298,12 @@ class DisasmTab(BaseTab):
         button(act, "→ CHEAT-EDITOR", self.to_cheat, accent=True).pack(side="right")
         button(act, "ALS CAVE-HOOK", self.to_cave_hook, accent=True).pack(side="right", padx=(0, 8))
 
-    def goto(self, address, focus=None):
-        """Ab `address` zeigen; `focus` = Adresse einer Zeile, die danach markiert und sichtbar sein soll."""
+    def goto(self, address, focus=None, marks=None, context=False):
+        """Ab `address` zeigen.  `focus` = Adresse einer Zeile, die danach sichtbar sein soll; `marks` = {Adresse: 'writer' | 'rip'}
+        (vom Debugger): diese Zeilen werden gruen bzw. gelb hinterlegt und die Liste auf `focus` zentriert.
+        context=True: ein paar Befehle VOR `address` mitzeigen (sauber ausgerichtet), damit die Zeile nicht ganz oben klebt."""
         self.v_addr.set(hexs(address))
-        self._focus = focus
+        self._focus, self._marks, self._context = focus, marks, context
         self.run()
 
     def run(self):
@@ -306,30 +312,43 @@ class DisasmTab(BaseTab):
             n = max(1, min(int(self.v_n.get(), 0), 1000))
         except Exception as e:
             return self.log(str(e), "err")
+        context, self._context = getattr(self, "_context", False), False
 
         def job():
-            data = self.win.client.read_memory(a, n * 15 + 16)
-            return AT.disassemble_lines(data, a, n)
+            start = a
+            if context:
+                try:
+                    chain = HC.lines_before(self.win.client.read_memory(a - HC.BEFORE_BYTES, HC.BEFORE_BYTES), a)
+                    start = chain[0]["addr"] if chain else a
+                except Exception:  # noqa: BLE001 - davor nicht lesbar (Seitengrenze): ab der Adresse selbst
+                    start = a
+            data = self.win.client.read_memory(start, n * 15 + 16)
+            return AT.disassemble_lines(data, start, n)
         self.bg(job, self._show)
 
     def _show(self, lines):
         self.lines = lines
+        marks, self._marks = getattr(self, "_marks", None) or {}, None
+        focus, self._focus = getattr(self, "_focus", None), None
         self.tv.delete(*self.tv.get_children())
-        base = self.base
+        base, w, focus_i = self.base, DV.addr_width(lines), None
         for i, l in enumerate(lines):
             off = l["addr"] - base
-            self.tv.insert("", "end", iid=str(i), values=(
-                f"{l['addr']:016X}", f"+{off:X}" if off >= 0 else "-",
-                AT.hexdump_line(l["bytes"]), f"{l['mnemonic']} {l['op_str']}".strip(),
+            mark = marks.get(l["addr"])
+            self.tv.insert("", "end", iid=str(i), tags=(DV.row_tag(l, i, mark),), values=(
+                DV.MARK_TEXT.get(mark, ""), f"{l['addr']:0{w}X}", f"+{off:X}" if off >= 0 else "-",
+                AT.hexdump_line(l["bytes"]), f"{l['mnemonic']} {l['op_str']}".strip(), l["size"],
                 AX.explain(l["mnemonic"], l["op_str"])))
+            if l["addr"] == focus:
+                focus_i = i
         self.lbl_exp.configure(text="")
-        focus, self._focus = getattr(self, "_focus", None), None
-        if focus is not None:
-            for i, l in enumerate(lines):
-                if l["addr"] == focus:
-                    self.tv.selection_set(str(i))
-                    self.tv.see(str(i))
-                    break
+        if focus_i is None:
+            return
+        if focus in marks:                      # markierte Zeile: Farbe soll sichtbar bleiben -> nicht auswaehlen, nur zentrieren
+            DV.center_row(self.tv, focus_i, len(lines))
+        else:
+            self.tv.selection_set(str(focus_i))
+            self.tv.see(str(focus_i))
 
     def _explain(self):
         """Klartext zur markierten Zeile (die Spalte ERKLÄRUNG kann abgeschnitten sein)."""
@@ -1617,8 +1636,8 @@ class ToolsWindow(tk.Toplevel):
     def goto_memory(self, address):
         self.show_tab(self.t_mem); self.t_mem.goto(address)
 
-    def goto_disasm(self, address, focus=None):
-        self.show_tab(self.t_dis); self.t_dis.goto(address, focus)
+    def goto_disasm(self, address, focus=None, marks=None, context=False):
+        self.show_tab(self.t_dis); self.t_dis.goto(address, focus, marks, context)
 
     def to_pointer(self, address, vname="Int32"):
         if not self.ptr_tab:

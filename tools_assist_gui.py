@@ -379,7 +379,7 @@ class AssistTab(BaseTab):
     def to_disasm(self):
         w = self._writer()
         if w:
-            self.win.goto_disasm(w[0])
+            self.win.goto_disasm(w[0], focus=w[0], marks={w[0]: "writer"}, context=True)
 
     def shutdown(self):
         self.watching = False
