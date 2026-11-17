@@ -318,11 +318,11 @@ class DisasmTab(BaseTab):
             start = a
             if context:
                 try:
-                    chain = HC.lines_before(self.win.client.read_memory(a - HC.BEFORE_BYTES, HC.BEFORE_BYTES), a)
+                    chain = HC.lines_before(self.win.read_code(a - HC.BEFORE_BYTES, HC.BEFORE_BYTES), a)
                     start = chain[0]["addr"] if chain else a
                 except Exception:  # noqa: BLE001 - davor nicht lesbar (Seitengrenze): ab der Adresse selbst
                     start = a
-            data = self.win.client.read_memory(start, n * 15 + 16)
+            data = self.win.read_code(start, n * 15 + 16)
             return AT.disassemble_lines(data, start, n)
         self.bg(job, self._show)
 
@@ -433,7 +433,7 @@ class DisasmTab(BaseTab):
         rid, value = res
 
         def job():
-            data = self.win.client.read_memory(a, 96)
+            data = self.win.read_code(a, 96)
             plan = AR.make_plan(rid, data, a, value)
             if plan["kind"] == "patch":
                 code = AT.assemble(plan["new"], a, self.win.client)
@@ -482,7 +482,7 @@ class DisasmTab(BaseTab):
         a = sel[0]["addr"]
 
         def job():
-            return AT.build_cave_hook(self.win.client.read_memory(a, 96), a)
+            return AT.build_cave_hook(self.win.read_code(a, 96), a)
 
         def ok(r):
             r["addr"] = a
@@ -1635,6 +1635,14 @@ class ToolsWindow(tk.Toplevel):
 
     def goto_memory(self, address):
         self.show_tab(self.t_mem); self.t_mem.goto(address)
+
+    def read_code(self, address, n):
+        """Speicher zum DISASSEMBLIEREN lesen: an gesetzten Breakpoints stehen die Original-Bytes statt des 0xCC.
+
+        Alles, was Befehle entschluesselt oder kopiert (Disassembler, Kontext-Ansicht, PRESET, Cave-Hook), liest hierueber."""
+        data = self.client.read_memory(address, n)
+        sess = getattr(getattr(self, "dbg_tab", None), "sess", None)
+        return HC.apply_overrides(address, data, sess.bp_overrides()) if sess else data
 
     def goto_disasm(self, address, focus=None, marks=None, context=False):
         self.show_tab(self.t_dis); self.t_dis.goto(address, focus, marks, context)

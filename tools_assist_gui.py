@@ -312,12 +312,13 @@ class AssistTab(BaseTab):
     def _handle_hit(self, dbg, hit, addr, size):
         regs = hit["regs"]
         rip = regs["rip"]
-        sess, client = dbg.sess, self.win.client
+        sess = dbg.sess
+        read = getattr(self.win, "read_code", None) or self.win.client.read_memory     # mit Original-Bytes unter Breakpoints
 
         def job():
             writer = None
             try:
-                before = client.read_memory(rip - 16, 16)
+                before = read(rip - 16, 16)
                 writer = A.find_writer(rip, before, regs, addr, size, AT.disassemble_lines)
             finally:
                 try:

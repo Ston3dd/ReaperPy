@@ -43,6 +43,21 @@ def _ending_at(data, rip, k, disasm):
     return lines if pos == rip and lines else None
 
 
+def apply_overrides(addr, data, overrides):
+    """Setzt unter gesetzten Breakpoints die Original-Bytes wieder ein.
+
+    Der Server schreibt an einen Breakpoint ein 0xCC (int3) in den Speicher.  Wer den Speicher roh disassembliert, sieht dort
+    ein int3 und ab da lauter falsch ausgerichtete Befehle.  overrides = {Adresse: Original-Bytes} (debugger.bp_overrides())."""
+    if not overrides:
+        return data
+    buf = bytearray(data)
+    for a, orig in overrides.items():
+        for i, b in enumerate(bytes(orig)):
+            if addr <= a + i < addr + len(buf):
+                buf[a + i - addr] = b
+    return bytes(buf)
+
+
 def lines_before(back, rip, disasm=None):
     """Die Befehle direkt vor `rip`.  `back` = die Bytes unmittelbar davor.
 

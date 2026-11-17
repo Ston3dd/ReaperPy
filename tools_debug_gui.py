@@ -310,7 +310,7 @@ class DebugTab(BaseTab):
         tok = self._ctx_token
         if cached:
             return self.ctxv.show(cached)
-        client, wp = self.win.client, self._wp_info(hit)
+        read, wp = self.win.read_code, self._wp_info(hit)
         self.ctxv.show_message("Lese Befehle um den Treffer …")
 
         def ok(ctx):
@@ -325,7 +325,7 @@ class DebugTab(BaseTab):
                 self.hits.set(iid, "ins", "?")
             if tok == self._ctx_token:
                 self.ctxv.show_message(f"Kontext nicht lesbar: {e}")
-        self.bg(lambda: HC.build_context(client.read_memory, hit, wp), ok, err)
+        self.bg(lambda: HC.build_context(read, hit, wp), ok, err)
 
     def _ctx_open(self, line):
         """Im Disassembler-Tab öffnen - ab dem Anfang des Kontexts, die gewählte Zeile ist dort markiert."""

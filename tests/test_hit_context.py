@@ -131,5 +131,66 @@ class Helpers(unittest.TestCase):
         self.assertEqual(HC.describe({"lines": [], "focus": 5}), "")
 
 
+def read_with_breakpoint(*addrs):
+    """Wie die Konsole: an gesetzten Breakpoints steht im Speicher ein 0xCC statt des Original-Bytes."""
+    def rd(addr, n):
+        data = bytearray(read(addr, n))
+        for a in addrs:
+            if addr <= a < addr + n:
+                data[a - addr] = 0xCC
+        return bytes(data)
+    return rd
+
+
+class BreakpointBytes(unittest.TestCase):
+    def test_apply_overrides_puts_original_bytes_back(self):
+        self.assertEqual(HC.apply_overrides(0x100, b"\xcc\x01\xcc", {0x100: b"\x48", 0x102: b"\x89"}), b"\x48\x01\x89")
+
+    def test_apply_overrides_ignores_addresses_outside_the_read_range(self):
+        self.assertEqual(HC.apply_overrides(0x100, b"\xcc\xcc", {0xFF: b"\x48", 0x102: b"\x89"}), b"\xcc\xcc")
+
+    def test_apply_overrides_handles_multi_byte_originals_across_the_edge(self):
+        self.assertEqual(HC.apply_overrides(0x101, b"\xcc\xcc", {0x100: b"\x11\x22\x33"}), b"\x22\x33")
+
+    def test_without_overrides_data_is_returned_unchanged(self):
+        data = b"\xcc\x90"
+        self.assertIs(HC.apply_overrides(0, data, {}), data)
+        self.assertIs(HC.apply_overrides(0, data, None), data)
+
+    @unittest.skipUnless(AT.HAVE_CAPSTONE, "Capstone fehlt")
+    def test_raw_read_at_a_breakpoint_shows_int3_and_shifts_every_address_after_it(self):
+        """So sah der Fehler aus: int3 (1 Byte) statt des 3-Byte-Befehls - alles dahinter steht an der falschen Adresse."""
+        ctx = HC.build_context(read_with_breakpoint(WRITER), hit("BP", WRITER))
+        rows = {ln["addr"]: ln for ln in ctx["lines"]}
+        self.assertEqual(rows[WRITER]["mnemonic"], "int3")
+        self.assertIn(WRITER + 1, rows)                         # der echte naechste Befehl waere bei WRITER + 3
+        self.assertNotIn(RIP_AFTER, rows)
+
+    @unittest.skipUnless(AT.HAVE_CAPSTONE, "Capstone fehlt")
+    def test_with_original_bytes_the_instruction_and_the_next_address_are_right(self):
+        rd = read_with_breakpoint(WRITER)
+
+        def clean(addr, n):
+            return HC.apply_overrides(addr, rd(addr, n), {WRITER: b"\x89"})
+        ctx = HC.build_context(clean, hit("BP", WRITER))
+        rows = {ln["addr"]: ln for ln in ctx["lines"]}
+        self.assertEqual(rows[WRITER]["op_str"], "dword ptr [rdi + 0x1c], eax")
+        self.assertEqual(rows[WRITER]["size"], 3)
+        self.assertIn(RIP_AFTER, rows)
+        self.assertNotIn(WRITER + 1, rows)
+
+    @unittest.skipUnless(AT.HAVE_CAPSTONE, "Capstone fehlt")
+    def test_breakpoint_on_an_earlier_instruction_does_not_break_the_writer_search(self):
+        bp = BASE + 7                                           # add eax, 5 - zwei Befehle vor dem Schreiber
+        rd = read_with_breakpoint(bp)
+
+        def clean(addr, n):
+            return HC.apply_overrides(addr, rd(addr, n), {bp: b"\x83"})
+        wp = {"addr": 0x701C, "size": 4, "access": "write"}
+        ctx = HC.build_context(clean, hit("WP", RIP_AFTER, 0), wp)
+        self.assertEqual(ctx["writer"]["addr"], WRITER)
+        self.assertEqual(next(ln for ln in ctx["lines"] if ln["addr"] == bp)["mnemonic"], "add")
+
+
 if __name__ == "__main__":
     unittest.main()
