@@ -1,13 +1,17 @@
 """tools_debug_gui.py – Debugger-Tab für das Werkzeug-Fenster."""
+import threading
 import time
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 
+import debug_guide as DG
 import hit_context as HC
+import hit_targets as TG
 import ps5_ext as X
 from debugger import DebugSession
 from disasm_view import DisasmView
-from tools_common import (BG, ACCENT, ERROR, TEXT_DIM, WARN, FONT_MONO, BaseTab, button, label, entry, tree, with_scroll)
+from tools_common import (BG, BG_CARD, ACCENT, ERROR, TEXT, TEXT_DIM, WARN, FONT_MONO, FONT_LABEL, BaseTab, button, label,
+                          entry, tree, with_scroll)
 
 WP_TYPES = {"schreiben": X.WP_WRITE, "lesen/schreiben": X.WP_RDWR, "ausführen": X.WP_EXEC}
 
@@ -23,11 +27,19 @@ class DebugTab(BaseTab):
         self._ctx_token = 0          # nur die zuletzt angeforderte Kontext-Ansicht wird gezeigt
         self._ctx_cache = {}         # iid -> Kontext (Klick auf einen alten Treffer liest nichts neu)
         self._shown_regs = {}        # lwpid -> zuletzt gezeigte Register (fuer die Hervorhebung geaenderter)
+        self.book = TG.TargetBook()  # Ziele (Objekte), die der Befehl bei den Treffern angefasst hat
+        self.only_ea = None          # Filter: nur Treffer auf dieses Ziel zeigen, alle anderen laufen automatisch weiter
+        self._insn_cache = {}        # (Art, RIP) -> Befehlszeile: damit der Filter ohne Speicherlesen entscheiden kann
+        self._target_iid = {}        # Zieladresse -> iid in der ZIELE-Tabelle
 
         top = tk.Frame(self, bg=BG); top.pack(fill="x", padx=8, pady=(8, 4))
         button(top, "ATTACH", self.attach, accent=True).pack(side="left", padx=2)
         button(top, "DETACH", self.detach).pack(side="left", padx=2)
         self.lbl = label(top, "nicht attached"); self.lbl.pack(side="left", padx=12)
+
+        self.lbl_guide = tk.Label(self, text="", bg=BG_CARD, fg=ACCENT, anchor="w", justify="left", wraplength=1100,
+                                  font=FONT_LABEL, padx=8, pady=4)
+        self.lbl_guide.pack(fill="x", padx=8, pady=(0, 4))
 
         run = tk.Frame(self, bg=BG); run.pack(fill="x", padx=8, pady=2)
         button(run, "▶ WEITER", lambda: self._do(lambda: self.sess.resume()), accent=True).pack(side="left", padx=2)
@@ -81,14 +93,47 @@ class DebugTab(BaseTab):
         label(left, "TREFFER (Klick = Register dieses Treffers)").pack(anchor="w")
         fr = tk.Frame(left, bg=BG); fr.pack(fill="x")
         self.hits = tree(fr, [("t", "ZEIT"), ("k", "ART"), ("a", "ADRESSE"), ("th", "THREAD"), ("n", "ANZAHL"),
-                              ("ins", "BEFEHL")], [74, 56, 150, 62, 62, 300], height=4)
+                              ("z", "ZIEL"), ("w", "WERT"), ("ins", "BEFEHL")],
+                         [74, 56, 150, 62, 62, 130, 90, 260], height=4)
         with_scroll(fr, self.hits)
         self.hits.bind("<<TreeviewSelect>>", self._hit_sel)
+        self.hits.tag_configure("newt", foreground=ACCENT)                 # neues Ziel (anderes Objekt als bisher)
+        self.hits.tag_configure("chg", foreground=WARN)                    # gleiches Ziel, anderer Wert als beim letzten Mal
+
+        # Ziele: gleicher Befehl, aber verschiedene Objekte (du, Gegner A, Gegner B ...)
+        label(left, "ZIELE (eine Zeile pro Objekt - so findest du die HP-Leiste, die nur dich betrifft)").pack(
+            anchor="w", pady=(8, 2))
+        trow = tk.Frame(left, bg=BG); trow.pack(fill="x")
+        button(trow, "NUR DIESES ZIEL", self.filter_target, accent=True).pack(side="left", padx=2)
+        button(trow, "ALLE ZEIGEN", self.filter_off).pack(side="left", padx=2)
+        button(trow, "DAS BIN ICH", self.mark_me).pack(side="left", padx=2)
+        button(trow, "WATCH AUF ZIEL", self.watch_target).pack(side="left", padx=2)
+        button(trow, "LEEREN", self.clear_targets).pack(side="left", padx=2)
+        self.v_auto = tk.BooleanVar(value=False)
+        tk.Checkbutton(trow, text="AUTO-WEITER", variable=self.v_auto, bg=BG, fg=TEXT_DIM, selectcolor=BG_CARD,
+                       activebackground=BG, activeforeground=ACCENT, font=FONT_LABEL).pack(side="left", padx=8)
+        label(trow, "MEIN WERT").pack(side="left", padx=(8, 2))
+        self.v_myval = tk.StringVar()
+        entry(trow, self.v_myval, 9).pack(side="left")
+        button(trow, "FINDEN", self.find_mine).pack(side="left", padx=2)
+        self.lbl_filter = label(left, "")
+        self.lbl_filter.pack(anchor="w")
+        self.tgt = tree(left, [("l", "Z"), ("a", "ZIEL-ADRESSE"), ("o", "OBJEKT"), ("v", "WERT"), ("p", "VORHER"),
+                               ("d", "Δ"), ("h", "TREFFER"), ("c", "ÄNDERUNGEN"), ("m", "")],
+                        [44, 140, 140, 90, 90, 70, 64, 90, 50], height=4)
+        self.tgt.pack(fill="x", pady=(2, 0))
+        self.tgt.tag_configure("me", foreground=ACCENT, font=(FONT_MONO[0], FONT_MONO[1], "bold"))
+        self.tgt.tag_configure("match", foreground=WARN)
+        self.tgt.tag_configure("live", foreground=WARN)
 
         # Kontext: Befehle rund um den Treffer, Schreiber und RIP markiert
         label(left, "KONTEXT (Befehle um den Treffer - grün = Schreiber, gelb = RIP)").pack(anchor="w", pady=(8, 2))
-        self.ctxv = DisasmView(left, on_open=self._ctx_open, on_preset=self._ctx_preset, height=11)
+        self.ctxv = DisasmView(left, on_open=self._ctx_open, on_preset=self._ctx_preset, height=8)
         self.ctxv.pack(fill="both", expand=True)
+        self.lbl_explain = tk.Label(left, text="", bg=BG, fg=TEXT, anchor="w", justify="left", wraplength=700,
+                                    font=FONT_LABEL)
+        self.lbl_explain.pack(fill="x", pady=(4, 0))
+        self._guide()
 
         # Register
         label(right, "REGISTER (Doppelklick = ändern, gelb = geändert)").pack(anchor="w")
@@ -99,6 +144,16 @@ class DebugTab(BaseTab):
         self.lbl_stack = label(right, "")
 
     # ---- Hilfen ----
+    def _guide(self):
+        """Hilfezeile oben: was ist als Naechstes zu tun (fuer Einsteiger)."""
+        try:
+            n_t = len(self.book.groups) if hasattr(self.book, "groups") else 0
+            text = DG.next_step(self.sess is not None, len(getattr(self.sess, "bps", {}) or {}),
+                                len(getattr(self.sess, "wps", {}) or {}), len(self.hit_items), n_t)
+            self.lbl_guide.configure(text=text)
+        except Exception:  # noqa: BLE001
+            pass
+
     def _need(self):
         if not self.sess or not self.sess.attached:
             self.log("Erst ATTACH", "warn")
@@ -163,7 +218,9 @@ class DebugTab(BaseTab):
 
     def _attached(self, sess):
         self.sess = sess
+        self.clear_targets()
         self.lbl.configure(text=f"attached  PID {sess.pid}", fg=ACCENT)
+        self._guide()
         self.refresh_threads()
         self._self_test(0.5)
         self._self_test(3.0)
@@ -194,7 +251,8 @@ class DebugTab(BaseTab):
         self.win.app.debug_busy = False
         self.bg(s.detach, lambda _r: (self.lbl.configure(text="nicht attached", fg=TEXT_DIM),
                                       self.bpt.delete(*self.bpt.get_children()),
-                                      self.wpt.delete(*self.wpt.get_children())))
+                                      self.wpt.delete(*self.wpt.get_children()),
+                                      self.lbl_guide.configure(text=DG.next_step(False))))
 
     def shutdown(self):
         if self.sess and self.sess.attached:
@@ -226,6 +284,7 @@ class DebugTab(BaseTab):
         for i, b in sorted(self.sess.bps.items()):
             self.bpt.insert("", "end", values=(i, f"{b['addr']:016X}", f"+{b['addr'] - self.base:X}",
                                                "ja" if b["enabled"] else "nein"))
+        self._guide()
 
     # ---- Watchpoints ----
     def add_wp(self):
@@ -256,9 +315,12 @@ class DebugTab(BaseTab):
         names = {v: k for k, v in WP_TYPES.items()}
         for i, w in sorted(self.sess.wps.items()):
             self.wpt.insert("", "end", values=(i, f"{w['addr']:016X}", w["size"], names.get(w["type"], "?")))
+        self._guide()
 
     # ---- Treffer (kommen aus dem Listener-Thread) ----
     def _on_hit_thread(self, hit):
+        if self._filtered_out(hit):
+            return
         try:
             self.win.app.notifier.hit(hit["kind"], hit["addr"])
         except Exception:  # noqa: BLE001
@@ -270,11 +332,21 @@ class DebugTab(BaseTab):
             time.strftime("%H:%M:%S", time.localtime(hit["time"])), hit["kind"],
             f"{hit['addr']:016X}", hit["lwpid"], hit["count"], ""))
         self.hit_items[iid] = hit
+        self._trim_hits()
         self.hits.selection_set(iid)
         self._fill_regs(hit["regs"], prev=self._prev_hit_regs(iid), lwp=hit["lwpid"])
         self._load_context(hit, iid)
         self.log(f"{hit['kind']} @ {hit['addr']:#x}  Thread {hit['lwpid']}  (#{hit['count']})", "warn")
+        self._guide()
         self.refresh_threads(select=hit["lwpid"])
+
+    def _trim_hits(self, keep=300):
+        """Bei AUTO-WEITER kommen viele Treffer: nur die letzten `keep` behalten."""
+        rows = self.hits.get_children()
+        for iid in rows[keep:]:
+            self.hits.delete(iid)
+            self.hit_items.pop(iid, None)
+            self._ctx_cache.pop(iid, None)
 
     def _hit_sel(self, _e):
         sel = self.hits.selection()
@@ -317,14 +389,22 @@ class DebugTab(BaseTab):
             if iid is not None and self.hits.exists(iid):
                 self._ctx_cache[iid] = ctx
                 self.hits.set(iid, "ins", HC.describe(ctx))
+                self._note_target(hit, ctx, iid)
             if tok == self._ctx_token:
                 self.ctxv.show(ctx)
+                try:
+                    from tools_i18n import lang as _lang
+                    self.lbl_explain.configure(text=DG.explain_hit(ctx, _lang()))
+                except Exception:  # noqa: BLE001
+                    pass
+            self._auto_continue(hit)
 
         def err(e):
             if iid is not None and self.hits.exists(iid):
                 self.hits.set(iid, "ins", "?")
             if tok == self._ctx_token:
                 self.ctxv.show_message(f"Kontext nicht lesbar: {e}")
+            self._auto_continue(hit)
         self.bg(lambda: HC.build_context(read, hit, wp), ok, err)
 
     def _ctx_open(self, line):
@@ -334,6 +414,141 @@ class DebugTab(BaseTab):
 
     def _ctx_preset(self, line):
         self.win.t_dis.recipe_at(line["addr"], f"{line['mnemonic']} {line['op_str']}".strip())
+
+    # ---- Ziele: gleicher Befehl, verschiedene Objekte ----
+    def _note_target(self, hit, ctx, iid):
+        """Ziel eines Treffers in Trefferliste und ZIELE-Tabelle eintragen; Befehl fuer den Filter merken."""
+        insn, t = ctx.get("insn"), ctx.get("target")
+        if insn is not None and hit.get("kind") in ("BP", "WP"):
+            self._insn_cache[(hit["kind"], hit["regs"]["rip"])] = insn
+        if not t:
+            return
+        g, is_new, changed = self.book.add(t, t.get("value"), insn=t.get("writer"), when=hit.get("time"))
+        self.hits.set(iid, "z", f"{g['label']}  {t['ea']:X}")
+        self.hits.set(iid, "w", TG.format_value(t.get("value"), t["width"]))
+        tag = "newt" if is_new else ("chg" if changed else None)
+        if tag:
+            self.hits.item(iid, tags=(tag,))
+        self._fill_targets()
+        self._guide()
+
+    def _filtered_out(self, hit):
+        """True = Treffer gehoert zu einem anderen Ziel als dem gewaehlten: nicht zeigen, Spiel laeuft sofort weiter."""
+        want = self.only_ea
+        if want is None or hit.get("kind") not in ("BP", "WP"):
+            return False
+        insn = self._insn_cache.get((hit["kind"], hit["regs"]["rip"]))
+        t = TG.target_of(insn, hit["regs"]) if insn else None
+        if t is None or t["ea"] == want:                      # unbekannt oder das gesuchte Ziel: ganz normal zeigen
+            return False
+        self.book.skipped += 1
+        self.win.ui(self._show_filter_label)
+        self._resume_async()
+        return True
+
+    def _resume_async(self):
+        sess = self.sess
+
+        def run():
+            try:
+                if sess and sess.attached:
+                    sess.resume()
+            except Exception as e:  # noqa: BLE001
+                self.win.ui(lambda: self.log(f"Auto-Weiter: {e}", "err"))
+        threading.Thread(target=run, daemon=True).start()
+
+    def _auto_continue(self, hit):
+        """AUTO-WEITER: nach dem Eintragen des Treffers das Spiel selbst weiterlaufen lassen."""
+        if self.v_auto.get() and self.sess and self.sess.attached and hit.get("kind") in ("BP", "WP"):
+            self._resume_async()
+
+    def _sel_group(self):
+        sel = self.tgt.selection()
+        if not sel:
+            self.log("Erst eine Zeile in ZIELE wählen", "warn")
+            return None
+        return self.book.groups.get(self._target_iid.get(sel[0]))
+
+    def _show_filter_label(self):
+        if self.only_ea is None:
+            self.lbl_filter.configure(text="", fg=TEXT_DIM)
+            return
+        g = self.book.groups.get(self.only_ea)
+        self.lbl_filter.configure(
+            text=f"FILTER AKTIV: nur {g['label'] if g else ''} @ {self.only_ea:X} - {self.book.skipped} andere Treffer "
+                 f"übersprungen", fg=ACCENT)
+
+    def filter_target(self):
+        g = self._sel_group()
+        if g is None:
+            return
+        self.only_ea = g["ea"]
+        self.book.skipped = 0
+        self._show_filter_label()
+        self.log(f"Filter: nur Ziel {g['label']} @ {g['ea']:#x} - Treffer auf andere Objekte laufen automatisch weiter", "info")
+
+    def filter_off(self):
+        self.only_ea = None
+        self._show_filter_label()
+
+    def mark_me(self):
+        g = self._sel_group()
+        if g is not None:
+            self.book.toggle_me(g["ea"])
+            self._fill_targets()
+
+    def watch_target(self):
+        """Schreib-Watchpoint genau auf das gewaehlte Ziel: trifft nur dieses Objekt."""
+        g = self._sel_group()
+        if g is None:
+            return
+        size = g["width"] if g["ea"] % g["width"] == 0 else 1
+        self.v_wp.set(f"{g['ea']:X}")
+        self.v_wsize.set(str(size))
+        self.v_wtype.set("schreiben")
+        self.add_wp()
+
+    def find_mine(self):
+        """Ziel markieren, dessen Wert dem eingegebenen entspricht (z. B. deine aktuellen HP)."""
+        found = self.book.find_value(self.v_myval.get())
+        ids = {g["ea"] for g in found}
+        self._fill_targets(match=ids)
+        if len(found) == 1:
+            self.log(f"{found[0]['label']} hat den Wert {self.v_myval.get().strip()} - das ist sehr wahrscheinlich dein Ziel", "ok")
+        elif found:
+            self.log(f"{len(found)} Ziele haben diesen Wert - lass dir HP abziehen/heilen und suche erneut", "warn")
+        else:
+            self.log("Kein Ziel mit diesem Wert - erst Treffer sammeln (AUTO-WEITER) oder Wert prüfen", "warn")
+
+    def clear_targets(self):
+        self.book.reset()
+        self.only_ea = None
+        self._insn_cache.clear()
+        self.tgt.delete(*self.tgt.get_children())
+        self._target_iid.clear()
+        self._show_filter_label()
+
+    def _fill_targets(self, match=()):
+        sel = self.tgt.selection()
+        keep = self._target_iid.get(sel[0]) if sel else None       # Adresse merken (Tk macht aus "1E5" gern eine Zahl)
+        self.tgt.delete(*self.tgt.get_children())
+        self._target_iid.clear()
+        for g in self.book.rows():
+            tags = []
+            if g["me"]:
+                tags.append("me")
+            if g["ea"] in match:
+                tags.append("match")
+            iid = self.tgt.insert("", "end", tags=tuple(tags), values=(
+                g["label"], f"{g['ea']:X}", f"{g['base_val']:X}" if g["base_val"] is not None else "-",
+                TG.format_value(g["value"], g["width"]), TG.format_value(g["prev"], g["width"]),
+                TG.delta_text(g["prev"], g["value"], g["width"]), g["hits"], g["changes"],
+                "ICH" if g["me"] else ""))
+            self._target_iid[iid] = g["ea"]
+            if g["ea"] == keep:
+                self.tgt.selection_set(iid)
+        if self.only_ea is not None:
+            self._show_filter_label()
 
     # ---- Threads / Register / Stack ----
     def refresh_threads(self, select=None):

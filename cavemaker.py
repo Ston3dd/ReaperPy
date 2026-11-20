@@ -546,8 +546,8 @@ class Model:
         if n > 1:
             return False, f"Code wird von {n} Methoden geteilt"
         b = self.bound(m.rva)
-        if b is not None and b < 8:
-            return False, "Funktion kürzer als der Hook (8 Byte)"
+        if b is not None and b < 5:
+            return False, "Funktion kürzer als der Hook (5 Byte)"
         return True, ""
 
     # --- Kandidaten ---
@@ -946,7 +946,7 @@ def build_patch(model, ctx, act, mode, value, hook_method=None, name=None):
     owner = act.owner.name if act.owner is not None else hm.cls.name
     nm = name or f"{owner}.{clean_name(act.field.name) if act.field else clean_name(hm.name)} - {what}"
     return PatchDef(nm, offset, hook_addr, False, scaffold["default"], "jmp OriginTarget", scaffold["size"],
-                    blocks, warnings, f"Code-Cave: Hook an {hm.cls.name}.{hm.name}", hook_len=8)
+                    blocks, warnings, f"Code-Cave: Hook an {hm.cls.name}.{hm.name}", hook_len=scaffold["size"])
 
 
 # ======================================================================

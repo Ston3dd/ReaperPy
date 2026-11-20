@@ -212,7 +212,7 @@ class LoggerTab(BaseTab):
         self.b_stop = button(top, "■ STOP", self.stop); self.b_stop.pack(side="left", padx=2)
         button(top, "LEEREN", self.clear).pack(side="left", padx=2)
         button(top, "CSV…", self.export).pack(side="right")
-        self.lbl = label(self, "Aus. Hook: erste ≥8 Byte der Funktion werden durch einen Sprung ersetzt, "
+        self.lbl = label(self, "Aus. Hook: erste ≥5 Byte der Funktion werden durch einen Sprung ersetzt, "
                                "STOP stellt sie zurueck.")
         self.lbl.pack(anchor="w", padx=12)
 
@@ -239,7 +239,7 @@ class LoggerTab(BaseTab):
             return self.log(str(e), "err")
         if not messagebox.askyesno("Logger starten",
                                    f"Funktion {a:#x} patchen (Sprung in Code-Cave)?\nSteht am Funktionsanfang "
-                                   "ein Sprungziel mitten in den ersten 8 Byte, kann das Spiel abstuerzen.",
+                                   "ein Sprungziel mitten in den ersten 5 Byte, kann das Spiel abstuerzen.",
                                    parent=self.win):
             return
         sess = LG.LoggerSession(self.win.app.backend, a, ring, thr)

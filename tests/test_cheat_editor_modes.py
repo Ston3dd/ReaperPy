@@ -172,7 +172,7 @@ class ReturnLen(Base):
         super().tearDown()
 
     def fake_hook(self, size, calls=None):
-        def f(data, addr, min_len=8):
+        def f(data, addr, min_len=5):
             if calls is not None:
                 calls.append((bytes(data), addr))
             return {"size": size}
@@ -191,11 +191,13 @@ class ReturnLen(Base):
         self.assertEqual(self.tab._return_len(), (10, "manual"))
 
     def test_manual_value_below_hook_length_is_rejected(self):
-        self.tab.v["ret"].set("5")
+        self.tab.v["ret"].set("4")
         with self.assertRaises(ValueError) as cm:
             self.tab._return_len()
         self.assertIn("zu klein", str(cm.exception))
-        self.assertIn("8", str(cm.exception))
+        self.assertIn("5", str(cm.exception))
+        self.tab.v["ret"].set("5")                                          # 5 = jmp rel32, reicht
+        self.assertEqual(self.tab._return_len(), (5, "manual"))
 
     def test_manual_value_must_be_a_number(self):
         self.tab.v["ret"].set("abc")
@@ -218,12 +220,12 @@ class ReturnLen(Base):
         self.assertEqual(self.tab._return_len(), (9, "auto"))
 
     def test_too_few_original_bytes_use_the_default(self):
-        self.tab.t_def = FakeText("48 8B 05 00 00 00 00")                  # 7 Byte
-        self.assertEqual(self.tab._return_len(), (8, "default"))
+        self.tab.t_def = FakeText("48 8B 05 00")                  # 4 Byte
+        self.assertEqual(self.tab._return_len(), (5, "default"))
         self.tab.t_def = FakeText("")
-        self.assertEqual(self.tab._return_len(), (8, "default"))
+        self.assertEqual(self.tab._return_len(), (5, "default"))
         self.tab.t_def = FakeText("kein hex")
-        self.assertEqual(self.tab._return_len(), (8, "default"))
+        self.assertEqual(self.tab._return_len(), (5, "default"))
 
     def test_build_json_writes_the_derived_value_for_caves_only(self):
         self.fake_hook(9)

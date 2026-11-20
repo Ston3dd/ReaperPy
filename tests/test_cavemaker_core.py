@@ -180,7 +180,7 @@ class CaveMakerCore(unittest.TestCase):
         import patch_engine as PE
         self.assertTrue(PE.is_cave_patch(rp))
         self.assertEqual(rp.origin_source[0], 0x1000)
-        self.assertEqual(rp.origin_return_offset, 9)
+        self.assertEqual(rp.origin_return_offset, 6)
         self.assertEqual([n for n, _ in rp.labels], ["OriginTarget"])
         self.assertIn("Cave", self.CC.describe(doc))
 
@@ -195,7 +195,7 @@ class CaveMakerCore(unittest.TestCase):
 
         self.assertTrue(variant(lambda v: v.pop(0)), "ohne OriginSource")
         self.assertTrue(any("OriginTarget" in p for p in variant(lambda v: v.pop())), "ohne Cave-Code")
-        self.assertTrue(any("OriginReturn" in p for p in variant(lambda v: v[1].update(offset=7))), "falscher Rueckkehr-Offset")
+        self.assertTrue(any("OriginReturn" in p for p in variant(lambda v: v[1].update(offset=4))), "falscher Rueckkehr-Offset")
         self.assertTrue(any("OriginReturn" in p for p in variant(lambda v: v[0].update(defaultValue=" ".join(["90"] * 12)))),
                         "Rückkehr hinter weniger Bytes, als die Original-Bytes lang sind")
         bad = variant(lambda v: v[2].update(defaultValue="mov esi, 0x64\njmp nirgendwo"))

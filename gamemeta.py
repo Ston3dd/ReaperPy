@@ -200,6 +200,64 @@ def _dump_index_path(directory=None):
     return os.path.join(directory or cache_dir(), "dumps.json")
 
 
+def _list_here(ftp, why):
+    """Inhalt des aktuellen FTP-Ordners (ohne Pfad-Argument): NLST, dann MLSD, dann LIST."""
+    try:
+        names = [str(n) for n in ftp.nlst()]
+        if names:
+            return names
+    except (ftplib.Error, OSError, EOFError) as e:
+        why.append("NLST " + str(e)[:50])
+    if hasattr(ftp, "mlsd"):
+        try:
+            names = [n for n, _facts in ftp.mlsd() if n not in (".", "..")]
+            if names:
+                return names
+        except (ftplib.Error, OSError, EOFError, AttributeError) as e:
+            why.append("MLSD " + str(e)[:50])
+    rows, names = [], []
+    try:
+        ftp.retrlines("LIST", rows.append)
+    except (ftplib.Error, OSError, EOFError, AttributeError) as e:
+        why.append("LIST " + str(e)[:50])
+        return names
+    for r in rows:
+        parts = r.split(None, 8)
+        nm = parts[8] if len(parts) >= 9 else (parts[-1] if parts else "")
+        if nm and nm not in (".", ".."):
+            names.append(nm)
+    return names
+
+
+def listdir(ftp, path, diag=None):
+    """Namen im FTP-Ordner.  Wie FileZilla: erst in den Ordner wechseln (CWD), dann listen - manche Server (ps5-ftpsrv)
+    ignorieren den Pfad bei NLST/LIST und liefern dann das Hauptverzeichnis.  Existiert der Ordner nicht (CWD
+    scheitert), ist die Liste leer.  diag: Liste, in die (Pfad, Ergebnis) geschrieben wird."""
+    diag = diag if diag is not None else []
+    why = []
+    if hasattr(ftp, "cwd"):
+        try:
+            ftp.cwd(path)
+        except (ftplib.Error, OSError, EOFError) as e:
+            diag.append((path, "no such folder (" + str(e)[:40] + ")"))
+            return []
+        try:
+            names = _list_here(ftp, why)
+        finally:
+            try:
+                ftp.cwd("/")
+            except (ftplib.Error, OSError, EOFError):
+                pass
+    else:                                                   # Notfall: Pfad als Argument
+        names = []
+        try:
+            names = [str(n) for n in ftp.nlst(path)]
+        except (ftplib.Error, OSError, EOFError) as e:
+            why.append("NLST " + str(e)[:50])
+    diag.append((path, f"{len(names)} entries" if names else ("empty/" + ", ".join(why) if why else "empty")))
+    return names
+
+
 def index_dumps(ftp, cfg, directory=None, m=None):
     """{Titel-ID: [sce_sys-Ordner]} aus den Dump-Ordnern.  Schon gelesene Ordner kommen aus dem Cache
     (covers/dumps.json); nur neue/umbenannte Ordner werden per FTP gelesen."""
@@ -216,19 +274,14 @@ def index_dumps(ftp, cfg, directory=None, m=None):
     roots = list(cfg.get("dump_roots") or DUMP_ROOTS)
     for root in roots:
         root = str(root).rstrip("/") or "/"
-        try:
-            names = ftp.nlst(root)
-        except (ftplib.Error, OSError, EOFError):
-            if m is not None:
-                m.tried.append((root, "cannot list"))
-            continue
+        names = listdir(ftp, root, m.tried if m is not None else None)
         for n in names:
             base = os.path.basename(str(n).rstrip("/"))
             if not base or base.startswith("."):
                 continue
             folder = f"{root}/{base}"
             tid = known.get(folder)
-            if tid is None:
+            if not tid:                                 # unbekannt oder frueher ohne Ergebnis: neu lesen
                 tid = ""
                 for sub in ("sce_sys/param.json", "param.json"):
                     raw = _try(ftp, f"{folder}/{sub}", MAX_JSON, m or Meta())
@@ -239,8 +292,9 @@ def index_dumps(ftp, cfg, directory=None, m=None):
                 if not tid:
                     mt = TITLE_RE.search(base)          # Notnagel: ID steht im Ordnernamen
                     tid = mt.group(1) if mt else ""
-                known[folder] = tid
-                changed = True
+                if tid:                                 # nur Treffer merken (leere Ergebnisse jedes Mal neu versuchen)
+                    known[folder] = tid
+                    changed = True
             if tid:
                 out.setdefault(tid, []).append(folder)
     if changed:
@@ -362,13 +416,11 @@ def list_titles(host, cfg=None, ftp_factory=None, directory=None):
     if ftp is None:
         return [], "FTP nicht erreichbar: " + err
     found = set()
+    dm = Meta()
     try:
-        found.update(index_dumps(ftp, cfg, directory).keys())
+        found.update(index_dumps(ftp, cfg, directory, dm).keys())
         for root in TITLE_ROOTS:
-            try:
-                names = ftp.nlst(root)
-            except (ftplib.Error, OSError, EOFError):
-                continue
+            names = listdir(ftp, root, dm.tried)
             for n in names:
                 mt = TITLE_RE.search(os.path.basename(str(n).rstrip("/")))
                 if mt:
@@ -378,7 +430,8 @@ def list_titles(host, cfg=None, ftp_factory=None, directory=None):
             ftp.quit()
         except Exception:                                   # noqa: BLE001
             pass
-    return sorted(found), ("" if found else "keine Spiele-Ordner gefunden (" + ", ".join(TITLE_ROOTS) + ")")
+    detail = "; ".join(f"{p}: {r}" for p, r in dm.tried[:14])
+    return sorted(found), ("" if found else "no game folders found - " + detail)
 
 
 def fetch_all(host, cfg=None, progress=None, ftp_factory=None, directory=None, stop=None):

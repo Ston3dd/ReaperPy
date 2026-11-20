@@ -21,6 +21,7 @@ import asm_help as AH
 import asm_recipes as AR
 import reappatch_fmt as RF
 import asm_tools as AT
+import cheat_from_disasm as CD
 import disasm_view as DV
 import hit_context as HC
 import ps5_ext as X
@@ -297,6 +298,7 @@ class DisasmTab(BaseTab):
         button(act, "→ HEX", self.to_hex).pack(side="left", padx=2)
         button(act, "→ CHEAT-EDITOR", self.to_cheat, accent=True).pack(side="right")
         button(act, "ALS CAVE-HOOK", self.to_cave_hook, accent=True).pack(side="right", padx=(0, 8))
+        button(act, "CHEAT BAUEN…", self.build_cheat, accent=True).pack(side="right", padx=(0, 8))
 
     def goto(self, address, focus=None, marks=None, context=False):
         """Ab `address` zeigen.  `focus` = Adresse einer Zeile, die danach sichtbar sein soll; `marks` = {Adresse: 'writer' | 'rip'}
@@ -379,21 +381,37 @@ class DisasmTab(BaseTab):
         else:
             self.win.goto_memory(t)
 
-    def _write(self, address, data, what):
+    def _write_all(self, patches, what):
+        """[(Adresse, Bytes)] schreiben und zurücklesen; die Liste wird danach einmal neu geladen."""
         def job():
-            self.win.client.write_memory(address, data)
-            return self.win.client.read_memory(address, len(data))
-        self.bg(job, lambda back: (self.log(f"{what} @ {address:#x}: {AT.hexdump_line(back)}", "ok"),
-                                   self.run()))
+            out = []
+            for a, d in patches:
+                self.win.client.write_memory(a, d)
+                out.append((a, self.win.client.read_memory(a, len(d))))
+            return out
+
+        def ok(res):
+            for a, back in res:
+                self.log(f"{what} @ {a:#x}: {AT.hexdump_line(back)}", "ok")
+            self.run()
+        self.bg(job, ok)
+
+    def _write(self, address, data, what):
+        self._write_all([(address, data)], what)
 
     def nop(self):
-        sel = self._selected()
-        if not sel:
+        """Markierte Befehle mit NOP füllen.  Getrennte Stellen (Strg-Klick) werden einzeln überschrieben - die Befehle
+        dazwischen bleiben unberührt."""
+        rs = CD.runs(self._selected())
+        if not rs:
             return
-        a = sel[0]["addr"]
-        n = sum(l["size"] for l in sel)
-        if messagebox.askyesno("NOP", f"{n} Byte(s) ab {a:#x} mit NOP (90) füllen?"):
-            self._write(a, b"\x90" * n, "NOP")
+        n = sum(r["size"] for r in rs)
+        if len(rs) == 1:
+            question = f"{n} Byte(s) ab {rs[0]['addr']:#x} mit NOP (90) füllen?"
+        else:
+            question = f"{n} Byte(s) an {len(rs)} Stellen mit NOP (90) füllen?"
+        if messagebox.askyesno("NOP", question):
+            self._write_all([(r["addr"], b"\x90" * r["size"]) for r in rs], "NOP")
 
     def patch(self):
         sel = self._selected()
@@ -491,6 +509,43 @@ class DisasmTab(BaseTab):
                 self.log(f"Hook: {w}", "warn")
         self.bg(job, ok)
 
+    def build_cheat(self):
+        """Markierte Zeilen -> Cheat (NOP oder Cave), vorbereitet im Cheat-Editor; dort TEST AN/AUS und SPEICHERN."""
+        sel = self._selected()
+        if not sel:
+            return self.log("Erst die Zeilen markieren, aus denen der Cheat werden soll", "warn")
+        from tools_buildcheat_gui import ask_build_cheat
+        res = ask_build_cheat(self, sel, self.base)
+        if not res:
+            return
+        rs = CD.runs(sel)
+        cheat = self.win.t_cheat
+
+        def finish():
+            if res["save"]:
+                cheat.save()
+        if res["mode"] == "nop":
+            cheat.clear()                                   # keine alte Signatur / kein alter Cave-Text mitnehmen
+            self.win.to_cheat(CD.nop_draft(rs, self.base, res["name"]))
+            self.log(f"NOP-Cheat vorbereitet: {len(rs)} Stelle(n)", "ok")
+            return finish()
+        plan = CD.cave_plan(rs)
+
+        def job():
+            data = self.win.read_code(plan["start"], max(96, plan["min_len"] + 32))
+            return AT.build_cave_hook(data, plan["start"], min_len=plan["min_len"])
+
+        def ok(r):
+            r["addr"] = plan["start"]
+            self.win.to_cave_hook(r)
+            if res["name"]:
+                cheat.v["name"].set(res["name"])
+            for w in r["warnings"]:
+                self.log(f"Hook: {w}", "warn")
+            self.log(f"Cave vorbereitet: {r['size']} Byte werden überschrieben - die Befehle stehen im Cave-Text, dort ändern", "ok")
+            finish()
+        self.bg(job, ok)
+
     def to_cheat(self):
         sel = self._selected()
         if not sel:
@@ -579,9 +634,9 @@ SIMPLE_HINT = ("Einfach: Die Felder füllen sich meist von selbst - aus dem ASSI
                "Trage einen NAME ein, probiere mit TEST AN und speichere. Signatur und Rücksprung-Länge erledigt ReaperPy.")
 ADVANCED_HINT = "Erweitert: Du siehst Cave-Code, OriginReturn und Signatur und bestimmst sie selbst."
 CAVE_NOTE = "Dieser Cheat nutzt eine Code-Cave ({} Zeilen) - den Code siehst du unter ERWEITERTE OPTIONEN."
-HOOK_MIN = 8        # ein Cave-Hook (jmp rel32 + NOPs) überschreibt immer 8 Byte - OriginReturn kann nicht kleiner sein
+HOOK_MIN = 5        # ein Cave-Hook (jmp rel32 = 5 Byte, dazu NOPs) überschreibt mindestens 5 Byte - OriginReturn kann nicht kleiner sein
 RET_AUTO = "OriginReturn automatisch: {} Bytes (aus den ORIGINAL-Bytes, ganze Befehle)."
-RET_DEFAULT = ("OriginReturn nicht angegeben und ORIGINAL hat weniger als 8 Bytes - ich nehme {}. Das stimmt nur, wenn dort ein "
+RET_DEFAULT = ("OriginReturn nicht angegeben und ORIGINAL hat weniger als 5 Bytes - ich nehme {}. Das stimmt nur, wenn dort ein "
                "Befehl endet; sicherer ist DISASSEMBLER → CHEAT-EDITOR.")
 RET_NAN = "OriginReturn muss eine Zahl sein (oder leer lassen = automatisch)."
 RET_TOO_SMALL = "OriginReturn {} ist zu klein: Der Hook überschreibt immer {} Bytes."
@@ -710,6 +765,11 @@ class CheatTab(BaseTab):
 
     # ---- Übernahme aus anderen Tabs ----
     def fill(self, d):
+        if d.get("name"):
+            self.v["name"].set(d["name"])
+        if d.get("type") in ("patch", "cave"):
+            self.v_type.set(d["type"])
+            self._type()
         if "addr" in d:
             self.v["offset"].set(hexs(d["addr"] - self.base))
         if "default" in d:
@@ -731,7 +791,13 @@ class CheatTab(BaseTab):
         self.t_new.delete("1.0", "end"); self.t_new.insert("1.0", d["new"])
         self.v_type.set("cave")
         self._type()                                            # Cave-Textfeld aktivieren
-        self.t_cave.delete("1.0", "end"); self.t_cave.insert("1.0", d["cave"])
+        self.t_cave.delete("1.0", "end")
+        try:
+            note = AT.hook_overview(d, d["addr"])
+            self.t_cave.insert("1.0", "\n".join("; " + ln for ln in note.splitlines()) + "\n\n")
+        except Exception:
+            pass                                                # Uebersicht ist nur Hilfe - nie den Hook blockieren
+        self.t_cave.insert("end", d["cave"])
         self.log(f"Cave-Hook @ {d['addr']:#x}: {d['size']} Byte überschrieben, "
                  f"OriginReturn = {d['size']}", "ok")
 
@@ -929,7 +995,7 @@ class CheatTab(BaseTab):
                     self.t_cave.insert("end", f"{lbl}:\n")
                 self.t_cave.insert("end", code + "\n")
             if ret:
-                self.v["ret"].set(str(ret.get("offset", 8)))
+                self.v["ret"].set(str(ret.get("offset", HOOK_MIN)))
         else:
             self.v_type.set("patch")
         self._type()

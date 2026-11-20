@@ -154,7 +154,7 @@ def make_plan(rid, data, addr, value=""):
         plan["warnings"].append("Nur am ANFANG einer Funktion sinnvoll")
         return plan
     # set_value -> Cave
-    info = AT.build_cave_hook(data, addr, 8)
+    info = AT.build_cave_hook(data, addr, 5)
     body = [ln.strip() for ln in info["cave"].splitlines() if ln.strip() and not ln.strip().startswith(";")]
     body = [ln for ln in body if ln != "jmp OriginReturn"]
     cheat = [body[0], _set_line(body[0], value)] + body[1:]

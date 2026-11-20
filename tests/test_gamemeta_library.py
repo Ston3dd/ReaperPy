@@ -66,7 +66,7 @@ class T(unittest.TestCase):
 
     def test_no_titles_message(self):
         FTP2.dirs = {}
-        self.assertIn("keine Spiele-Ordner", G.list_titles("h", {}, FTP2)[1])
+        self.assertIn("no game folders found", G.list_titles("h", {}, FTP2)[1])
 
     def test_library_uses_console_cache(self):
         G.fetch_all("h", {}, ftp_factory=FTP2, directory=self.dir)
@@ -142,3 +142,65 @@ class Dumps(unittest.TestCase):
         FTP2.files = {"/data/games/x/sce_sys/param.json": json.dumps({"titleId": "PPSA13197"}).encode()}
         ids, _ = G.list_titles("h", {"dump_roots": ["/data/games"]}, FTP2, self.dir)
         self.assertEqual(ids, ["PPSA13197"])
+
+
+class OnlyList(unittest.TestCase):
+    """Server, der NLST ablehnt, aber LIST kann (und Namen mit Leerzeichen)."""
+    def test_list_fallback_and_diagnostics(self):
+        class F(FTP2):
+            cur = "/"
+
+            def cwd(self, p):
+                if p not in ("/", "/data/homebrew"):
+                    raise ftplib.error_perm("550 no")
+                self.cur = p
+
+            def nlst(self, *a):
+                raise ftplib.error_perm("500 NLST unknown")
+
+            def retrlines(self, cmd, cb):
+                if cmd == "LIST" and self.cur == "/data/homebrew":
+                    cb("drwxr-xr-x 2 root root 0 Nov 15 12:00 Daybreak dump")
+                    cb("drwxr-xr-x 2 root root 0 Nov 15 12:00 .")
+                else:
+                    raise ftplib.error_perm("550 no")
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        FTP2.files = {"/data/homebrew/Daybreak dump/sce_sys/param.json": json.dumps({"titleId": "PPSA06929"}).encode()}
+        G._DOWN.clear()
+        ids, err = G.list_titles("h", {}, F, d)
+        self.assertEqual((ids, err), (["PPSA06929"], ""))
+        FTP2.files = {}
+        diag = []
+        self.assertEqual(G.listdir(F(), "/nix", diag), [])
+        self.assertIn("no such folder", diag[0][1])            # Grund steht in der Diagnose
+
+
+class PathIgnoringServer(unittest.TestCase):
+    """Wie ps5-ftpsrv beim Nutzer: NLST/LIST ignorieren den Pfad und liefern das Hauptverzeichnis - nur CWD zaehlt."""
+    def test_cwd_then_list(self):
+        tree = {"/": ["adm", "dev", "data"], "/data/homebrew": ["PPSA06929-app", "Oceanhorn 2 PPSA04123-app0", "ps5-app-dumper"]}
+
+        class F(FTP2):
+            cur = "/"
+
+            def cwd(self, p):
+                if p not in tree:
+                    raise ftplib.error_perm("550 No such file or directory")
+                self.cur = p
+
+            def nlst(self, *a):                      # Pfad-Argument wird ignoriert
+                return tree[self.cur]
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        G._DOWN.clear()
+        FTP2.files = {"/data/homebrew/PPSA06929-app/sce_sys/param.json": json.dumps({"titleId": "PPSA06929"}).encode()}
+        FTP2.dirs = {}
+        ids, err = G.list_titles("h", {}, F, d)
+        self.assertEqual(ids, ["PPSA04123", "PPSA06929"])           # ID aus param.json bzw. aus dem Ordnernamen
+        diag = []
+        self.assertEqual(G.listdir(F(), "/gibt/es/nicht", diag), [])   # kein Hauptverzeichnis als Ersatz
+        self.assertIn("no such folder", diag[0][1])
+        # alter Negativ-Eintrag ('' im Cache) wird neu gelesen statt fuer immer ignoriert
+        json.dump({"/data/homebrew/PPSA06929-app": ""}, open(os.path.join(d, "dumps.json"), "w", encoding="utf-8"))
+        self.assertIn("PPSA06929", G.list_titles("h", {}, F, d)[0])

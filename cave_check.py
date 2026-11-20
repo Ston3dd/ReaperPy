@@ -23,7 +23,7 @@ import tempfile
 import patch_engine as PE
 from reapatch import ReapPatch, is_patch_file
 
-HOOK_LEN = 8                         # jmp rel32 + NOPs (patch_engine.build_hook)
+HOOK_LEN = 5                         # jmp rel32 + NOPs (patch_engine.build_hook)
 PROBE_DISTANCE = 0x4000000          # Probe-Cave 64 MB hinter dem Hook (rel32-Sprung und rip-relative Zugriffe passen)
 JUMP_RE = re.compile(r"^\s*(?:jmp|call|j[a-z]{1,3}|loop[a-z]*)\s+([A-Za-z_]\w*)\s*$", re.I)
 LABEL_DEF_RE = re.compile(r"^\s*([A-Za-z_]\w*)\s*:\s*$")

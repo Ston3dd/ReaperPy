@@ -373,8 +373,8 @@ def assemble_cave(backend, reapatch, cave_base, hook_addr, return_offset):
 # ==================================================================
 # Hook-Bau (JMP rel32)
 # ==================================================================
-def build_hook(backend, hook_addr, cave_addr, length=8):
-    """Baut einen 8-Byte-Hook: jmp rel32 + nops."""
+def build_hook(backend, hook_addr, cave_addr, length=5):
+    """Baut einen Hook: jmp rel32 (5 Byte) + NOPs bis `length`."""
     distance = cave_addr - (hook_addr + 5)
     if not (-0x80000000 <= distance <= 0x7FFFFFFF):
         raise RuntimeError(
@@ -396,13 +396,17 @@ def build_hook(backend, hook_addr, cave_addr, length=8):
 # ==================================================================
 # Cave-Patch anwenden
 # ==================================================================
+HOOK_MIN = 5            # jmp rel32 = E9 + 4 Byte; kuerzer geht es nicht
+
+
 def _apply_cave(backend, reapatch, hook_addr, size_hint=0x4000):
     if not reapatch.origin_source:
         raise RuntimeError("OriginSource fehlt")
-    return_offset = reapatch.origin_return_offset or 8
+    return_offset = reapatch.origin_return_offset or HOOK_MIN
+    hook_len = max(return_offset, HOOK_MIN)        # der Hook (jmp rel32 + NOPs) deckt genau die kopierten Befehle ab
 
     # --- 1. Original-Bytes lesen ---
-    orig = backend.read(hook_addr, 8)
+    orig = backend.read(hook_addr, hook_len)
     if orig is None:
         raise RuntimeError(f"Hook {hook_addr:#x} nicht lesbar")
     original_bytes = bytes(orig)
@@ -433,7 +437,7 @@ def _apply_cave(backend, reapatch, hook_addr, size_hint=0x4000):
     print("[cave]   Cave-Verifikation OK")
 
     # --- 6. Hook schreiben (KEIN set_rwx!) ---
-    hook_bytes = build_hook(backend, hook_addr, cave_addr, length=8)
+    hook_bytes = build_hook(backend, hook_addr, cave_addr, length=hook_len)
     backend.write(hook_addr, hook_bytes)
     print(f"[cave]   Hook-Bytes: {fmt_bytes(hook_bytes)} @ {hook_addr:#x}")
 
@@ -596,7 +600,7 @@ def _layout_native_cave(backend, rp, cave_base, ext):
         pos += pad
         for name, typ, dv, nv in rp.variables:
             new[name] = pos
-            vb = _var_bytes(typ, dv, getattr(rp, "var_values", {}).get(name, nv))
+            vb = _var_bytes(typ, dv, nv)
             parts.append(vb)
             pos += len(vb)
         if new == addrs:
@@ -703,60 +707,7 @@ def _apply_native(backend, rp, hook_addr, size_hint=0x4000):
     first = done[0]
     return {"hook_addr": addrs[0], "cave_addr": cave_addr, "cave_region_size": size_hint,
             "size": sum(s["size"] for s in done), "original_bytes": first["original_bytes"],
-            "new_bytes": first["new_bytes"], "sites": done, "simple": True, "native": True,
-            "vars": {n: {"addr": names[n], "typ": t} for n, t, _d, _v in rp.variables if n in names}}
-
-
-# ------------------------------------------------------------------
-# Variablen live lesen/schreiben (Werte-Dialog)
-# ------------------------------------------------------------------
-def var_kind(typ, dv, nv):
-    """'switch' (0/1), 'float' oder 'int' - bestimmt das Bedienelement."""
-    def num(x):
-        try:
-            return float(x if not isinstance(x, str) else int(x.strip(), 0))
-        except Exception:
-            return None
-    vals = [num(x) for x in (dv, nv) if x is not None]
-    if typ == 7 or any(isinstance(x, float) and not float(x).is_integer() for x in (dv, nv)):
-        return "float"
-    if vals and all(v in (0.0, 1.0) for v in vals):
-        return "switch"
-    return "int"
-
-
-def var_addrs(backend, rp, state):
-    """name -> Adresse der Variablen im Cave des aktiven Patches (aus dem Zustand, sonst neu berechnet)."""
-    saved = (state or {}).get("vars")
-    if saved:
-        return {n: v["addr"] for n, v in saved.items()}
-    cave = (state or {}).get("cave_addr")
-    if not cave or not rp.variables:
-        return {}
-    addrs = []
-    for i in range(len(rp.sites())):
-        addrs.append(_site_addr(backend, rp, i, addrs[0] if addrs else None))
-    if any(a is None for a in addrs):
-        return {}
-    by_label = {inf["label"]: addrs[k] for k, inf in enumerate(rp.src_info)}
-    ext = {ret: by_label[src] + off for ret, (src, off) in rp.native_returns.items() if src in by_label}
-    _blob, names = _layout_native_cave(backend, rp, cave, ext)
-    return {n: names[n] for n, *_ in rp.variables if n in names}
-
-
-def read_var(backend, addr, typ):
-    raw = backend.read(addr, 4)
-    if raw is None or len(raw) < 4:
-        raise RuntimeError(f"Variable @ {addr:#x} nicht lesbar")
-    raw = bytes(raw)
-    return struct.unpack("<f", raw)[0] if typ == 7 else struct.unpack("<i", raw)[0]
-
-
-def write_var(backend, addr, typ, value):
-    data = _var_bytes(typ, value, value)
-    backend.write(addr, data)
-    if not _verify_write(backend, addr, data, "Variable"):
-        raise RuntimeError(f"Variable @ {addr:#x}: Schreiben fehlgeschlagen")
+            "new_bytes": first["new_bytes"], "sites": done, "simple": True, "native": True}
 
 
 def _detect_native(backend, rp, hook_addr):
@@ -831,7 +782,10 @@ def deactivate_patch(backend, reapatch, state):
             return True
 
     original = state.get("original_bytes")
-    size = state.get("size", 8) if state.get("simple") else 8
+    if state.get("simple"):
+        size = state.get("size", HOOK_MIN)
+    else:
+        size = max((getattr(reapatch, "origin_return_offset", 0) or 0) if reapatch is not None else 0, HOOK_MIN)
     if original is None and reapatch is not None and reapatch.origin_source:
         default_asm = reapatch.origin_source[1]
         try:

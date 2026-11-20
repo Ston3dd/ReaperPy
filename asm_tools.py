@@ -165,16 +165,16 @@ def _rel(delta):
     return f"@hook{'+' if delta >= 0 else '-'}{abs(delta):#x}"
 
 
-def build_cave_hook(data, addr, min_len=8):
+def build_cave_hook(data, addr, min_len=5):
     """Aus den Bytes ab `addr` ein fertiges Cave-Hook-Gerüst bauen.
 
-    Der Hook überschreibt min_len (8) Byte: jmp rel32 + NOPs.  Es werden ganze Befehle kopiert, bis
+    Der Hook überschreibt min_len (mindestens 5) Byte: jmp rel32 + NOPs.  Es werden ganze Befehle kopiert, bis
     mindestens min_len Byte abgedeckt sind; OriginReturn = Summe der Befehlsgrößen.
     RIP-relative Operanden und direkte Sprungziele werden als `@hook±N` geschrieben - der
     Cave-Assembler (patch_engine) rechnet sie für die echte Cave-Position aus.
 
     Rückgabe: dict(size, default, cave, new, warnings)."""
-    lines = disassemble_lines(data, addr, max_insn=16)
+    lines = disassemble_lines(data, addr, max_insn=max(16, min_len))        # min_len > 16 (lange Markierung): mehr Befehle zulassen
     used, total, warnings = [], 0, []
     for l in lines:
         if l["mnemonic"] == "db":
@@ -209,5 +209,41 @@ def build_cave_hook(data, addr, min_len=8):
 
     cave = ("; --- eigener Code hier (vor den Original-Befehlen) ---\n"
             + "\n".join(body) + "\njmp OriginReturn\n")
+    insns = [{"off": l["addr"] - addr, "hex": " ".join(f"{x:02X}" for x in bytes(l["bytes"])),
+              "text": f"{l['mnemonic']} {l['op_str']}".strip(), "cave": body[i]} for i, l in enumerate(used)]
     return {"size": total, "default": " ".join(f"{b:02X}" for b in data[:total]),
-            "cave": cave, "new": "jmp OriginTarget", "warnings": warnings}
+            "cave": cave, "new": "jmp OriginTarget", "warnings": warnings, "insns": insns}
+
+
+T_HEAD = "SO FUNKTIONIERT DER HOOK (macht ReaperPy automatisch)"
+T_OVER = "1) Im Spiel werden {size} Byte ab {addr} ueberschrieben:"
+T_AFTER = "   Dort steht danach: E9 <Sprung zur Cave> (5 Byte){nops}"
+T_NOPS = " + {n}x 90 (NOP, fuellt den Rest)"
+T_WHY = "   Warum mindestens 5 Byte: ein Sprung (jmp rel32) ist 5 Byte lang. Befehle werden nie zerschnitten."
+T_CAVE = "2) In der Cave (freier Platz im Spiel) laeuft dann der Reihe nach:"
+T_A = "     a) DEIN Code (oben im Cave-Text, hier aenderst du etwas)"
+T_B = "     b) die kopierten Original-Befehle (damit das Spiel normal weiterlaeuft):"
+T_C = "     c) jmp OriginReturn = zurueck ins Spiel zu {ret} (OriginReturn = {size})"
+T_OFF = "3) AUS: die {size} Original-Bytes werden zurueckgeschrieben, das Spiel ist wieder wie vorher."
+
+
+def hook_overview(info, addr):
+    """Das GANZE Bild eines Cave-Hooks in einfacher Sprache (ASCII, als ';'-Kommentar tauglich):
+    was im Spiel ueberschrieben wird, was dort stattdessen steht, was die Cave macht, wohin sie zurueckkehrt.
+    `info` = Rueckgabe von build_cave_hook.  Sprache folgt der Oberflaeche."""
+    try:
+        from tools_i18n import translate as t
+    except Exception:  # noqa: BLE001
+        def t(x):
+            return x
+    size = info["size"]
+    nops = max(size - 5, 0)
+    L = [t(T_HEAD), t(T_OVER).format(size=size, addr=f"{addr:#x}")]
+    for i in info.get("insns", []):
+        L.append(f"     +{i['off']:<3} {i['hex']:<24} {i['text']}")
+    L.append(t(T_AFTER).format(nops=t(T_NOPS).format(n=nops) if nops else ""))
+    L += [t(T_WHY), t(T_CAVE), t(T_A), t(T_B)]
+    L += [f"          {i['cave']}" for i in info.get("insns", [])]
+    L.append(t(T_C).format(ret=f"{addr + size:#x}", size=size))
+    L.append(t(T_OFF).format(size=size))
+    return "\n".join(L)

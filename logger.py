@@ -1,6 +1,6 @@
 """logger.py - Function-Logger: protokolliert jeden Aufruf einer Spiel-Funktion.
 
-Die ersten >= 8 Byte der Funktion werden durch einen Sprung in eine Code-Cave ersetzt.  Die Cave
+Die ersten >= 5 Byte der Funktion werden durch einen Sprung in eine Code-Cave ersetzt.  Die Cave
 legt bei jedem Aufruf einen 128-Byte-Eintrag (Argument-Register, Rueckkehradresse, Stack-Argumente,
 xmm0/xmm1) in einen Ringpuffer im Spiel-Speicher, fuehrt die verschobenen Original-Befehle aus und
 springt zurueck.  Das Tool liest den Ringpuffer nur noch aus - das Spiel wird nie angehalten.
@@ -106,7 +106,7 @@ class LoggerSession:
             raise RuntimeError(f"{self.hook:#x} nicht lesbar")
         if code[:1] == b"\xE9" and not force:
             raise RuntimeError("an der Adresse liegt schon ein JMP (anderer Hook?) - erst entfernen")
-        info = asm_tools.build_cave_hook(code, self.hook, 8)
+        info = asm_tools.build_cave_hook(code, self.hook, 5)
         size = info["size"]
         self.original = code[:size]
         size_total = HEADER + self.ring * REC
@@ -126,9 +126,7 @@ class LoggerSession:
         b.write(self.cave, cave_bytes)
         if bytes(b.read(self.cave, len(cave_bytes)) or b"") != cave_bytes:
             raise RuntimeError("Cave-Write nicht verifiziert")
-        hook = pe.build_hook(b, self.hook, self.cave, length=8)
-        if size > 8:
-            hook = hook + b"\x90" * (size - 8)
+        hook = pe.build_hook(b, self.hook, self.cave, length=max(info["size"],5))
         b.write(self.hook, hook)
         time.sleep(0.1)
         self.last, self.lost, self.active = 0, 0, True
