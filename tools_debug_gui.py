@@ -454,7 +454,8 @@ class DebugTab(BaseTab):
                 if sess and sess.attached:
                     sess.resume()
             except Exception as e:  # noqa: BLE001
-                self.win.ui(lambda: self.log(f"Auto-Weiter: {e}", "err"))
+                msg = f"Auto-Weiter: {e}"                       # e ist nach dem except-Block weg - Text jetzt festhalten
+                self.win.ui(lambda: self.log(msg, "err"))
         threading.Thread(target=run, daemon=True).start()
 
     def _auto_continue(self, hit):
