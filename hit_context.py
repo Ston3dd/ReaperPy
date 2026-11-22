@@ -11,10 +11,13 @@ build_context(read, hit, wp) -> dict:
     focus     Adresse, die in der Ansicht in die Mitte soll (Schreiber, sonst RIP)
     writer    Zeile des Schreibers oder None;  how = "address" | "writes" | "guess" | None
     rip       Adresse, an der die CPU steht
+    insn      Zeile des Befehls, dessen Speicherziel gefragt ist (Schreiber bzw. Befehl bei RIP) oder None
+    target    Speicherziel dieses Befehls {ea, width, base, writer, value} (hit_targets.target_of) oder None
     headline  ein Satz in Klartext, was hier passiert ist
 """
 import assist as A
 import asm_tools as AT
+import hit_targets as TG
 
 try:                                    # Texte im EN-Modus uebersetzen; ohne Oberflaechen-Umgebung bleibt es Deutsch
     from tools_i18n import translate as _tr
@@ -133,9 +136,34 @@ def build_context(read, hit, wp=None, disasm=None):
         marks[writer] = "writer"
         writer_line = next((ln for ln in lines if ln["addr"] == writer), None)
 
+    # der Befehl, dessen Speicherziel gefragt ist: bei Datentreffern der Schreiber, sonst der Befehl bei RIP
+    insn = writer_line if data_trap else next((ln for ln in lines if ln["addr"] == rip), None)
+    target = _target(read, insn, regs, wp if data_trap else None)
+
     return {"lines": lines, "marks": marks, "focus": writer if writer_line else rip,
-            "writer": writer_line, "how": how, "rip": rip,
+            "writer": writer_line, "how": how, "rip": rip, "insn": insn, "target": target,
             "headline": _headline(kind, wp, rip, writer_line, how)}
+
+
+def _target(read, insn, regs, wp):
+    """Speicherziel des Befehls (hit_targets.target_of) samt aktuellem Wert; None, wenn der Befehl keins hat.
+
+    Bei einem Datentreffer stehen die Register NACH dem Befehl.  Aendert er sein eigenes Basisregister (mov rax,[rax+8]),
+    stimmt die errechnete Adresse nicht mehr - dann gilt die Adresse des Watchpoints, die der Befehl ja getroffen hat."""
+    if insn is None:
+        return None
+    try:
+        t = TG.target_of(insn, regs)
+    except Exception:  # noqa: BLE001
+        return None
+    if t is None:
+        return None
+    if wp is not None and not (t["ea"] < wp["addr"] + wp["size"] and t["ea"] + t["width"] > wp["addr"]):
+        t["ea"], t["base"] = wp["addr"], None
+        t["width"] = wp["size"] if wp["size"] in (1, 2, 4, 8) else t["width"]
+    raw = _read_best(read, t["ea"], (t["width"],))
+    t["value"] = int.from_bytes(raw, "little") if len(raw) == t["width"] else None
+    return t
 
 
 def reg_changes(prev, cur, names=None):

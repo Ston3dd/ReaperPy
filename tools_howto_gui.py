@@ -183,8 +183,8 @@ class HowToTab(BaseTab):
         if sel and sel[0] < len(self._shown):
             self.show(self._shown[sel[0]], keep_list=True)
 
-    def show(self, slug, keep_list=False):
-        """Anleitung anzeigen (Sprache des Programms); die Suchwoerter werden markiert."""
+    def show(self, slug, keep_list=False, section=()):
+        """Anleitung anzeigen (Sprache des Programms); die Suchwoerter werden markiert; section: zu dieser Ueberschrift springen."""
         lang = tools_i18n.lang()
         try:
             md = howto.load(slug, lang, self.root_dir)
@@ -194,8 +194,23 @@ class HowToTab(BaseTab):
         self._slug, self._lang = slug, lang
         words = [w for w in self.v_search.get().lower().split() if w] if keep_list else ()
         self.render(md, words)
+        if section:
+            self._goto(section)
         if not keep_list:
             self._select_current()
+
+    def _goto(self, hints):
+        """Zur ersten Ueberschrift springen, die zu einem der Begriffe passt (der Tab-Abschnitt in einer geteilten Anleitung)."""
+        try:
+            t = self.txt
+            rng = t.tag_ranges("h2")
+            starts = [rng[i] for i in range(0, len(rng), 2)]
+            heads = [t.get(a, f"{a} lineend") for a in starts]
+            i = howto.find_section(heads, hints)
+            if i is not None:
+                t.yview(t.index(f"{starts[i]} linestart"))
+        except Exception:  # noqa: BLE001 - Springen ist nur Komfort
+            pass
 
     def focus_search(self):
         self.e_search.focus_set()
@@ -216,7 +231,7 @@ class HowToTab(BaseTab):
 class HowToWindow(tk.Toplevel):
     """Eigenes Fenster mit den Anleitungen - braucht keine Verbindung zur PS5."""
 
-    def __init__(self, app, slug=None):
+    def __init__(self, app, slug=None, section=()):
         super().__init__(app.root)
         try:
             import branding
@@ -232,16 +247,16 @@ class HowToWindow(tk.Toplevel):
         self.tab = HowToTab(self, self)
         self.tab.pack(fill="both", expand=True)
         if slug:
-            self.tab.show(slug)
+            self.tab.show(slug, section=section)
         self.apply_language()
 
     def log(self, msg, kind="info"):
         self.app.log_msg(msg, kind)
 
-    def show(self, slug=None):
-        """Fenster nach vorne holen, mit slug direkt diese Anleitung zeigen."""
+    def show(self, slug=None, section=()):
+        """Fenster nach vorne holen, mit slug direkt diese Anleitung zeigen (section: Abschnitt des Tabs)."""
         if slug:
-            self.tab.show(slug)
+            self.tab.show(slug, section=section)
         try:
             self.deiconify()
             self.lift()

@@ -194,3 +194,34 @@ class BreakpointBytes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TargetInContext(unittest.TestCase):
+    """ctx['target']: Zieladresse + Wert, ohne Capstone mit eigenem disasm."""
+
+    def test_breakpoint_on_shared_hp_write_reports_object_and_old_value(self):
+        line = {"addr": WRITER, "size": 3, "bytes": b"", "mnemonic": "mov", "op_str": "dword ptr [rdi + 0x1c], eax"}
+        mem = {0x701C: (100).to_bytes(4, "little"), 0x901C: (35).to_bytes(4, "little")}
+
+        def rd(addr, n):
+            if addr in mem:
+                return mem[addr]
+            return read(addr, n)
+
+        def fake_disasm(data, addr, count=None):
+            return [dict(line, addr=addr)] if addr == WRITER else [{"addr": addr, "size": len(data), "bytes": data,
+                                                                    "mnemonic": "nop", "op_str": ""}]
+        for rdi, want in ((0x7000, 100), (0x9000, 35)):
+            h = hit("BP", WRITER)
+            h["regs"]["rdi"] = rdi
+            h["regs"]["rax"] = 77
+            ctx = HC.build_context(rd, h, None, disasm=fake_disasm)
+            t = ctx["target"]
+            self.assertEqual((t["ea"], t["value"], t["base"]), (rdi + 0x1C, want, rdi))
+            self.assertEqual(ctx["insn"]["addr"], WRITER)
+
+    def test_step_has_no_target(self):
+        def fake_disasm(data, addr, count=None):
+            return [{"addr": addr, "size": 1, "bytes": b"", "mnemonic": "nop", "op_str": ""}]
+        ctx = HC.build_context(read, hit("STEP", BASE), None, disasm=fake_disasm)
+        self.assertIsNone(ctx["target"])

@@ -12,6 +12,8 @@
 
 **Disassembler** - macht aus Bytes lesbare Befehle.
 
+**dump.cs** - Textdatei des Il2CppDumpers mit allen Klassen, Feldern und Methoden eines Unity-Spiels samt Offsets und RVAs.
+
 **eboot.bin** - das Hauptprogramm des Spiels. Sein Anfang im Speicher ist die *Image-Basis*.
 
 **Float** - eine Dezimalzahl. Viele Spiele speichern Leben als Float.
@@ -19,6 +21,8 @@
 **FName** - die Zahl, die ein Unreal-Engine-Spiel für einen Namen benutzt. Item-Trainer sagen damit, welches Item gemeint ist.
 
 **Freeze (Einfrieren)** - immer wieder denselben Wert schreiben, damit er sich nicht ändern kann.
+
+**FTP** - der Weg, auf dem ReaperPy Dateien (Cover, Spielname) von der Konsole holt. Dafür muss ein FTP-Payload laufen. Fürs Cheaten selbst brauchst du ihn nicht.
 
 **GObjects** - die Liste aller Objekte eines Unreal-Engine-Spiels.
 
@@ -46,8 +50,14 @@
 
 **RIP** - das Register, das die Stelle hält, an der der Prozessor gerade arbeitet.
 
+**RVA** - die Adresse einer Methode, vom Anfang des Spielprogramms an gezählt (nicht die echte Adresse im Speicher). Echte Adresse = Image-Basis + RVA. Steht in der Unity-Dump-Datei `dump.cs`.
+
 **SDK-Dump** - die Liste der Klassen und Member eines Unreal-Engine-Spiels, die der Dumper schreibt.
 
 **Titel-ID** - der Code eines Spiels auf der PS5, zum Beispiel `PPSA01234`.
+
+**Treffer (Debugger)** - ein Moment, in dem das Spiel an deinem Breakpoint oder Watchpoint angehalten hat. Die Zeile zeigt, welcher Befehl dort war.
+
+**UObject** - ein Objekt in einem Unreal-Engine-Spiel (Figur, Waffe, Gegenstand). Alle liegen in der Liste GObjects.
 
 **Watchpoint** - hält das Spiel an, wenn etwas eine Adresse liest oder schreibt.

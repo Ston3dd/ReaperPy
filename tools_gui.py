@@ -940,7 +940,12 @@ class CheatTab(BaseTab):
         self.bg(job, ok, fail)
 
     def _sig_len(self):
-        return 8 if self.v_type.get() == "cave" else self._hook_len_hint()
+        if self.v_type.get() != "cave":
+            return self._hook_len_hint()
+        try:
+            return max(self._return_len()[0], HOOK_MIN)     # genau so viele Bytes ueberschreibt der Hook (ab 5)
+        except Exception:
+            return 8
 
     def _save_now(self):
         try:
@@ -1169,7 +1174,7 @@ class AobTab(BaseTab):
 
     def _hook_len(self, rp, hook):
         if is_cave_patch(rp):
-            return 8
+            return max(getattr(rp, "origin_return_offset", 0) or 0, HOOK_MIN)
         try:
             d = asm_to_bytes(self.win.app.backend, rp.origin_source[1], hook)
             n = asm_to_bytes(self.win.app.backend, rp.origin_source[2], hook)
@@ -1428,6 +1433,7 @@ class ToolsWindow(tk.Toplevel):
         by_name = {name: t for t, name in tabs}
         for t, name in tabs:                                       # welche Anleitung gehoert zu welchem Tab ("? HILFE")
             t.howto_topic = howto.topic_for(name)
+            t.howto_section = howto.section_for(name)
         try:
             from tools_start_gui import StartTab
             self.start_tab = StartTab(self.nb, self)
@@ -1676,9 +1682,23 @@ class ToolsWindow(tk.Toplevel):
         except Exception:
             return None
 
+    def current_section(self):
+        """Abschnitts-Begriffe des gerade offenen (Unter-)Tabs, damit ? HILFE zu seiner Ueberschrift springt."""
+        try:
+            w = self.nametowidget(self.nb.select())
+            hints = getattr(w, "howto_section", ())
+            inner = self.adv_nb if w is self.adv_frame else getattr(w, "nb", None)
+            if inner is not None:
+                hints = getattr(self.nametowidget(inner.select()), "howto_section", ()) or hints
+            return hints or ()
+        except Exception:
+            return ()
+
     def open_howto(self, slug=None):
         """Das Anleitungen-Fenster des Hauptfensters zeigen - ohne slug die Anleitung zum aktuellen Tab."""
-        self.app.open_howto(slug or self.current_topic() or "first-steps")
+        if slug:
+            return self.app.open_howto(slug)
+        self.app.open_howto(self.current_topic() or "first-steps", self.current_section())
 
     # ---- Navigation zwischen Tabs ----
     def show_tab(self, tab):

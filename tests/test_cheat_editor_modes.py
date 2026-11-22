@@ -309,7 +309,16 @@ class AutoSignature(Base):
         self.tab.v_type.set("cave")
         self.tab.t_cave = FakeText("  mov eax, 1\n  jmp OriginReturn\n")
         self.tab.save()
-        self.assertEqual(seen["hl"], 8)
+        self.assertEqual(seen["hl"], 7)                  # aus den ORIGINAL-Bytes: ganze Befehle, mindestens 5
+
+    def test_cave_signature_covers_a_typed_return_length(self):
+        seen = {}
+        G.AOB.make_signature = lambda c, m, a, hl: (seen.update(hl=hl), ("AA BB", 0))[1]
+        self.tab.v_type.set("cave")
+        self.tab.t_cave = FakeText("  mov eax, 1\n  jmp OriginReturn\n")
+        self.tab.v["ret"].set("11")
+        self.tab.save()
+        self.assertEqual(seen["hl"], 11)                 # genau so viele Bytes ueberschreibt der Hook
 
     def test_failed_signature_still_saves_and_warns(self):
         def boom(*a):

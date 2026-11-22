@@ -12,6 +12,8 @@
 
 **Disassembler** - turns bytes into readable instructions.
 
+**dump.cs** - text file from Il2CppDumper with all classes, fields and methods of a Unity game including offsets and RVAs.
+
 **eboot.bin** - the game's main program. Its start in memory is the *image base*.
 
 **Float** - a decimal number. Many games store health as float.
@@ -20,7 +22,11 @@
 
 **Freeze** - write the same value again and again so it cannot change.
 
+**FTP** - the way ReaperPy fetches files (cover, game name) from the console. An FTP payload has to be running for that. You do not need it for cheating itself.
+
 **GObjects** - the list of all objects of an Unreal Engine game.
+
+**Hit (debugger)** - a moment when the game stopped at your breakpoint or watchpoint. The row shows which instruction was there.
 
 **Hook** - a place where the game's code is redirected to your code.
 
@@ -46,8 +52,12 @@
 
 **RIP** - the register that holds the place the processor is working on.
 
+**RVA** - the address of a method counted from the start of the game program (not the real memory address). Real address = image base + RVA. Found in the Unity dump file `dump.cs`.
+
 **SDK dump** - the list of an Unreal Engine game's classes and members that the dumper writes.
 
 **Title ID** - the code of a game on the PS5, for example `PPSA01234`.
+
+**UObject** - an object in an Unreal Engine game (character, weapon, item). All of them are in the GObjects list.
 
 **Watchpoint** - stops the game when something reads or writes an address.

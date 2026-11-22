@@ -31,9 +31,21 @@ TAB_TOPICS = {
     "★ WERTE UNITY": "values-and-live", "★ UNITY MANUELL": "values-and-live", "★ UNITY CHEAT-MENÜ": "values-and-live",
     "★ UNITY CAVEMAKER": "values-and-live", "★ UE CAVEMAKER": "values-and-live",
     "POINTER": "pointers", "AOB / UPDATE": "pointers",
-    "DEBUGGER": "debugger", "KERNEL-LOG": "debugger", "FUNKTIONS-LOGGER": "debugger",
+    "DEBUGGER": "debugger", "KERNEL-LOG": "advanced-tools", "FUNKTIONS-LOGGER": "advanced-tools",
     "FORTGESCHRITTEN": "advanced-tools", "SPEICHER": "advanced-tools", "PYTHON-SKRIPT": "advanced-tools",
     "FUNKTION AUFRUFEN": "advanced-tools", "JOURNAL / UNDO": "advanced-tools",
+}
+# Tabs, die sich eine Anleitung teilen, springen beim "? HILFE" zu ihrem Abschnitt: erste Ueberschrift (##), die einen der
+# Begriffe (klein geschrieben, deutsch ODER englisch) enthaelt.
+SECTION_HINTS = {
+    "★ WERTE": ("werte:", "values:"), "★ UE-LIVE": ("live:",), "★ CHEAT-MENÜ": ("cheat-menü:", "cheat menu:"),
+    "★ UE-ENTDECKER": ("entdecker", "discoverer"), "★ UE CAVEMAKER": ("cavemaker",), "UE-AUTO": ("experte", "expert"),
+    "★ WERTE UNITY": ("unity: schnell", "unity: quick"), "★ UNITY MANUELL": ("unity: schnell", "unity: quick"),
+    "★ UNITY CHEAT-MENÜ": ("unity: cheat",), "★ UNITY CAVEMAKER": ("cavemaker",),
+    "SPEICHER": ("speicher", "memory"),
+    "FUNKTION AUFRUFEN": ("funktion aufrufen", "call function"), "PYTHON-SKRIPT": ("python",),
+    "JOURNAL / UNDO": ("journal",), "KERNEL-LOG": ("kernel",), "FUNKTIONS-LOGGER": ("funktions-logger", "function logger"),
+    "AOB / UPDATE": ("aob",), "POINTER": ("pointer:",),
 }
 TOPIC_FILES = re.compile(r"^(\d+)-([a-z0-9][a-z0-9-]*)\.md$")
 
@@ -87,6 +99,21 @@ def load(slug, lang="de", root=None):
 
 def topic_for(tab_name):
     return TAB_TOPICS.get(tab_name)
+
+
+def section_for(tab_name):
+    """Begriffe, mit denen der Hilfe-Knopf die Ueberschrift des Tabs in der geteilten Anleitung findet (leer = Anfang)."""
+    return SECTION_HINTS.get(tab_name, ())
+
+
+def find_section(headings, hints):
+    """headings: Liste der ##-Ueberschriften -> Index der ersten, die einen Begriff enthaelt (Begriffe in Reihenfolge), sonst None."""
+    low = [h.lower() for h in headings]
+    for hint in hints:
+        for i, h in enumerate(low):
+            if hint in h:
+                return i
+    return None
 
 
 # ----------------------------------------------------------------------------------------------------------

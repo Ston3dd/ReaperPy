@@ -119,7 +119,7 @@ Spieler-Instanz erkennt man am Wert bzw. daran, dass sich die Zahl im Spiel mit�
 
 **Funktion aufrufen:** `FUNKTION` = `base+0x1234`, Argumente z. B. `0x10`, `-1`, `base+0x20`, `@buf`, `"Hallo"`. Der Aufruf hält kurz einen Spiel-Thread an und wird **nie automatisch wiederholt**. Nicht benutzen, solange der Debugger das Spiel angehalten hat. Float-Argumente gehen nicht (nur Ganzzahl-Register).
 
-**Logger:** Adresse = Funktionsanfang. Die ersten ≥ 8 Byte werden durch `jmp` in eine Cave ersetzt, **STOP** (oder Fenster schließen) stellt sie zurück. Liegt mitten in diesen Bytes ein Sprungziel, kann das Spiel abstürzen – deshalb die Rückfrage. Der Ring hat 256/1024/4096 Einträge; „VERLOREN“ heißt: Ring zu klein.
+**Logger:** Adresse = Funktionsanfang. Die ersten ≥ 5 Byte werden durch `jmp` in eine Cave ersetzt, **STOP** (oder Fenster schließen) stellt sie zurück. Liegt mitten in diesen Bytes ein Sprungziel, kann das Spiel abstürzen – deshalb die Rückfrage. Der Ring hat 256/1024/4096 Einträge; „VERLOREN“ heißt: Ring zu klein.
 
 **Journal:** zeichnet alles auf, was über die Tools-Verbindung schreibt (nicht: Freeze-Ticks, Schreibzugriffe > 64 KB).
 
