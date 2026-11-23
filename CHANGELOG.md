@@ -2,6 +2,23 @@
 
 Older release notes (German) are in [`docs/history/`](docs/history/).
 
+## Unreleased
+
+**Smarter finding for Unity and Unreal (`smart_find.py`).**
+
+### Added
+- **Names in other languages, abbreviations and typos** are now recognised: `Vida`, `Salud`, `Gesundheit`, `Munición`, `Dinero`, `Kinsen`, `m_Hp`, `curMp`, `Gld`, `Immotal` ... (Spanish, German, French, Italian, Portuguese, romaji, pinyin). Matching is fuzzy (plural, one typo, start of a long word) but never for short words.
+- **The class can carry the meaning:** `Wallet.Pay(int)`, `Geldbeutel.amount` or `Purse.Take(int)` are found although the method / field name alone says nothing. Verbs (spend / add / check / damage) are read in several languages.
+- **Siblings:** a give method with an unhelpful name (`Obtener`, `Zorp` ...) is found when a *remove* method with the same parameters sits next to it. Shown from filter level *normal* if there is real evidence, otherwise only at *off* (flagged as fallback, as before).
+- **Item lists in other languages:** enum names like `Objeto` / `Gegenstand` and item rows like `espada_hierro` / `Schwert_Eisen` count as item lists.
+- **Unity values + cheat menu** get the extra methods / fields (never pre-ticked; the row says *how* it was recognised). **Unreal** members and functions use the same fuzzy / multilingual matching (a little lower score, with the reason).
+- **Obfuscated games:** when most names are unreadable the values tab now says so and what helps (search a visible value in memory) instead of just "nothing found".
+- New tests: `tests/test_smart_find.py`.
+
+### Changed
+- Test fixtures in `tests/test_unity_items_find.py` used the Japanese words *kusuri / buki / tate / yoroi* as examples of "unknown names"; those are known now, so the fixtures use invented words.
+- Enemy / player class detection also knows *Feind, Gegner, Enemigo, Ennemi, Spieler, Jugador ...*.
+
 ## 6.4.0 - 2026-11-15
 
 **Trainer release cards, CAVEMAKER for Unity and Unreal, faster Unity scanning and original Reaper patches that finally load.**

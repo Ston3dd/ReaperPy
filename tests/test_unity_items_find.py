@@ -19,7 +19,7 @@ from test_gui_smoke import FakeWin  # noqa: E402
 
 ITEM_NAMES = ["Sword_Iron", "Sword_Steel", "Sword_Gold", "Potion_Small", "Potion_Big", "Potion_Mega", "Shield_Wood", "Fish_Trout",
               "Fish_Salmon", "Gold", "Wood", "Stone"]
-ODD = ["kusuri_a", "kusuri_b", "kusuri_c", "buki_a", "buki_b", "buki_c", "tate_a", "tate_b", "tate_c", "yoroi_a", "yoroi_b", "yoroi_c"]
+ODD = ["frunk_a", "frunk_b", "frunk_c", "zorb_a", "zorb_b", "zorb_c", "plimt_a", "plimt_b", "plimt_c", "gwexa_a", "gwexa_b", "gwexa_c"]
 
 
 def make_game(tmp, enums, classes=()):
@@ -54,7 +54,7 @@ class Scoring(unittest.TestCase):
     def game(self):
         return make_game(self.tmp, [
             ("E_Obj", ["Obj%02d" % i for i in range(24)]),                 # Name sagt nichts, Werte auch nicht
-            ("Buki", ITEM_NAMES),                                         # Name sagt nichts, Werte sind Items
+            ("Zorb", ITEM_NAMES),                                         # Name sagt nichts, Werte sind Items
             ("ItemID", ITEM_NAMES + ["Herb_Red", "Herb_Blue"]),           # Name sagt Item
             ("Color", ["Red", "Green", "Blue", "Yellow", "Black", "White"]),
             ("UIButtonKind", ["B%d" % i for i in range(30)]),
@@ -81,10 +81,10 @@ class Scoring(unittest.TestCase):
 
     def test_content_alone_finds_a_list_but_ranks_below_name_matches(self):
         g = self.game()
-        buki, real = g.find_class("Buki"), g.find_class("ItemID")
-        self.assertGreater(U.enum_score(buki), 0)
-        self.assertEqual(U.enum_how(buki), "content")
-        self.assertLess(U.enum_score(buki), U.enum_score(real))
+        zorb, real = g.find_class("Zorb"), g.find_class("ItemID")
+        self.assertGreater(U.enum_score(zorb), 0)
+        self.assertEqual(U.enum_how(zorb), "content")
+        self.assertLess(U.enum_score(zorb), U.enum_score(real))
         self.assertEqual(U.enum_how(real), "name")
 
     def test_noise_enums_stay_out(self):
@@ -99,7 +99,7 @@ class Scoring(unittest.TestCase):
     def test_search_finds_the_enum_with_the_item_name(self):
         g = self.game()
         res = U.search_enums(g, "potion small")
-        self.assertEqual({f.probe.name for f in res}, {"Buki", "ItemID"})
+        self.assertEqual({f.probe.name for f in res}, {"Zorb", "ItemID"})
         self.assertEqual(res[0].hits[0], "Potion_Small")
         self.assertEqual(U.search_enums(g, "einhorn"), [])
 
@@ -138,9 +138,9 @@ class FindItems(Base):
         self.assertNotIn("Keine Item-Liste", self.text())
 
     def test_content_only_list_is_used_but_flagged(self):
-        self.build([("Buki", ITEM_NAMES)])
+        self.build([("Zorb", ITEM_NAMES)])
         self.t.find_items()
-        self.assertEqual(self.t.enum.name, "Buki")
+        self.assertEqual(self.t.enum.name, "Zorb")
         self.assertEqual(self.t.found_by, "content")
         self.assertIn("erkannt am Inhalt", self.text())
         self.assertTrue(self.t._help_shown)                               # falls die Vermutung falsch ist: Suche bleibt sichtbar
@@ -170,7 +170,7 @@ class FindItems(Base):
         self.assertIn("1 ITEM TESTEN", self.text())
 
     def test_english(self):
-        self.build([("Buki", ITEM_NAMES)])
+        self.build([("Zorb", ITEM_NAMES)])
         old = tools_i18n.lang()
         tools_i18n.set_lang("en")
         try:
@@ -183,21 +183,21 @@ class FindItems(Base):
 class SearchByName(Base):
     def setUp(self):
         self.build([("Mst", ODD), ("Color", ["Red", "Green", "Blue", "Yellow"]),
-                    ("Shop", ["buki_a", "buki_b", "buki_c", "x", "y", "z"])])
+                    ("Shop", ["zorb_a", "zorb_b", "zorb_c", "x", "y", "z"])])
         self.t.find_items()
         self.assertTrue(self.t._help_shown)
 
     def test_item_name_selects_the_enum_it_lives_in(self):
-        self.t.v_known.set("yoroi b")
+        self.t.v_known.set("gwexa b")
         self.t.search_known()
         self.assertEqual(self.t.enum.name, "Mst")
         self.assertEqual(self.t.found_by, "search")
         self.assertEqual(len(self.t.items), 12)
-        self.assertIn("yoroi_b", self.text())
+        self.assertIn("gwexa_b", self.text())
         self.assertIn("ausgewählt", self.text())
 
     def test_hits_in_several_lists_are_offered_as_candidates(self):
-        self.t.v_known.set("buki")
+        self.t.v_known.set("zorb")
         self.t.search_known()
         self.assertEqual({p.name for p in self.t.cand_probes}, {"Mst", "Shop"})
         other = next(i for i, p in enumerate(self.t.cand_probes) if p.name != self.t.enum.name)
@@ -223,10 +223,10 @@ class SearchByName(Base):
         self.assertIn("mögliche Item-Listen", self.text())
 
     def test_check_all_lists_loads_a_clear_winner(self):
-        self.build([("Buki", ITEM_NAMES + ["Herb_Red", "Herb_Blue"] * 0), ("Color", ["Red", "Green", "Blue", "Yellow"])])
+        self.build([("Zorb", ITEM_NAMES + ["Herb_Red", "Herb_Blue"] * 0), ("Color", ["Red", "Green", "Blue", "Yellow"])])
         self.t.enum, self.t.items = None, []
         self.t.check_all_lists()
-        self.assertEqual(self.t.enum.name, "Buki")
+        self.assertEqual(self.t.enum.name, "Zorb")
         self.assertEqual(self.t.found_by, "content")
 
 

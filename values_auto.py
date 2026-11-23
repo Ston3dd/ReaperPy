@@ -50,8 +50,8 @@ RULES = [
                       r"(getexp|getxp)(for|to)(next)?level", False, None, 1),
 ]
 _COMPILED = [(r, re.compile(r"^(?:" + r.pattern + r")$")) for r in RULES]
-PLAYERISH = re.compile(r"(?i)player|hero|character|avatar|local|protagonist|main|vitals|stats|wallet|inventory")
-ENEMYISH = re.compile(r"(?i)enemy|enemies|monster|boss|npc|mob\b|ai\b|zombie|minion|creep|hostile|foe")
+PLAYERISH = re.compile(r"(?i)player|hero|character|avatar|local|protagonist|main|vitals|stats|wallet|inventory|spieler|jugador|joueur|giocatore")
+ENEMYISH = re.compile(r"(?i)enemy|enemies|monster|boss|npc|mob\b|ai\b|zombie|minion|creep|hostile|foe|feind|gegner|enemigo|ennemi|nemico|monstruo")
 
 Candidate = namedtuple("Candidate", "key cat label method mode value effect score warn default_on")
 
@@ -108,12 +108,47 @@ def find_unity_candidates(game, per_cat=UNITY_PER_CAT):
             found.setdefault(rule.cat, []).append(
                 Candidate(key, rule.cat, f"{cls}.{m.name}", m, mode, value, _effect(mode, value), score, warn, False))
             break
+    _add_smart_candidates(game, found)
     out = []
     for cat in CATEGORY_ORDER:
         lst = sorted(found.get(cat, []), key=lambda c: (-c.score, c.label))[:per_cat]
         for i, c in enumerate(lst):
             out.append(c._replace(default_on=i < 2 and not c.warn and c.score >= 14))
     return out
+
+
+def _add_smart_candidates(game, found):
+    """Was die Namensregeln oben NICHT erkennen (andere Sprache, Abkuerzung, Tippfehler, Name steckt in der Klasse:
+    Wallet.Pay(int), Purse.Take(int)) ergaenzt smart_find.  Nur Methoden, die sich sicher patchen lassen (smart_find.patch_mode);
+    nie vorangehakt - die Zeile sagt, WORAN sie erkannt wurde."""
+    import smart_find as SF
+    if not hasattr(game, "classes"):
+        return
+    have = {c.key for lst in found.values() for c in lst}
+    for um in SF.unity_methods(game):
+        m = um.method
+        if um.conf < 0.6 or D.is_generated(m.cls):
+            continue
+        key = f"{m.cls.full}.{m.name}@{m.rva:x}"
+        if key in have:
+            continue
+        pm = SF.patch_mode(um)
+        if pm is None or um.concept not in CATEGORY_ORDER:
+            continue
+        mode, how = pm
+        try:
+            D.make_patch(m, mode, None)
+        except (ValueError, TypeError):
+            continue
+        cls = m.cls.full
+        enemy = bool(ENEMYISH.search(cls))
+        score = 6 + 6 * um.conf + (3 if (m.cls.image or "").startswith("Assembly-CSharp") else 0) \
+            + (3 if PLAYERISH.search(cls) else 0) - (6 if enemy else 0) - min(m.n_params, 3)
+        warn = "Klassenname sieht nach Gegner aus - würde auch Gegner betreffen" if enemy else ""
+        found.setdefault(um.concept, []).append(
+            Candidate(key, um.concept, f"{cls}.{m.name}", m, mode, None, f"{_effect(mode, None)}  [erkannt: {um.why}]",
+                      round(score, 1), warn, False))
+        have.add(key)
 
 
 def unity_patch_doc(c, module_base, read, author="ReaperPy Werte"):

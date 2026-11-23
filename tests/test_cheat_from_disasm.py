@@ -92,7 +92,7 @@ class NopDraft(unittest.TestCase):
 
 class CavePlan(unittest.TestCase):
     def test_hook_covers_the_whole_first_run_but_at_least_hook_min(self):
-        self.assertEqual(CD.cave_plan(CD.runs([A]))["min_len"], CD.HOOK_MIN)                 # 4 Byte -> mindestens 8
+        self.assertEqual(CD.cave_plan(CD.runs([A]))["min_len"], CD.HOOK_MIN)                 # 4 Byte -> mindestens HOOK_MIN (5)
         long_run = [ln(BASE + 0x2000 + 3 * i, b"\x48\x89\xe5") for i in range(10)]             # 30 Byte
         plan = CD.cave_plan(CD.runs(long_run))
         self.assertEqual((plan["start"], plan["min_len"], plan["ignored"]), (BASE + 0x2000, 30, 0))
@@ -111,7 +111,7 @@ class CavePlan(unittest.TestCase):
     @unittest.skipUnless(AT.HAVE_CAPSTONE, "Capstone fehlt")
     def test_default_min_len_is_unchanged(self):
         r = AT.build_cave_hook(b"\x48\x89\xe5" * 12, BASE)
-        self.assertEqual(r["size"], 9)                                                       # 3 Befehle >= 8 Byte
+        self.assertEqual(r["size"], 6)                                                       # Standard min_len=5 (jmp rel32): 2 Befehle a 3 Byte
 
 
 class Hints(unittest.TestCase):

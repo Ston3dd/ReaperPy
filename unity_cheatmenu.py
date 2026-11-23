@@ -104,10 +104,35 @@ def field_entries(game, per_cat=PER_CAT):
                        score=_score_field(c, f, cat, w),
                        warn="Klassenname sieht nach Gegner aus - betrifft auch Gegner" if VA.ENEMYISH.search(c.full) else "")
             found.setdefault(cat, []).append(e)
+    _add_smart_fields(game, found)
     out = []
     for cat in ("Schalter",) + tuple(DISPLAY.get(k, k) for k in FIELD_CATS):
         out += sorted(found.get(cat, []), key=lambda e: (-e.score, e.label))[:per_cat]
     return out
+
+
+def _add_smart_fields(game, found):
+    """Felder, die die Namensliste nicht kennt (andere Sprache, Abkuerzung wie m_Hp / curMp, Tippfehler, 'amount' in einer
+    Wallet-Klasse) -> mit smart_find.  Die Sicherheit steht in der Notiz; bereits gefundene Felder bleiben unveraendert."""
+    import smart_find as SF
+    have = {e.key for lst in found.values() for e in lst}
+    for uf in SF.unity_fields(game):
+        c, f = uf.cls, uf.field
+        cat = uf.concept
+        if cat not in VA.CATEGORY_ORDER and cat != "Schalter":
+            continue
+        key = f"{c.full}.{f.name}@{f.offset:x}"
+        if key in have or f.offset <= 0:
+            continue
+        w = UC.words(f.name)
+        e = UEntry(key=key, cat=cat, label=f"{c.full}.{f.name}", kind="field", cls=c.full, member=f.name, type=f.prim,
+                   offset=f.offset, cls_obj=c, toggle=f.prim == "bool",
+                   default="1" if f.prim == "bool" else (VA.XP_DEFAULT if cat == VA.XP_CATEGORY else VA.FORCE_DEFAULTS.get(cat, "9999")),
+                   score=_score_field(c, f, cat, w) - 2 + 4 * uf.conf,
+                   warn="Klassenname sieht nach Gegner aus - betrifft auch Gegner" if VA.ENEMYISH.search(c.full) else "",
+                   note=f"erkannt: {uf.why} ({int(uf.conf * 100)} %)")
+        found.setdefault(cat, []).append(e)
+        have.add(key)
 
 
 def patch_entries(game, per_cat=VA.UNITY_PER_CAT):

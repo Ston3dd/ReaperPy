@@ -28,6 +28,7 @@ import struct
 import cave_trainer as TR
 import il2cpp_dump as D
 import item_finder as F
+import smart_find as SF
 import ue_items as IT
 
 # ----------------------------------------------------------------------------------------------------------------
@@ -184,6 +185,8 @@ def enum_score(cls, give_types=()):
         s += 3
     elif ITEM_ENUM.search(cls.full):
         pass                                      # der Namensraum sagt "Item": zaehlt, aber ohne Zuschlag
+    elif SF.name_says_item(name) >= 0.8:
+        s += 3                                    # 'Objeto', 'Gegenstand', 'Buki' ... : der Name sagt Item in einer anderen Sprache
     else:                                         # der NAME sagt nichts (E_Obj, Buki ...): Geben-Methode und INHALT entscheiden
         content = F.content_score([n for n, _v in vals])[0]
         if by_give and len(vals) >= 8:
@@ -235,7 +238,7 @@ def give_enum_types(game, level="normal"):
 def enum_how(cls, give_types=()):
     """Woran wurde dieses Enum als Item-Liste erkannt?  'name' | 'give' (Geben-Methode nimmt es) | 'content' (nur am Inhalt)."""
     name = cls.name.split(".")[-1]
-    if ITEM_ENUM_GOOD.match(name) or ITEM_ENUM.search(name) or ITEM_ENUM.search(cls.full):
+    if ITEM_ENUM_GOOD.match(name) or ITEM_ENUM.search(name) or ITEM_ENUM.search(cls.full) or SF.name_says_item(name) >= 0.8:
         return "name"
     if cls.name in give_types or cls.full in give_types:
         return "give"
@@ -432,8 +435,29 @@ def give_candidates(game, item_enum=None, limit=40, level="strict"):
         if g.score < min_score:
             continue
         ok.append(g)
+    if level != "strict":                          # erst nach dem strengen Durchlauf: die Oberflaeche kennzeichnet das als Notloesung
+        _add_shape_gives(game, item_enum, enums, ok, bad, min_score, only_strong=level == "normal")
     ok.sort(key=lambda g: -g.score)
     return ok[:limit], bad[:limit]
+
+
+def _add_shape_gives(game, item_enum, enums, ok, bad, min_score, only_strong=True):
+    """Geben-Methoden, deren NAME nichts verraet (Obtener, Zufuegen, Xyz ...), aber deren FORM und Klasse es tun
+    (smart_find.give_by_shape: Geschwister einer Entfernen-Methode, Item-Enum + Menge, Inventar-Klasse)."""
+    have = {(g.method.cls.full, g.method.name, g.method.rva) for g in ok}
+    for m, shape_score, why, strong in SF.give_by_shape(game, item_enum):
+        if (m.cls.full, m.name, m.rva) in have or (only_strong and not strong):
+            continue
+        try:
+            g = classify_give(m, enums, item_enum)
+        except UnityTrainerError as e:
+            bad.append((m, str(e)))
+            continue
+        g.score = give_score(g, item_enum) + min(shape_score, 8.0) / 2.0
+        g.note = "erkannt an der Form: " + "; ".join(why)
+        if g.score >= min_score:
+            ok.append(g)
+            have.add((m.cls.full, m.name, m.rva))
 
 
 # ----------------------------------------------------------------------------------------------------------------

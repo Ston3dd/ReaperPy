@@ -7,6 +7,8 @@ Treffer sind Kandidaten, keine Garantie - jede Zeile nennt ihre Gruende.
 import re
 from dataclasses import dataclass, field
 
+import smart_find as SF
+
 # Kategorie -> (Woerter, Gewicht, erlaubte Typen)
 NUM = {
     "float",
@@ -320,8 +322,12 @@ def classify_member(m, cls_name, wrap=None):
         hit = [x for x in w if x in kw]
         joined = "".join(w)
         sub = [k for k in kw if len(k) >= 6 and k in joined]
+        fuzzy = False
         if not hit and not sub:
-            continue
+            hit = SF.ue_member_hits(w, cat, kw)       # Abkuerzung / Tippfehler / andere Sprache (smart_find)
+            if not hit:
+                continue
+            fuzzy = True
         hit = hit or sub
         if cat == "Währung" and hit == ["points"] and any(x in POINT_OWNERS for x in w):
             continue  # SkillPoints/PerkPoints sind Erfahrung, kein Geld
@@ -332,6 +338,9 @@ def classify_member(m, cls_name, wrap=None):
             continue
         sc = float(weight)
         reasons = [f"Name enthält '{hit[0]}'"]
+        if fuzzy:
+            sc -= 1.0
+            reasons = [f"Name erinnert an '{hit[0]}' (Abkürzung / Schreibweise / andere Sprache)"]
         if gas:
             sc += 2
             reasons.append("GAS-Attribut (CurrentValue +0xC)" if "gameplayattributedata" in m.type.lower() else "Zahlen-Struct: " + m.type.replace("struct ", ""))
@@ -404,6 +413,11 @@ def find_candidates(sdk, min_score=4.0, include_inherited=False, only_classes=No
     return out
 
 
+_SMART_FUNC_CAT = {(SF.LEBEN, "damage"): "Schaden", (SF.LEBEN, "add"): "Leben", (SF.MUNITION, "spend"): "Munition",
+                   (SF.MUNITION, "add"): "Munition", (SF.GELD, "spend"): "Währung", (SF.GELD, "add"): "Währung",
+                   (SF.XP, "add"): "Erfahrung", (SF.AUSDAUER, "spend"): "Ausdauer", (SF.AUSDAUER, "add"): "Ausdauer"}
+
+
 def find_functions(sdk, only_classes=None):
     """Funktionen, die nach Cheat-Zielen klingen -> [(klasse, funktion, kategorie, signatur)]."""
     out = []
@@ -418,6 +432,11 @@ def find_functions(sdk, only_classes=None):
                     pen = any(b in cl for b in BAD_CLASS)
                     out.append((name, fn, cat, sig, pen))
                     break
+            else:                                       # kein festes Wort passt: Konzept + Verb (smart_find, mehrsprachig)
+                concept, role = SF.ue_function_role(fn)
+                cat = _SMART_FUNC_CAT.get((concept, role))
+                if cat:
+                    out.append((name, fn, cat, sig, any(b in name.lower() for b in BAD_CLASS)))
     out.sort(key=lambda t: (t[4], t[2], t[0], t[1]))
     return [(a, b, c, d) for a, b, c, d, _p in out]
 

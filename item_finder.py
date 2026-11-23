@@ -54,6 +54,11 @@ anim animation montage sound sfx vfx fx audio bgm voice music particle niagara w
 dialog dialogue subtitle cutscene sequence level map stage trigger input key_binding keybinding localization string text
 curve spline navmesh collision physics weather sky light shader material_instance socket bone skeleton
 """.split())
+try:                                                  # Item-Woerter anderer Sprachen (espada, schwert, kusuri ...)
+    import smart_find as _SF
+    ROW_ITEM_WORDS = ROW_ITEM_WORDS | _SF.ITEM_ROW_WORDS
+except Exception:  # noqa: BLE001 - die Erkennung bleibt auch ohne das Zusatzmodul nutzbar
+    pass
 GENERIC_FIRST = frozenset({"item", "items", "dt", "row", "data", "id", "e", "i", "t", "mst", "tbl"})
 
 

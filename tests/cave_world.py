@@ -118,6 +118,9 @@ class GasBackend:
     def set_rwx(self, addr, size):
         return True
 
+    def set_rw(self, addr, size):          # wie ps5_backend.PS5Backend.set_rw (patch_engine.restore ruft es auf)
+        return True
+
     def get_maps(self, force=False):
         return [(self.base, self.base + self.SIZE, 7)]
 

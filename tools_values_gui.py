@@ -19,6 +19,7 @@ import cave_trainer as TR
 import cheatmenu as M
 import cheatmenu_cave as CV
 import il2cpp_dump as D
+import smart_find as SF
 import tools_i18n as T
 import ue_quick as Q
 import values_auto as VA
@@ -232,10 +233,11 @@ class ValuesTab(BaseTab):
             self.on = [c.default_on for c in cands]
             self.fill()
             n = len(cands)
+            hint = "" if n else SF.no_result_hint(game, T.lang())          # z. B. "Namen verschleiert" + was dann hilft
             self._found(f"✔ {n} Methoden erkannt (Namenserkennung). Haken setzen, was mit soll - angehakt sind die "
                         "wahrscheinlichsten für den Spieler." if n else
                         "✗ Keine passenden Methoden gefunden (das Spiel nutzt andere Namen). Im Tab UNITY lässt sich von Hand "
-                        "suchen.", ACCENT if n else WARN)
+                        "suchen." + (" " + hint if hint else ""), ACCENT if n else WARN)
 
         def fail(e):
             self._busy = False
