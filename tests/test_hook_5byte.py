@@ -37,6 +37,7 @@ class Overview(unittest.TestCase):
                 tools_i18n.LANG = "de"
 
 
+@unittest.skipUnless(W.TOOLCHAIN, "keine Toolchain (Linux x86-64 mit as/ld/objdump)")
 class FiveByteEngine(unittest.TestCase):
     def test_hook_is_exactly_five_bytes_and_restores(self):
         import cave_check as CC
